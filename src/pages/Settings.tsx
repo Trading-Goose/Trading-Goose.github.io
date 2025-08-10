@@ -42,8 +42,7 @@ import {
   X,
   Info,
   RefreshCw,
-  DollarSign,
-  Loader2
+  DollarSign
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-supabase";
 import { supabaseHelpers, supabase } from "@/lib/supabase";
@@ -1076,9 +1075,9 @@ export default function SettingsPage() {
   if (authChecking || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-          <p className="text-muted-foreground">Loading settings...</p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );

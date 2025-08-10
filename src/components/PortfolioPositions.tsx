@@ -50,6 +50,20 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   };
 
   const fetchPositions = async () => {
+    // Check if Alpaca API is configured
+    const isPaper = apiSettings?.alpaca_paper_trading ?? true;
+    const hasAlpacaConfig = isPaper 
+      ? (apiSettings?.alpaca_paper_api_key && apiSettings?.alpaca_paper_secret_key)
+      : (apiSettings?.alpaca_live_api_key && apiSettings?.alpaca_live_secret_key);
+    
+    if (!hasAlpacaConfig) {
+      // Don't show error, just keep positions empty when API is not configured
+      setPositions([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -71,7 +85,11 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       setLastRefresh(new Date());
     } catch (err) {
       console.error('Error fetching positions:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch positions');
+      // Only show error if it's not a configuration issue
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch positions';
+      if (!errorMessage.includes('Edge Function returned')) {
+        setError(errorMessage);
+      }
       // Keep positions empty if API fails
       setPositions([]);
     } finally {
@@ -145,7 +163,10 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               {positions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-4">
-                    {loading ? "Loading positions..." : "No positions found"}
+                    {loading ? "Loading positions..." : 
+                     !apiSettings?.alpaca_paper_api_key && !apiSettings?.alpaca_live_api_key ? 
+                     "Configure Alpaca API in Settings to view positions" : 
+                     "No positions found"}
                   </TableCell>
                 </TableRow>
               ) : (

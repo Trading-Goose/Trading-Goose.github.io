@@ -110,7 +110,9 @@ export const useAuth = create<AuthState>()(
           console.log('Logout complete');
           
           // Force reload to clear any remaining state
-          window.location.href = '/';
+          // Use the base URL from environment or default to current origin
+          const basePath = import.meta.env.BASE_URL || '/';
+          window.location.href = basePath;
         } catch (error) {
           console.error('Logout error:', error);
           // Even if there's an error, clear local state

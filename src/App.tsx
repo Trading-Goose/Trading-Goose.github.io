@@ -30,13 +30,16 @@ const AppRoutes = () => {
 
 const App = () => {
   // Auth state is managed in auth-supabase.ts
+  
+  // Get basename from Vite's base configuration
+  const basename = import.meta.env.BASE_URL || '/';
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter basename={basename}>
           <AppRoutes />
         </BrowserRouter>
       </TooltipProvider>

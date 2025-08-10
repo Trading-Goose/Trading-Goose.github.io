@@ -40,7 +40,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           # Set base path for GitHub Pages
           PUBLIC_URL: /${{ github.event.repository.name }}/
-        run: npm run build:gh-pages
+        run: npm run build
         
       - name: Setup Pages
         uses: actions/configure-pages@v4

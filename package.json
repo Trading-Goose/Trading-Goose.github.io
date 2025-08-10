@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "build:gh-pages": "vite build --base=/TradingGoose/",
     "lint": "eslint .",
     "preview": "vite preview",
     "preview:gh-pages": "vite preview --base=/TradingGoose/"

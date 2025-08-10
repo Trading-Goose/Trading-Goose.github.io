@@ -1,0 +1,251 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Premium Dark Theme with Subtle Gold Accents */
+    --background: 220 15% 5%;
+    --foreground: 210 10% 95%;
+
+    --card: 220 15% 8%;
+    --card-foreground: 210 10% 95%;
+
+    --popover: 220 15% 10%;
+    --popover-foreground: 210 10% 95%;
+
+    --primary: 45 90% 51%;
+    --primary-foreground: 220 15% 5%;
+    --primary-glow: 45 85% 58%;
+
+    --secondary: 220 15% 13%;
+    --secondary-foreground: 210 10% 95%;
+
+    --muted: 215 15% 17%;
+    --muted-foreground: 215 10% 65%;
+
+    --accent: 45 75% 48%;
+    --accent-foreground: 220 15% 5%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 10% 95%;
+
+    --border: 215 15% 20%;
+    --input: 220 15% 11%;
+    --ring: 45 90% 51%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 220 15% 7%;
+    --sidebar-foreground: 210 10% 95%;
+    --sidebar-primary: 45 90% 51%;
+    --sidebar-primary-foreground: 220 15% 5%;
+    --sidebar-accent: 220 15% 13%;
+    --sidebar-accent-foreground: 210 10% 95%;
+    --sidebar-border: 215 15% 20%;
+    --sidebar-ring: 45 90% 51%;
+
+    /* Trading specific colors */
+    --buy: 142 70% 45%;
+    --buy-foreground: 210 10% 95%;
+    --sell: 0 72% 51%;
+    --sell-foreground: 210 10% 95%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(45 90% 51%), hsl(45 85% 58%));
+    --gradient-success: linear-gradient(135deg, hsl(142 70% 45%), hsl(142 75% 55%));
+    --gradient-danger: linear-gradient(135deg, hsl(0 72% 51%), hsl(0 75% 60%));
+
+    /* Shadows */
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.15);
+    --shadow-elevated: 0 10px 30px -5px hsl(220 25% 5% / 0.8);
+
+    /* Agent status colors */
+    --agent-analyst: 210 70% 50%;
+    --agent-researcher: 45 70% 50%;
+    --agent-trader: 142 60% 45%;
+    --agent-risk: 0 72% 51%;
+
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    /* Dark mode with subtle gold accents */
+    --background: 220 15% 5%;
+    --foreground: 210 10% 95%;
+    --card: 220 15% 8%;
+    --card-foreground: 210 10% 95%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Premium button styles with subtle accents */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm hover:shadow-md transition-all duration-200 rounded-md px-4 py-2;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border transition-all duration-200 rounded-md px-4 py-2;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-accent hover:text-accent-foreground transition-colors duration-200 rounded-md px-4 py-2;
+  }
+
+  /* Card styles with subtle depth */
+  .card-enhanced {
+    @apply bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-all duration-200;
+  }
+
+  /* Subtle glow effects */
+  .glow-subtle {
+    @apply shadow-sm hover:shadow-md transition-shadow duration-300;
+  }
+
+  /* Premium gradient backgrounds */
+  .bg-premium {
+    @apply bg-gradient-to-br from-background via-card to-background;
+  }
+
+  /* Enhanced input fields */
+  .input-enhanced {
+    @apply bg-input border border-border focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-md transition-all duration-200;
+  }
+
+  /* Subtle gradient border */
+  .gradient-border {
+    @apply relative;
+    background: linear-gradient(var(--background), var(--background)) padding-box,
+              linear-gradient(90deg, hsl(var(--primary)/0.3), hsl(var(--accent)/0.3)) border-box;
+    border: 1px solid transparent;
+  }
+
+  /* Hover lift effect */
+  .hover-lift {
+    @apply transition-transform duration-200 hover:-translate-y-0.5;
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    @apply bg-card/80 backdrop-blur-sm border border-border/50;
+  }
+
+  /* Premium text gradient */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+  }
+
+  /* Status indicators - keeping original colors */
+  .status-active, .status-success {
+    @apply bg-green-600 text-white border border-green-700;
+  }
+
+  .status-pending, .status-warning {
+    @apply bg-yellow-600 text-white border border-yellow-700;
+  }
+
+  .status-error, .status-danger {
+    @apply bg-red-600 text-white border border-red-700;
+  }
+  
+  .status-info {
+    @apply bg-blue-600 text-white border border-blue-700;
+  }
+  
+  .status-neutral {
+    @apply bg-gray-600 text-white border border-gray-700;
+  }
+
+  /* Navigation item hover effects */
+  .nav-item {
+    @apply relative px-4 py-2 text-muted-foreground hover:text-foreground transition-colors duration-200 
+           after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:scale-x-0 hover:after:scale-x-100 
+           after:bg-primary after:transition-transform after:duration-200;
+  }
+
+  /* Premium badge */
+  .badge-premium {
+    @apply bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-md text-xs font-medium;
+  }
+
+  /* Section dividers */
+  .divider-subtle {
+    @apply h-px bg-gradient-to-r from-transparent via-border to-transparent;
+  }
+
+  /* Scrollbar customization */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/30 rounded-full hover:bg-primary/50 transition-colors;
+  }
+
+  /* Additional utility classes */
+  .transition-smooth {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  .shadow-premium {
+    box-shadow: 0 10px 40px -10px hsl(var(--primary) / 0.1);
+  }
+
+  .border-gradient {
+    border-image: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent))) 1;
+  }
+
+  /* Focus styles */
+  .focus-visible-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* Table enhancements */
+  .table-hover tbody tr {
+    @apply hover:bg-muted/50 transition-colors;
+  }
+
+  /* Loading animations */
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s ease-in-out infinite;
+  }
+
+  /* Gradient animations */
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite;
+  }
+}
+
+
+

@@ -32,6 +32,21 @@
         }
       }(window.location))
     </script>
+    
+    <!-- GitHub OAuth redirect handler -->
+    <script type="text/javascript">
+      // Handle GitHub OAuth redirect that drops the /TradingGoose/ path
+      (function() {
+        // Check if we have an access_token in the hash but we're at the wrong path
+        if (window.location.hash && window.location.hash.includes('access_token=')) {
+          // If we're at the root but should be at /TradingGoose/
+          if (window.location.pathname === '/' || !window.location.pathname.includes('/TradingGoose')) {
+            // Redirect to the correct path with the hash intact
+            window.location.replace('/TradingGoose/' + window.location.hash);
+          }
+        }
+      })();
+    </script>
   </head>
 
   <body>

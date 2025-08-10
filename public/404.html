@@ -6,18 +6,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TradingGoose AI</title>
     <script>
-      // Single Page Apps for GitHub Pages
-      // This script redirects all 404s to index.html for client-side routing
-      const pathSegmentsToKeep = 1; // For repo pages (username.github.io/repo-name)
-      
-      const l = window.location;
-      l.replace(
-        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
-        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
-        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-        l.hash
-      );
+      // Check if this is a GitHub OAuth redirect first
+      if (window.location.hash && window.location.hash.includes('access_token=')) {
+        // Redirect directly to /TradingGoose/ with the hash
+        window.location.replace('/TradingGoose/' + window.location.hash);
+      } else {
+        // Single Page Apps for GitHub Pages
+        // This script redirects all 404s to index.html for client-side routing
+        const pathSegmentsToKeep = 1; // For repo pages (username.github.io/repo-name)
+        
+        const l = window.location;
+        l.replace(
+          l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+          l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+          l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+          (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+          l.hash
+        );
+      }
     </script>
   </head>
   <body>

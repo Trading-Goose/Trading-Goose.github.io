@@ -102,10 +102,15 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setError("");
     setIsLoading(true);
 
+    // Construct the correct redirect URL for GitHub Pages
+    const baseUrl = window.location.origin;
+    const basePath = import.meta.env.BASE_URL || '/';
+    const redirectTo = basePath === '/' ? baseUrl : `${baseUrl}${basePath}`.replace(/\/$/, '');
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
-        redirectTo: window.location.origin
+        redirectTo: redirectTo
       }
     });
 

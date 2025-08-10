@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // These should be in your .env file
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Debug: Log the configuration (remove in production)
 if (!supabaseUrl || !supabasePublishableKey) {
@@ -143,7 +143,7 @@ export const supabaseFunctions = {
     const { data, error } = await supabase.functions.invoke('analyze-stock', {
       body: { ticker, date }
     });
-    
+
     if (error) throw error;
     return data;
   },
@@ -153,7 +153,7 @@ export const supabaseFunctions = {
     const { data, error } = await supabase.functions.invoke('analyze-portfolio', {
       body: { tickers, date }
     });
-    
+
     if (error) throw error;
     return data;
   }
@@ -164,7 +164,7 @@ export const supabaseHelpers = {
   // Get or create API settings for a user
   async getOrCreateApiSettings(userId: string): Promise<ApiSettings | null> {
     console.log('getOrCreateApiSettings called for user:', userId);
-    
+
     try {
       // First try to get existing settings
       console.log('Fetching api_settings for user:', userId);
@@ -180,7 +180,7 @@ export const supabaseHelpers = {
         console.log('Found existing settings:', existing);
         return existing;
       }
-      
+
       // If no settings exist (PGRST116 error), create default ones
       if (fetchError?.code === 'PGRST116') {
         console.log('No settings found, creating defaults...');
@@ -220,7 +220,7 @@ export const supabaseHelpers = {
         hint: fetchError?.hint,
         userId
       });
-      
+
       // If it's a different error, still try to create settings
       console.log('Attempting to create settings despite error...');
       const defaultSettings = {
@@ -291,10 +291,10 @@ export const supabaseHelpers = {
     try {
       // Set a timeout for the session check
       const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Session check timeout')), 5000)
       );
-      
+
       const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
       return result;
     } catch (error) {

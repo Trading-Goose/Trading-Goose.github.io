@@ -1352,7 +1352,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
 
               <Tabs defaultValue={isLiveAnalysis ? "actions" : "insights"} className="flex-1">
                 <div className="px-6 pt-4 pb-4">
-                  <TabsList className="grid w-full grid-cols-4 max-w-3xl mx-auto">
+                  <TabsList className="grid w-full grid-cols-3 max-w-3xl mx-auto">
                     <TabsTrigger 
                       value="actions" 
                       className="flex items-center gap-2"
@@ -1373,13 +1373,6 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                     >
                       <Brain className="w-4 h-4" />
                       Insights
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="messages" 
-                      className="flex items-center gap-2"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      Messages
                     </TabsTrigger>
                   </TabsList>
                 </div>
@@ -2001,65 +1994,6 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                           <Brain className="w-12 h-12 mb-4 opacity-20" />
                           <p>No insights available yet</p>
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    <TabsContent value="messages" className="mt-6 space-y-2">
-                      {console.log('Messages tab - total messages:', analysisData.messages?.length)}
-                      {console.log('First 3 messages:', analysisData.messages?.slice(0, 3))}
-                      {analysisData.messages?.length > 0 ? (
-                        analysisData.messages.map((message: any, index: number) => {
-                          const Icon = getMessageIcon(message.type);
-                          
-                          // Ensure message content is a string
-                          let messageContent = message.message;
-                          if (typeof messageContent === 'object' && messageContent !== null) {
-                            messageContent = JSON.stringify(messageContent, null, 2);
-                            console.warn(`Message ${index} from ${message.agent} was an object, converting to string`);
-                          }
-                          
-                          return (
-                            <div
-                              key={index}
-                              className={`rounded-lg border p-4 ${
-                                message.type === 'error'
-                                  ? 'bg-destructive/5 border-destructive/20'
-                                  : message.type === 'decision'
-                                  ? 'bg-primary/5 border-primary/20'
-                                  : message.type === 'debate'
-                                  ? 'bg-orange-50 dark:bg-orange-950/10 border-orange-200 dark:border-orange-800'
-                                  : 'bg-muted/50'
-                              }`}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className={`mt-0.5 ${
-                                  message.type === 'error' ? 'text-destructive' :
-                                  message.type === 'decision' ? 'text-primary' :
-                                  message.type === 'debate' ? 'text-orange-600 dark:text-orange-400' :
-                                  'text-muted-foreground'
-                                }`}>
-                                  <Icon className="w-4 h-4" />
-                                </div>
-                                <div className="flex-1 space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-sm">{message.agent}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {new Date(message.timestamp).toLocaleTimeString()}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm">
-                                    <MessageRenderer content={messageContent} />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                          <MessageCircle className="w-12 h-12 mb-4 opacity-20" />
-                          <p>No messages available yet</p>
                         </div>
                       )}
                     </TabsContent>

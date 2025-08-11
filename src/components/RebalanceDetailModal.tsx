@@ -624,17 +624,17 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         // Transform recommended positions from rebalance plan
         // Look for positions in multiple possible locations
-        let positionsArray = rebalancePlan.positions || 
-                           rebalancePlan.recommendedPositions || 
-                           rebalancePlan.recommended_positions ||
-                           rebalancePlan.trades ||
-                           rebalancePlan.orders ||
-                           rebalancePlan.trade_orders ||
-                           rebalanceRequest.positions ||
-                           rebalanceRequest.recommended_positions ||
-                           rebalanceRequest.trades ||
-                           rebalanceRequest.orders ||
-                           [];
+        let positionsArray = rebalancePlan.positions ||
+          rebalancePlan.recommendedPositions ||
+          rebalancePlan.recommended_positions ||
+          rebalancePlan.trades ||
+          rebalancePlan.orders ||
+          rebalancePlan.trade_orders ||
+          rebalanceRequest.positions ||
+          rebalanceRequest.recommended_positions ||
+          rebalanceRequest.trades ||
+          rebalanceRequest.orders ||
+          [];
 
         // If positions are empty but we have a rebalance plan with trade decisions, try to extract from there
         if (positionsArray.length === 0 && rebalancePlan.tradeDecisions) {
@@ -645,7 +645,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         if (positionsArray.length === 0 && rebalancePlan.portfolio_changes) {
           positionsArray = rebalancePlan.portfolio_changes;
         }
-        
+
         // Also check for camelCase variations
         if (positionsArray.length === 0 && rebalancePlan.tradeOrders) {
           positionsArray = rebalancePlan.tradeOrders;
@@ -659,7 +659,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         if (status === 'pending_approval' && positionsArray.length === 0) {
           console.warn('⚠️ No positions found for pending_approval status. This is likely a data extraction issue.');
           console.log('📊 Available rebalance_plan keys:', Object.keys(rebalancePlan));
-          
+
           // Check if there's any text-based plan we can parse
           if (rebalancePlan.portfolioManagerInsights || rebalancePlan.portfolio_manager_insights || rebalancePlan.plan_text) {
             console.log('📊 Found plan text, but unable to extract structured positions');
@@ -1292,383 +1292,400 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               </TabsList>
             </div>
 
-            <ScrollArea className="h-[calc(90vh-220px)]">
-              <div className="px-6 pb-6">
-                {error ? (
-                  <div className="flex items-center gap-2 text-destructive p-6">
-                    <AlertCircle className="w-5 h-5" />
-                    <span>{error}</span>
-                  </div>
-                ) : loading ? (
-                  <div className="flex flex-col items-center justify-center p-12 gap-4">
-                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Loading rebalance data...</p>
-                  </div>
-                ) : !rebalanceData ? (
-                  <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
-                    <AlertCircle className="w-12 h-12 mb-4 opacity-20" />
-                    <p>No rebalance data available</p>
-                  </div>
-                ) : (
-                  <>
-                    <TabsContent value="actions" className="mt-6 space-y-4">
-                      {/* Different states based on rebalance status */}
-                      {(() => {
-                        const isRunning = rebalanceData.status === 'running';
-                        const isAnalyzing = rebalanceData.status === 'analyzing' || rebalanceData.status === 'initializing';
-                        const isPlanning = rebalanceData.status === 'planning';
-                        const isPendingApproval = rebalanceData.status === 'pending_approval';
-                        const isExecuting = rebalanceData.status === 'executing' || rebalanceData.status === 'pending_trades';
-                        const isCompleted = rebalanceData.status === 'completed';
-                        const isCanceled = rebalanceData.status === 'canceled';
-                        const isError = rebalanceData.status === 'error';
-                        const hasPositions = rebalanceData.recommendedPositions && rebalanceData.recommendedPositions.length > 0;
-                        const allPositionsProcessed = rebalanceData.recommendedPositions?.every((p: RebalancePosition) => 
-                          executedTickers.has(p.ticker) || rejectedTickers.has(p.ticker) || p.shareChange === 0
-                        );
+            {error ? (
+              <div className="flex items-center gap-2 text-destructive p-6">
+                <AlertCircle className="w-5 h-5" />
+                <span>{error}</span>
+              </div>
+            ) : loading ? (
+              <div className="flex flex-col items-center justify-center p-12 gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading rebalance data...</p>
+              </div>
+            ) : !rebalanceData ? (
+              <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
+                <AlertCircle className="w-12 h-12 mb-4 opacity-20" />
+                <p>No rebalance data available</p>
+              </div>
+            ) : (
+              <>
+                <TabsContent value="actions" className="flex flex-col h-[calc(90vh-220px)] mt-0 data-[state=inactive]:hidden">
+                  <ScrollArea className="flex-1 px-6 pb-4 mt-6">
+                    {/* Different states based on rebalance status */}
+                    {(() => {
+                      const isRunning = rebalanceData.status === 'running';
+                      const isAnalyzing = rebalanceData.status === 'analyzing' || rebalanceData.status === 'initializing';
+                      const isPlanning = rebalanceData.status === 'planning';
+                      const isPendingApproval = rebalanceData.status === 'pending_approval';
+                      const isExecuting = rebalanceData.status === 'executing' || rebalanceData.status === 'pending_trades';
+                      const isCompleted = rebalanceData.status === 'completed';
+                      const isCanceled = rebalanceData.status === 'canceled';
+                      const isError = rebalanceData.status === 'error';
+                      const hasPositions = rebalanceData.recommendedPositions && rebalanceData.recommendedPositions.length > 0;
+                      const allPositionsProcessed = rebalanceData.recommendedPositions?.every((p: RebalancePosition) =>
+                        executedTickers.has(p.ticker) || rejectedTickers.has(p.ticker) || p.shareChange === 0
+                      );
 
-                        // State 1: Still analyzing stocks
-                        if (isAnalyzing) {
-                          return (
-                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
-                              <div className="relative">
-                                <div className="w-20 h-20 rounded-full border-4 border-primary/20 animate-pulse" />
-                                <Loader2 className="w-20 h-20 absolute inset-0 animate-spin text-primary" />
-                              </div>
-                              <div className="text-center space-y-2">
-                                <h3 className="text-lg font-semibold">Analyzing Portfolio</h3>
-                                <p className="text-sm text-muted-foreground max-w-md">
-                                  Our AI agents are analyzing your holdings and market conditions to determine optimal rebalancing actions...
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Clock className="w-3 h-3" />
-                                <span>This typically takes 2-5 minutes</span>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // State 2: Planning rebalance (only when still planning and no positions yet)
-                        if (isPlanning && !hasPositions) {
-                          return (
-                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
-                              <div className="relative">
-                                <PieChart className="w-20 h-20 text-primary animate-pulse" />
-                              </div>
-                              <div className="text-center space-y-2">
-                                <h3 className="text-lg font-semibold">Calculating Optimal Strategy</h3>
-                                <p className="text-sm text-muted-foreground max-w-md">
-                                  Portfolio Manager is determining the best rebalancing strategy based on the analysis results...
-                                </p>
-                              </div>
-                              <Progress value={65} className="w-48" />
-                            </div>
-                          );
-                        }
-
-                        // State 3: Error occurred
-                        if (isError) {
-                          return (
-                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
-                              <div className="relative">
-                                <XCircle className="w-20 h-20 text-destructive" />
-                              </div>
-                              <div className="text-center space-y-2">
-                                <h3 className="text-lg font-semibold">Rebalance Failed</h3>
-                                <p className="text-sm text-muted-foreground max-w-md">
-                                  An error occurred during the rebalancing process. Please try again or contact support if the issue persists.
-                                </p>
-                              </div>
-                              <Button variant="outline" onClick={onClose}>
-                                Close
-                              </Button>
-                            </div>
-                          );
-                        }
-
-                        // State 4: Canceled
-                        if (isCanceled) {
-                          return (
-                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
-                              <div className="relative">
-                                <XCircle className="w-20 h-20 text-muted-foreground" />
-                              </div>
-                              <div className="text-center space-y-2">
-                                <h3 className="text-lg font-semibold">Rebalance Canceled</h3>
-                                <p className="text-sm text-muted-foreground max-w-md">
-                                  This rebalancing session was canceled. No orders were executed.
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // State 5: No actions needed
-                        if (hasPositions && rebalanceData.recommendedPositions.every((p: RebalancePosition) => p.shareChange === 0)) {
-                          return (
-                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
-                              <div className="relative">
-                                <CheckCircle className="w-20 h-20 text-green-500" />
-                              </div>
-                              <div className="text-center space-y-2">
-                                <h3 className="text-lg font-semibold">Portfolio is Balanced</h3>
-                                <p className="text-sm text-muted-foreground max-w-md">
-                                  Your portfolio is already well-balanced. No rebalancing actions are needed at this time.
-                                </p>
-                              </div>
-                              <Card className="p-4 bg-green-500/5 border-green-500/20">
-                                <div className="flex items-center gap-3">
-                                  <Shield className="w-5 h-5 text-green-500" />
-                                  <div className="text-sm">
-                                    <p className="font-medium">All positions within target allocations</p>
-                                    <p className="text-xs text-muted-foreground">Next review recommended in 30 days</p>
-                                  </div>
-                                </div>
-                              </Card>
-                            </div>
-                          );
-                        }
-
-                        // State 6: Has positions to show (including pending approval)
-                        if (hasPositions || isPendingApproval) {
-                          return (
-                            <>
-                              {/* Status Banner for pending approval state */}
-                              {isPendingApproval && (
-                                <Card className="p-4 bg-blue-500/5 border-blue-500/20">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <AlertCircle className="w-5 h-5 text-blue-500" />
-                                      <div>
-                                        <p className="font-medium">Ready for Approval</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          Review the recommended trades below and approve to execute
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <Badge variant="default" className="text-xs">
-                                      {(() => {
-                                        const tradesCount = rebalanceData.recommendedPositions?.filter((p: RebalancePosition) => p.shareChange !== 0).length || 0;
-                                        console.log('🔍 Trades count calculation:', {
-                                          recommendedPositions: rebalanceData.recommendedPositions,
-                                          positionsLength: rebalanceData.recommendedPositions?.length,
-                                          tradesWithChanges: rebalanceData.recommendedPositions?.filter((p: RebalancePosition) => p.shareChange !== 0),
-                                          tradesCount
-                                        });
-                                        return `${tradesCount} trades`;
-                                      })()}
-                                    </Badge>
-                                  </div>
-                                </Card>
-                              )}
-
-                              {/* Status Banner for running/executing states */}
-                              {(isRunning || isExecuting) && (
-                                <Card className="p-4 bg-primary/5 border-primary/20">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                                      <div>
-                                        <p className="font-medium">
-                                          {isExecuting ? 'Executing Orders' : 'Rebalance in Progress'}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {isExecuting 
-                                            ? 'Orders are being submitted to your broker...' 
-                                            : 'Preparing rebalancing recommendations...'}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    {isExecuting && (
-                                      <Badge variant="outline" className="text-xs">
-                                        <Activity className="w-3 h-3 mr-1" />
-                                        Live Trading
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </Card>
-                              )}
-
-                              {/* Completion Banner */}
-                              {isCompleted && allPositionsProcessed && (
-                                <Card className="p-4 bg-green-500/5 border-green-500/20">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <CheckCircle className="w-5 h-5 text-green-500" />
-                                      <div>
-                                        <p className="font-medium">Rebalance Complete</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          All orders have been processed successfully
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-sm font-medium">
-                                        {executedTickers.size} executed
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {rejectedTickers.size} skipped
-                                      </p>
-                                    </div>
-                                  </div>
-                                </Card>
-                              )}
-
-                              {/* Summary Cards */}
-                              <div className="grid grid-cols-3 gap-4">
-                                <Card className="p-4">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Total Buy Value</span>
-                                    <TrendingUp className="w-4 h-4 text-green-500" />
-                                  </div>
-                                  <p className="text-lg font-semibold text-green-600">
-                                    ${totalBuyValue.toLocaleString()}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {pendingPositions.filter((p: RebalancePosition) => p.action === 'BUY').length} positions
-                                  </p>
-                                </Card>
-                                <Card className="p-4">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Total Sell Value</span>
-                                    <TrendingDown className="w-4 h-4 text-red-500" />
-                                  </div>
-                                  <p className="text-lg font-semibold text-red-600">
-                                    ${totalSellValue.toLocaleString()}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {pendingPositions.filter((p: RebalancePosition) => p.action === 'SELL').length} positions
-                                  </p>
-                                </Card>
-                                <Card className="p-4">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Net Cash Flow</span>
-                                    <DollarSign className="w-4 h-4 text-blue-500" />
-                                  </div>
-                                  <p className={`text-lg font-semibold ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {netCashFlow >= 0 ? '+' : ''}${Math.abs(netCashFlow).toLocaleString()}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {netCashFlow >= 0 ? 'Cash inflow' : 'Cash needed'}
-                                  </p>
-                                </Card>
-                              </div>
-
-                              {/* Section Header */}
-                              {pendingPositions.length > 0 && (
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h3 className="font-medium">Pending Orders</h3>
-                                    <p className="text-xs text-muted-foreground">
-                                      Review and approve each order before execution
-                                    </p>
-                                  </div>
-                                  <Badge variant="outline">
-                                    {pendingPositions.length} pending
-                                  </Badge>
-                                </div>
-                              )}
-
-                              {/* Rebalancing Positions */}
-                              <div className="space-y-3">
-                                {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
-                                  const isExecuted = executedTickers.has(position.ticker);
-                                  const isRejected = rejectedTickers.has(position.ticker);
-
-                                  if (isRejected) return null;
-
-                                  return (
-                                    <RebalancePositionCard
-                                      key={position.ticker}
-                                      position={position}
-                                      isExecuted={isExecuted}
-                                      onApprove={() => handleApproveOrder(position.ticker)}
-                                      onReject={() => handleRejectOrder(position.ticker)}
-                                    />
-                                  );
-                                })}
-                              </div>
-
-                              {/* Execute Orders Section with better states */}
-                              <div className="border-t pt-6">
-                                <div className="flex justify-between items-center">
-                                  <div className="space-y-1">
-                                    <div className="text-sm text-muted-foreground">
-                                      {executedTickers.size > 0 && (
-                                        <div className="flex items-center gap-2">
-                                          <CheckCircle className="w-4 h-4 text-green-600" />
-                                          <span className="text-green-600 font-medium">
-                                            {executedTickers.size} order{executedTickers.size !== 1 ? 's' : ''} executed
-                                          </span>
-                                        </div>
-                                      )}
-                                      {rejectedTickers.size > 0 && (
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <XCircle className="w-4 h-4 text-orange-600" />
-                                          <span className="text-orange-600 font-medium">
-                                            {rejectedTickers.size} order{rejectedTickers.size !== 1 ? 's' : ''} skipped
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    {hasPendingOrders && (
-                                      <p className="text-xs text-muted-foreground">
-                                        Execute all pending orders with one click
-                                      </p>
-                                    )}
-                                  </div>
-                                  <Button
-                                    onClick={handleExecuteAllOrders}
-                                    disabled={!hasPendingOrders || isExecuting}
-                                    className="min-w-[200px]"
-                                    variant={hasPendingOrders ? "default" : "secondary"}
-                                  >
-                                    {isExecuting ? (
-                                      <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Executing Orders...
-                                      </>
-                                    ) : hasPendingOrders ? (
-                                      <>
-                                        <Zap className="w-4 h-4 mr-2" />
-                                        Execute All ({pendingPositions.length})
-                                      </>
-                                    ) : (
-                                      <>
-                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                        All Orders Processed
-                                      </>
-                                    )}
-                                  </Button>
-                                </div>
-                              </div>
-                            </>
-                          );
-                        }
-
-                        // Default empty state
+                      // State 1: Still analyzing stocks
+                      if (isAnalyzing) {
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
-                              <Target className="w-20 h-20 text-muted-foreground/50" />
+                              <div className="w-20 h-20 rounded-full border-4 border-primary/20 animate-pulse" />
+                              <Loader2 className="w-20 h-20 absolute inset-0 animate-spin text-primary" />
                             </div>
                             <div className="text-center space-y-2">
-                              <h3 className="text-lg font-semibold">No Actions Available</h3>
+                              <h3 className="text-lg font-semibold">Analyzing Portfolio</h3>
                               <p className="text-sm text-muted-foreground max-w-md">
-                                Waiting for rebalancing recommendations...
+                                Our AI agents are analyzing your holdings and market conditions to determine optimal rebalancing actions...
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Clock className="w-3 h-3" />
+                              <span>This typically takes 2-5 minutes</span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // State 2: Planning rebalance (only when still planning and no positions yet)
+                      if (isPlanning && !hasPositions) {
+                        return (
+                          <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                            <div className="relative">
+                              <PieChart className="w-20 h-20 text-primary animate-pulse" />
+                            </div>
+                            <div className="text-center space-y-2">
+                              <h3 className="text-lg font-semibold">Calculating Optimal Strategy</h3>
+                              <p className="text-sm text-muted-foreground max-w-md">
+                                Portfolio Manager is determining the best rebalancing strategy based on the analysis results...
+                              </p>
+                            </div>
+                            <Progress value={65} className="w-48" />
+                          </div>
+                        );
+                      }
+
+                      // State 3: Error occurred
+                      if (isError) {
+                        return (
+                          <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                            <div className="relative">
+                              <XCircle className="w-20 h-20 text-destructive" />
+                            </div>
+                            <div className="text-center space-y-2">
+                              <h3 className="text-lg font-semibold">Rebalance Failed</h3>
+                              <p className="text-sm text-muted-foreground max-w-md">
+                                An error occurred during the rebalancing process. Please try again or contact support if the issue persists.
+                              </p>
+                            </div>
+                            <Button variant="outline" onClick={onClose}>
+                              Close
+                            </Button>
+                          </div>
+                        );
+                      }
+
+                      // State 4: Canceled
+                      if (isCanceled) {
+                        return (
+                          <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                            <div className="relative">
+                              <XCircle className="w-20 h-20 text-muted-foreground" />
+                            </div>
+                            <div className="text-center space-y-2">
+                              <h3 className="text-lg font-semibold">Rebalance Canceled</h3>
+                              <p className="text-sm text-muted-foreground max-w-md">
+                                This rebalancing session was canceled. No orders were executed.
                               </p>
                             </div>
                           </div>
                         );
-                      })()}
-                    </TabsContent>
+                      }
 
-                    <TabsContent value="workflow" className="mt-6">
+                      // State 5: No actions needed
+                      if (hasPositions && rebalanceData.recommendedPositions.every((p: RebalancePosition) => p.shareChange === 0)) {
+                        return (
+                          <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                            <div className="relative">
+                              <CheckCircle className="w-20 h-20 text-green-500" />
+                            </div>
+                            <div className="text-center space-y-2">
+                              <h3 className="text-lg font-semibold">Portfolio is Balanced</h3>
+                              <p className="text-sm text-muted-foreground max-w-md">
+                                Your portfolio is already well-balanced. No rebalancing actions are needed at this time.
+                              </p>
+                            </div>
+                            <Card className="p-4 bg-green-500/5 border-green-500/20">
+                              <div className="flex items-center gap-3">
+                                <Shield className="w-5 h-5 text-green-500" />
+                                <div className="text-sm">
+                                  <p className="font-medium">All positions within target allocations</p>
+                                  <p className="text-xs text-muted-foreground">Next review recommended in 30 days</p>
+                                </div>
+                              </div>
+                            </Card>
+                          </div>
+                        );
+                      }
+
+                      // State 6: Has positions to show (including pending approval)
+                      if (hasPositions || isPendingApproval) {
+                        return (
+                          <>
+                            {/* Status Banner for pending approval state */}
+                            {isPendingApproval && (
+                              <Card className="p-4 bg-blue-500/5 border-blue-500/20 mb-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <AlertCircle className="w-5 h-5 text-blue-500" />
+                                    <div>
+                                      <p className="font-medium">Ready for Approval</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Review the recommended trades below and approve to execute
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Badge variant="default" className="text-xs">
+                                    {(() => {
+                                      const tradesCount = rebalanceData.recommendedPositions?.filter((p: RebalancePosition) => p.shareChange !== 0).length || 0;
+                                      console.log('🔍 Trades count calculation:', {
+                                        recommendedPositions: rebalanceData.recommendedPositions,
+                                        positionsLength: rebalanceData.recommendedPositions?.length,
+                                        tradesWithChanges: rebalanceData.recommendedPositions?.filter((p: RebalancePosition) => p.shareChange !== 0),
+                                        tradesCount
+                                      });
+                                      return `${tradesCount} trades`;
+                                    })()}
+                                  </Badge>
+                                </div>
+                              </Card>
+                            )}
+
+                            {/* Status Banner for running/executing states */}
+                            {(isRunning || isExecuting) && (
+                              <Card className="p-4 bg-primary/5 border-primary/20 mb-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                                    <div>
+                                      <p className="font-medium">
+                                        {isExecuting ? 'Executing Orders' : 'Rebalance in Progress'}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {isExecuting
+                                          ? 'Orders are being submitted to your broker...'
+                                          : 'Preparing rebalancing recommendations...'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {isExecuting && (
+                                    <Badge variant="outline" className="text-xs">
+                                      <Activity className="w-3 h-3 mr-1" />
+                                      Live Trading
+                                    </Badge>
+                                  )}
+                                </div>
+                              </Card>
+                            )}
+
+                            {/* Completion Banner */}
+                            {isCompleted && allPositionsProcessed && (
+                              <Card className="p-4 bg-green-500/5 border-green-500/20 mb-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <CheckCircle className="w-5 h-5 text-green-500" />
+                                    <div>
+                                      <p className="font-medium">Rebalance Complete</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        All orders have been processed successfully
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-medium">
+                                      {executedTickers.size} executed
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {rejectedTickers.size} skipped
+                                    </p>
+                                  </div>
+                                </div>
+                              </Card>
+                            )}
+
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              <Card className="p-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-muted-foreground">Total Buy Value</span>
+                                  <TrendingUp className="w-4 h-4 text-green-500" />
+                                </div>
+                                <p className="text-lg font-semibold text-green-600">
+                                  ${totalBuyValue.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {pendingPositions.filter((p: RebalancePosition) => p.action === 'BUY').length} positions
+                                </p>
+                              </Card>
+                              <Card className="p-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-muted-foreground">Total Sell Value</span>
+                                  <TrendingDown className="w-4 h-4 text-red-500" />
+                                </div>
+                                <p className="text-lg font-semibold text-red-600">
+                                  ${totalSellValue.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {pendingPositions.filter((p: RebalancePosition) => p.action === 'SELL').length} positions
+                                </p>
+                              </Card>
+                              <Card className="p-4">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-muted-foreground">Net Cash Flow</span>
+                                  <DollarSign className="w-4 h-4 text-blue-500" />
+                                </div>
+                                <p className={`text-lg font-semibold ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {netCashFlow >= 0 ? '+' : ''}${Math.abs(netCashFlow).toLocaleString()}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {netCashFlow >= 0 ? 'Cash inflow' : 'Cash needed'}
+                                </p>
+                              </Card>
+                            </div>
+
+                            {/* Section Header */}
+                            {pendingPositions.length > 0 && (
+                              <div className="flex items-center justify-between mb-4">
+                                <div>
+                                  <h3 className="font-medium">Pending Orders</h3>
+                                  <p className="text-xs text-muted-foreground">
+                                    Review and approve each order before execution
+                                  </p>
+                                </div>
+                                <Badge variant="outline">
+                                  {pendingPositions.length} pending
+                                </Badge>
+                              </div>
+                            )}
+
+                            {/* Rebalancing Positions */}
+                            <div className="space-y-3 mb-6">
+                              {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
+                                const isExecuted = executedTickers.has(position.ticker);
+                                const isRejected = rejectedTickers.has(position.ticker);
+
+                                if (isRejected) return null;
+
+                                return (
+                                  <RebalancePositionCard
+                                    key={position.ticker}
+                                    position={position}
+                                    isExecuted={isExecuted}
+                                    onApprove={() => handleApproveOrder(position.ticker)}
+                                    onReject={() => handleRejectOrder(position.ticker)}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </>
+                        );
+                      }
+
+                      // Default empty state
+                      return (
+                        <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                          <div className="relative">
+                            <Target className="w-20 h-20 text-muted-foreground/50" />
+                          </div>
+                          <div className="text-center space-y-2">
+                            <h3 className="text-lg font-semibold">No Actions Available</h3>
+                            <p className="text-sm text-muted-foreground max-w-md">
+                              Waiting for rebalancing recommendations...
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </ScrollArea>
+
+                  {/* Fixed Execute Orders Section at bottom */}
+                  {(() => {
+                    const isPendingApproval = rebalanceData.status === 'pending_approval';
+                    const isExecuting = rebalanceData.status === 'executing' || rebalanceData.status === 'pending_trades';
+                    const hasPositions = rebalanceData.recommendedPositions && rebalanceData.recommendedPositions.length > 0;
+
+                    if ((isPendingApproval || hasPositions) && rebalanceData.recommendedPositions?.some((p: RebalancePosition) => p.shareChange !== 0)) {
+                      return (
+                        <div className="border-t px-6 py-4 bg-background shrink-0">
+                          <div className="flex justify-between items-center">
+                            <div className="space-y-1">
+                              <div className="text-sm text-muted-foreground">
+                                {executedTickers.size > 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                    <span className="text-green-600 font-medium">
+                                      {executedTickers.size} order{executedTickers.size !== 1 ? 's' : ''} executed
+                                    </span>
+                                  </div>
+                                )}
+                                {rejectedTickers.size > 0 && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <XCircle className="w-4 h-4 text-orange-600" />
+                                    <span className="text-orange-600 font-medium">
+                                      {rejectedTickers.size} order{rejectedTickers.size !== 1 ? 's' : ''} skipped
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              {hasPendingOrders && (
+                                <p className="text-xs text-muted-foreground">
+                                  Execute all pending orders with one click
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              onClick={handleExecuteAllOrders}
+                              disabled={!hasPendingOrders || isExecuting}
+                              className="min-w-[200px]"
+                              variant={hasPendingOrders ? "default" : "secondary"}
+                            >
+                              {isExecuting ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Executing Orders...
+                                </>
+                              ) : hasPendingOrders ? (
+                                <>
+                                  <Zap className="w-4 h-4 mr-2" />
+                                  Execute All ({pendingPositions.length})
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  All Orders Processed
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </TabsContent>
+
+                <TabsContent value="workflow" className="data-[state=active]:block hidden">
+                  <ScrollArea className="h-[calc(90vh-220px)] px-6 pt-6">
+                    <div className="pb-6">
                       <RebalanceWorkflowSteps workflowData={rebalanceData} />
-                    </TabsContent>
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
 
-                    <TabsContent value="insights" className="mt-6 space-y-4">
+                <TabsContent value="insights" className="data-[state=active]:block hidden">
+                  <ScrollArea className="h-[calc(90vh-220px)] px-6 pt-6">
+                    <div className="pb-6 space-y-4">
                       {/* Threshold Check Insights */}
                       {!rebalanceData.skipThresholdCheck && (() => {
                         const thresholdStep = rebalanceData.workflowSteps?.find((s: any) => s.id === 'threshold');
@@ -1890,11 +1907,34 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       {/* Portfolio Manager Insights */}
                       {(() => {
                         const portfolioStep = rebalanceData.workflowSteps?.find((s: any) => s.id === 'rebalance');
-                        const hasPortfolioInsights = rebalanceData.rebalance_plan?.portfolioManagerInsights ||
+                        // Check all possible locations where Portfolio Manager insights might be stored
+                        // Priority: portfolioManager key first, then rebalanceAgent for backward compatibility
+                        const portfolioInsights = 
+                          rebalanceData.rebalance_plan?.agentInsights?.portfolioManager ||
+                          rebalanceData.rebalance_plan?.agentInsights?.rebalanceAgent ||
+                          rebalanceData.rebalance_plan?.portfolioManagerInsights ||
                           rebalanceData.agentInsights?.portfolioManager ||
                           rebalanceData.agentInsights?.rebalanceAgent;
 
-                        if (portfolioStep?.status === 'completed' && hasPortfolioInsights) {
+                        // Debug logging to understand the data structure
+                        console.log('Portfolio Manager Insights Debug:', {
+                          portfolioStepStatus: portfolioStep?.status,
+                          hasPortfolioInsights: !!portfolioInsights,
+                          foundAt: portfolioInsights ? (
+                            rebalanceData.rebalance_plan?.agentInsights?.portfolioManager ? 'rebalance_plan.agentInsights.portfolioManager' :
+                            rebalanceData.rebalance_plan?.agentInsights?.rebalanceAgent ? 'rebalance_plan.agentInsights.rebalanceAgent' :
+                            rebalanceData.rebalance_plan?.portfolioManagerInsights ? 'rebalance_plan.portfolioManagerInsights' :
+                            rebalanceData.agentInsights?.portfolioManager ? 'agentInsights.portfolioManager' :
+                            rebalanceData.agentInsights?.rebalanceAgent ? 'agentInsights.rebalanceAgent' :
+                            'unknown'
+                          ) : 'not found',
+                          rebalancePlan: rebalanceData.rebalance_plan,
+                          agentInsights: rebalanceData.agentInsights,
+                          nestedAgentInsights: rebalanceData.rebalance_plan?.agentInsights
+                        });
+
+                        // Show insights if they exist, even if status isn't marked complete yet
+                        if (portfolioInsights) {
                           return (
                             <Card className="overflow-hidden">
                               <CardHeader className="bg-muted/30">
@@ -1904,23 +1944,18 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                 </CardTitle>
                               </CardHeader>
                               <CardContent className="pt-4">
-                                <MarkdownRenderer content={
-                                  rebalanceData.rebalance_plan?.portfolioManagerInsights ||
-                                  rebalanceData.agentInsights?.portfolioManager ||
-                                  rebalanceData.agentInsights?.rebalanceAgent ||
-                                  'Portfolio optimization complete.'
-                                } />
+                                <MarkdownRenderer content={portfolioInsights} />
                               </CardContent>
                             </Card>
                           );
                         }
                         return null;
                       })()}
-                    </TabsContent>
-                  </>
-                )}
-              </div>
-            </ScrollArea>
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              </>
+            )}
           </Tabs>
         </DialogContent>
       </Dialog>

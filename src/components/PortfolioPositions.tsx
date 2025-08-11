@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import RebalanceModal from "./RebalanceModal";
 import RebalanceDetailModal from "./RebalanceDetailModal";
+import ScheduleListModal from "./ScheduleListModal";
 
 interface Position {
   symbol: string;
@@ -38,6 +39,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showRebalanceModal, setShowRebalanceModal] = useState(false);
   const [showRebalanceDetailModal, setShowRebalanceDetailModal] = useState(false);
+  const [showScheduleListModal, setShowScheduleListModal] = useState(false);
   const [rebalancing, setRebalancing] = useState(false);
   const [runningRebalance, setRunningRebalance] = useState<string | null>(null); // Store rebalance_request_id
 
@@ -230,7 +232,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate('/rebalance-records')}
+                  onClick={() => setShowScheduleListModal(true)}
                 >
                   <Clock className="h-4 w-4" />
                 </Button>
@@ -425,6 +427,12 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         rebalanceId={runningRebalance || undefined}
         isOpen={showRebalanceDetailModal}
         onClose={() => setShowRebalanceDetailModal(false)}
+      />
+
+      {/* Schedule List Modal */}
+      <ScheduleListModal
+        isOpen={showScheduleListModal}
+        onClose={() => setShowScheduleListModal(false)}
       />
     </>
   );

@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw, Loader2, ExternalLink, FileText } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw, Loader2, ExternalLink, FileText, BarChart3 } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
 import { useAuth } from "@/lib/auth-supabase";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import AnalysisDetailModal from "@/components/AnalysisDetailModal";
+import RebalanceDetailModal from "@/components/RebalanceDetailModal";
 
 interface AIDecision {
   id: string;
@@ -24,6 +25,7 @@ interface AIDecision {
   executedAt: string | null;
   sourceType: string;
   analysisId?: string;
+  rebalanceRequestId?: string;
   alpacaOrderId?: string;
   alpacaOrderStatus?: string;
   alpacaFilledQty?: number;
@@ -35,6 +37,7 @@ export default function RecentTrades() {
   const [loading, setLoading] = useState(false);
   const [aiDecisions, setAiDecisions] = useState<AIDecision[]>([]);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
+  const [selectedRebalanceId, setSelectedRebalanceId] = useState<string | null>(null);
   const [executingOrderId, setExecutingOrderId] = useState<string | null>(null);
   const { apiSettings, user } = useAuth();
   const { toast } = useToast();
@@ -80,6 +83,7 @@ export default function RecentTrades() {
           executedAt: item.executed_at ? formatTimestamp(item.executed_at) : null,
           sourceType: item.source_type,
           analysisId: item.analysis_id,
+          rebalanceRequestId: item.rebalance_request_id,
           alpacaOrderId: item.metadata?.alpaca_order?.id,
           alpacaOrderStatus: item.metadata?.alpaca_order?.status,
           alpacaFilledQty: item.metadata?.alpaca_order?.filled_qty ? Number(item.metadata.alpaca_order.filled_qty) : undefined,
@@ -212,7 +216,7 @@ export default function RecentTrades() {
       // Call the edge function to execute the trade
       const { data, error } = await supabase.functions.invoke('execute-trade', {
         body: {
-          analysisId: decision.analysisId,
+          tradeActionId: decision.id,  // Pass the trading_actions ID directly
           action: 'approve'
         }
       });
@@ -332,19 +336,30 @@ export default function RecentTrades() {
 
   const handleRejectDecision = async (decision: AIDecision) => {
     try {
-      // Update the status in database to 'rejected'
-      const { error: updateError } = await supabase
-        .from('trading_actions')
-        .update({ status: 'rejected' })
-        .eq('id', decision.id);
+      // Call the edge function to reject the trade
+      const { data, error } = await supabase.functions.invoke('execute-trade', {
+        body: {
+          tradeActionId: decision.id,  // Pass the trading_actions ID directly
+          action: 'reject'
+        }
+      });
 
-      if (updateError) throw updateError;
+      if (error) throw error;
+
+      toast({
+        title: "Order Rejected",
+        description: `${decision.action} order for ${decision.symbol} has been rejected.`,
+      });
 
       // Refresh AI decisions
       fetchAIDecisions();
     } catch (err) {
       console.error('Error rejecting decision:', err);
-      alert('Failed to reject decision: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      toast({
+        title: "Failed to Reject",
+        description: err instanceof Error ? err.message : 'Failed to reject decision',
+        variant: "destructive"
+      });
     }
   };
 
@@ -362,7 +377,9 @@ export default function RecentTrades() {
             className="h-7 w-7"
             onClick={() => {
               fetchAIDecisions();
-              fetchOrders();
+              if (apiSettings) {
+                updateAlpacaOrderStatus();
+              }
             }}
             disabled={loading}
           >
@@ -507,6 +524,19 @@ export default function RecentTrades() {
                         >
                           <FileText className="h-3 w-3 mr-1" />
                           Analysis
+                        </Button>
+                      )}
+                      
+                      {/* Rebalance Detail Button */}
+                      {decision.rebalanceRequestId && (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 px-3 text-xs"
+                          onClick={() => setSelectedRebalanceId(decision.rebalanceRequestId!)}
+                        >
+                          <BarChart3 className="h-3 w-3 mr-1" />
+                          Rebalance
                         </Button>
                       )}
                       
@@ -702,6 +732,19 @@ export default function RecentTrades() {
                                   </Button>
                                 )}
                                 
+                                {/* Rebalance Detail Button */}
+                                {decision.rebalanceRequestId && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-7 px-2 text-xs border-slate-700"
+                                    onClick={() => setSelectedRebalanceId(decision.rebalanceRequestId!)}
+                                  >
+                                    <BarChart3 className="h-3 w-3 mr-1" />
+                                    Rebalance
+                                  </Button>
+                                )}
+                                
                                 {/* Alpaca Order Link */}
                                 {decision.alpacaOrderId && (
                                   <Button
@@ -878,6 +921,19 @@ export default function RecentTrades() {
                                   </Button>
                                 )}
                                 
+                                {/* Rebalance Detail Button */}
+                                {decision.rebalanceRequestId && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-7 px-2 text-xs border-slate-700"
+                                    onClick={() => setSelectedRebalanceId(decision.rebalanceRequestId!)}
+                                  >
+                                    <BarChart3 className="h-3 w-3 mr-1" />
+                                    Rebalance
+                                  </Button>
+                                )}
+                                
                                 {/* Alpaca Order Link */}
                                 {decision.alpacaOrderId && (
                                   <Button
@@ -970,6 +1026,15 @@ export default function RecentTrades() {
           analysisId={selectedAnalysisId}
           isOpen={true}
           onClose={() => setSelectedAnalysisId(null)}
+        />
+      )}
+      
+      {/* Rebalance Detail Modal */}
+      {selectedRebalanceId && (
+        <RebalanceDetailModal
+          rebalanceId={selectedRebalanceId}
+          isOpen={true}
+          onClose={() => setSelectedRebalanceId(null)}
         />
       )}
     </Card>

@@ -173,105 +173,19 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                         </div>
                         <p className="text-sm text-muted-foreground">{step.description}</p>
 
-                        {/* Show detailed insights for threshold check */}
-                        {step.id === 'threshold' && step.insights && (
-                          <div className="mt-3 p-3 bg-muted/30 rounded-lg text-sm space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Threshold:</span>
-                              <span className="font-medium">{step.insights.threshold}%</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Max Drift:</span>
-                              <span className={`font-medium ${step.insights.exceededThreshold ? 'text-orange-500' : 'text-green-500'}`}>
-                                {step.insights.maxValueChange?.toFixed(2)}%
-                              </span>
-                            </div>
-                            {step.insights.positionDrifts && step.insights.positionDrifts.length > 0 && (
-                              <div className="space-y-1 pt-2 border-t border-border/50">
-                                <p className="text-xs text-muted-foreground mb-1">
-                                  {step.insights.positionsExceedingThreshold} of {step.insights.totalPositions} positions exceeded threshold:
-                                </p>
-                                {step.insights.positionDrifts
-                                  .filter((d: any) => d.exceedsThreshold)
-                                  .slice(0, 3)
-                                  .map((drift: any) => (
-                                    <div key={drift.ticker} className="flex items-center justify-between text-xs">
-                                      <span className="font-mono">{drift.ticker}</span>
-                                      <span className={`${drift.exceedsThreshold ? 'text-orange-500' : ''}`}>
-                                        {drift.actualAllocation.toFixed(1)}% → {drift.targetAllocation.toFixed(1)}% ({drift.valueChangePercent > 0 ? '+' : ''}{drift.valueChangePercent.toFixed(1)}%)
-                                      </span>
-                                    </div>
-                                  ))}
-                                {step.insights.positionsExceedingThreshold > 3 && (
-                                  <p className="text-xs text-muted-foreground italic">
-                                    ...and {step.insights.positionsExceedingThreshold - 3} more
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground italic pt-2">
-                              {step.insights.reasoning}
-                            </p>
-                          </div>
-                        )}
 
-                        {/* Show detailed insights for opportunity analysis */}
-                        {step.id === 'opportunity' && step.insights && (
-                          <div className="mt-3 p-3 bg-muted/30 rounded-lg text-sm space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Recommendation:</span>
-                              <span className={`font-medium ${step.insights.recommendAnalysis ? 'text-green-500' : 'text-gray-500'}`}>
-                                {step.insights.recommendAnalysis ? 'Analysis Recommended' : 'No Action Needed'}
-                              </span>
-                            </div>
-                            {step.insights.marketConditions && (
-                              <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Market Trend:</span>
-                                <span className="font-medium capitalize">
-                                  {step.insights.marketConditions.trend} ({step.insights.marketConditions.volatility} volatility)
-                                </span>
-                              </div>
-                            )}
-                            {step.insights.selectedStocks && step.insights.selectedStocks.length > 0 && (
-                              <div className="space-y-1 pt-2 border-t border-border/50">
-                                <p className="text-xs text-muted-foreground mb-1">
-                                  Selected {step.insights.selectedStocksCount} of {step.insights.evaluatedStocksCount} stocks for analysis:
-                                </p>
-                                {step.insights.selectedStocks.slice(0, 3).map((stock: any) => (
-                                  <div key={stock.ticker} className="text-xs space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono font-medium">{stock.ticker}</span>
-                                      <Badge variant="outline" className="text-xs py-0 h-5">
-                                        {stock.priority}
-                                      </Badge>
-                                    </div>
-                                    <p className="text-muted-foreground pl-2">{stock.reason}</p>
-                                  </div>
-                                ))}
-                                {step.insights.selectedStocks.length > 3 && (
-                                  <p className="text-xs text-muted-foreground italic">
-                                    ...and {step.insights.selectedStocks.length - 3} more
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground italic pt-2">
-                              {step.insights.reasoning}
-                            </p>
-                          </div>
-                        )}
 
                         {/* Progress for stock analysis step */}
                         {step.id === 'analysis' && step.stockAnalyses?.length > 0 && (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">
-                                {step.stockAnalyses.filter((sa: any) => 
+                                {step.stockAnalyses.filter((sa: any) =>
                                   sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
                                 ).length}/{step.stockAnalyses.length} stocks analyzed
                               </span>
                               <span className={isCompleted ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
-                                {Math.round((step.stockAnalyses.filter((sa: any) => 
+                                {Math.round((step.stockAnalyses.filter((sa: any) =>
                                   sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
                                 ).length / step.stockAnalyses.length) * 100)}%
                               </span>
@@ -284,9 +198,11 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                                     ? 'bg-primary'
                                     : 'bg-muted-foreground/30'
                                   }`}
-                                style={{ width: `${Math.round((step.stockAnalyses.filter((sa: any) => 
-                                  sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
-                                ).length / step.stockAnalyses.length) * 100)}%` }}
+                                style={{
+                                  width: `${Math.round((step.stockAnalyses.filter((sa: any) =>
+                                    sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
+                                  ).length / step.stockAnalyses.length) * 100)}%`
+                                }}
                               />
                             </div>
                           </div>
@@ -318,7 +234,7 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                       status: stockAnalysis.status,
                       agents: stockAnalysis.agents
                     });
-                    
+
 
                     // Define workflow steps and determine their status based on agent completion
                     const getWorkflowStepStatus = (agentKeys: string[]) => {
@@ -326,7 +242,7 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                       const hasCompleted = agentStatuses.some(s => s === 'completed');
                       const hasRunning = agentStatuses.some(s => s === 'running');
                       const allCompleted = agentStatuses.every(s => s === 'completed');
-                      
+
                       if (allCompleted && agentStatuses.length > 0) return 'completed';
                       if (hasCompleted || hasRunning) return 'running';
                       return 'pending';
@@ -335,49 +251,49 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                     // Get research and other steps from full_analysis workflow steps
                     const fullAnalysis = stockAnalysis.fullAnalysis || {};
                     const fullWorkflowSteps = fullAnalysis.workflowSteps || [];
-                    
+
                     const getStepStatusFromWorkflow = (stepId: string) => {
                       const step = fullWorkflowSteps.find((s: any) => s.id === stepId);
                       if (!step) return 'pending';
-                      
+
                       // Check if all agents in this step are completed
                       const agents = step.agents || [];
                       const allCompleted = agents.length > 0 && agents.every((a: any) => a.status === 'completed');
                       const anyRunning = agents.some((a: any) => a.status === 'running');
                       const anyCompleted = agents.some((a: any) => a.status === 'completed');
-                      
+
                       if (allCompleted) return 'completed';
                       if (anyRunning || anyCompleted) return 'running';
                       return 'pending';
                     };
 
                     const workflowSteps = [
-                      { 
-                        name: 'Data Analysis', 
-                        key: 'dataAnalysis', 
+                      {
+                        name: 'Data Analysis',
+                        key: 'dataAnalysis',
                         icon: BarChart3,
                         status: getWorkflowStepStatus(['marketAnalyst', 'newsAnalyst', 'socialMediaAnalyst', 'fundamentalsAnalyst'])
                       },
-                      { 
-                        name: 'Research', 
-                        key: 'research', 
+                      {
+                        name: 'Research',
+                        key: 'research',
                         icon: Brain,
                         status: getStepStatusFromWorkflow('research')
                       },
-                      { 
-                        name: 'Trading Decision', 
-                        key: 'trading', 
+                      {
+                        name: 'Trading Decision',
+                        key: 'trading',
                         icon: Activity,
                         status: getStepStatusFromWorkflow('trading')
                       },
-                      { 
-                        name: 'Risk Assessment', 
-                        key: 'risk', 
+                      {
+                        name: 'Risk Assessment',
+                        key: 'risk',
                         icon: Shield,
                         status: getStepStatusFromWorkflow('risk')
                       }
                     ];
-                    
+
                     return (
                       <div key={stockAnalysis.ticker} className="space-y-3">
                         <div className="flex items-center gap-2">
@@ -386,11 +302,11 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                           </Badge>
                           <span className="text-sm text-muted-foreground">Analysis</span>
                           {stockAnalysis.decision && stockAnalysis.decision !== 'PENDING' && (
-                            <Badge 
+                            <Badge
                               variant={
                                 stockAnalysis.decision === 'BUY' ? 'default' :
-                                stockAnalysis.decision === 'SELL' ? 'destructive' :
-                                'secondary'
+                                  stockAnalysis.decision === 'SELL' ? 'destructive' :
+                                    'secondary'
                               }
                               className="text-xs"
                             >
@@ -398,11 +314,10 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                             </Badge>
                           )}
                           {stockAnalysis.confidence > 0 && (
-                            <span className={`text-xs font-medium ${
-                              stockAnalysis.confidence >= 80 ? 'text-green-600 dark:text-green-400' :
+                            <span className={`text-xs font-medium ${stockAnalysis.confidence >= 80 ? 'text-green-600 dark:text-green-400' :
                               stockAnalysis.confidence >= 60 ? 'text-yellow-600 dark:text-yellow-400' :
-                              'text-red-600 dark:text-red-400'
-                            }`}>
+                                'text-red-600 dark:text-red-400'
+                              }`}>
                               {stockAnalysis.confidence}%
                             </span>
                           )}
@@ -590,9 +505,7 @@ function RebalancePositionCard({ position, onApprove, onReject, isExecuted }: {
         </div>
 
         {/* Reasoning */}
-        <p className="text-xs text-muted-foreground italic">
-          {position.reasoning}
-        </p>
+        <MarkdownRenderer content={position.reasoning} className="text-xs text-muted-foreground italic" />
 
         {/* Action Buttons */}
         {isPending && (
@@ -675,6 +588,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           throw new Error('Rebalance data not found');
         }
 
+        console.log('🔍 Full rebalance request:', rebalanceRequest);
+        console.log('🔍 Rebalance request keys:', Object.keys(rebalanceRequest));
+
         // Fetch related rebalance analyses from analysis_history table
         // Include all fields including the full_analysis JSON field that contains workflow steps
         const { data: rebalanceAnalyses, error: analysesError } = await supabase
@@ -689,7 +605,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         // Determine status
         let status = rebalanceRequest.status;
-        const isRunning = ['initializing', 'analyzing', 'planning', 'executing', 'pending_approval', 'pending_trades'].includes(status);
+        const isRunning = ['initializing', 'analyzing', 'planning', 'executing', 'pending_trades'].includes(status);
+        const isPendingApproval = status === 'pending_approval';
         const isCompleted = status === 'completed' || status === 'no_action_needed';
         const isCancelled = status === 'cancelled';
         const isFailed = status === 'failed';
@@ -700,35 +617,82 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         const rebalancePlan = rebalanceRequest.rebalance_plan || {};
         const portfolioSnapshot = rebalanceRequest.portfolio_snapshot || {};
         const targetAllocations = rebalanceRequest.target_allocations || {};
-        
+
+        console.log('📊 Rebalance plan:', rebalancePlan);
+        console.log('📊 Rebalance plan positions:', rebalancePlan.positions);
+        console.log('📊 Rebalance request status:', status);
+
         // Transform recommended positions from rebalance plan
-        const recommendedPositions = rebalancePlan.positions?.map((position: any) => ({
-          ticker: position.ticker,
-          currentShares: position.current_shares || 0,
-          currentValue: position.current_value || 0,
-          currentAllocation: position.current_allocation || 0,
-          targetAllocation: position.target_allocation || 0,
-          recommendedShares: position.recommended_shares || position.current_shares || 0,
-          shareChange: position.share_change || 0,
-          action: position.action || 'HOLD',
-          reasoning: position.reasoning || '',
+        // Look for positions in multiple possible locations
+        let positionsArray = rebalancePlan.positions || 
+                           rebalancePlan.recommendedPositions || 
+                           rebalancePlan.recommended_positions ||
+                           rebalancePlan.trades ||
+                           rebalancePlan.orders ||
+                           rebalancePlan.trade_orders ||
+                           rebalanceRequest.positions ||
+                           rebalanceRequest.recommended_positions ||
+                           rebalanceRequest.trades ||
+                           rebalanceRequest.orders ||
+                           [];
+
+        // If positions are empty but we have a rebalance plan with trade decisions, try to extract from there
+        if (positionsArray.length === 0 && rebalancePlan.tradeDecisions) {
+          positionsArray = rebalancePlan.tradeDecisions;
+        }
+
+        // If still empty, try to extract from rebalance plan text or create from portfolio data
+        if (positionsArray.length === 0 && rebalancePlan.portfolio_changes) {
+          positionsArray = rebalancePlan.portfolio_changes;
+        }
+        
+        // Also check for camelCase variations
+        if (positionsArray.length === 0 && rebalancePlan.tradeOrders) {
+          positionsArray = rebalancePlan.tradeOrders;
+        }
+
+        console.log('📊 Found positions array:', positionsArray);
+        console.log('📊 Positions array length:', positionsArray.length);
+
+        // TEMPORARY: If we're in pending_approval but have no positions, create sample data
+        // This helps identify if the issue is with data extraction or UI rendering
+        if (status === 'pending_approval' && positionsArray.length === 0) {
+          console.warn('⚠️ No positions found for pending_approval status. This is likely a data extraction issue.');
+          console.log('📊 Available rebalance_plan keys:', Object.keys(rebalancePlan));
+          
+          // Check if there's any text-based plan we can parse
+          if (rebalancePlan.portfolioManagerInsights || rebalancePlan.portfolio_manager_insights || rebalancePlan.plan_text) {
+            console.log('📊 Found plan text, but unable to extract structured positions');
+          }
+        }
+
+        const recommendedPositions = positionsArray.map((position: any) => ({
+          ticker: position.ticker || position.symbol || position.stock,
+          currentShares: position.current_shares || position.currentShares || position.current_quantity || 0,
+          currentValue: position.current_value || position.currentValue || position.current_market_value || 0,
+          currentAllocation: position.current_allocation || position.currentAllocation || position.current_percent || 0,
+          targetAllocation: position.target_allocation || position.targetAllocation || position.target_percent || 0,
+          recommendedShares: position.recommended_shares || position.recommendedShares || position.target_shares || position.new_quantity || position.current_shares || 0,
+          shareChange: position.share_change || position.shareChange || position.shares_to_trade || position.quantity_change || 0,
+          action: position.action || position.trade_action || position.trade_type || 'HOLD',
+          reasoning: position.reasoning || position.reason || position.rationale || '',
           executed: position.executed || false,
-          orderStatus: position.order_status,
-          alpacaOrderId: position.alpaca_order_id
-        })) || [];
+          orderStatus: position.order_status || position.orderStatus,
+          alpacaOrderId: position.alpaca_order_id || position.alpacaOrderId
+        }));
 
         // Build workflow steps based on status and workflow_steps data
         const workflowStepsData = rebalanceRequest.workflow_steps || {};
         console.log('📊 Workflow steps data from DB:', workflowStepsData);
         const workflowSteps = [];
-        
+
         // Add threshold check step
         if (!rebalanceRequest.skip_threshold_check) {
           const thresholdStep = workflowStepsData.threshold_check || {};
           console.log('🔍 Threshold step data:', thresholdStep);
           console.log('🔍 Threshold step status:', thresholdStep.status);
           console.log('🔍 Has threshold data:', !!thresholdStep.data);
-          
+
           // Determine threshold step status
           // Priority: 1) Check explicit status field, 2) Check if data exists, 3) Check overall workflow status
           let thresholdStatus = 'pending';
@@ -740,7 +704,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             // If we've moved past initializing, threshold must be complete
             thresholdStatus = 'completed';
           }
-          
+
           workflowSteps.push({
             id: 'threshold',
             title: 'Threshold Check',
@@ -757,7 +721,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           console.log('🎯 Opportunity step data:', opportunityStep);
           console.log('🎯 Opportunity step status:', opportunityStep.status);
           console.log('🎯 Has opportunity data:', !!opportunityStep.data);
-          
+
           // Determine opportunity step status
           // Priority: 1) Check explicit status field, 2) Check if data exists, 3) Check overall workflow status
           let opportunityStatus = 'pending';
@@ -769,7 +733,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             // If we've moved past analyzing, opportunity must be complete
             opportunityStatus = 'completed';
           }
-          
+
           // Parse the AI response if it's stored as a string
           let insights = opportunityStep.data;
           if (insights && typeof insights === 'string') {
@@ -785,7 +749,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               };
             }
           }
-          
+
           workflowSteps.push({
             id: 'opportunity',
             title: 'Opportunity Analysis',
@@ -800,7 +764,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         if (rebalanceAnalyses && rebalanceAnalyses.length > 0) {
           const stockAnalysisStep = workflowStepsData.stock_analysis || {};
           console.log('📊 Stock analysis step from DB:', stockAnalysisStep);
-          
+
           const stockAnalyses = rebalanceAnalyses.map((analysis: any) => {
             console.log(`📊 Analysis for ${analysis.ticker}:`, {
               analysis_status: analysis.analysis_status,
@@ -808,10 +772,10 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               confidence: analysis.confidence,
               has_insights: !!analysis.agent_insights
             });
-            
+
             // Determine individual analysis status based on analysis_status field
             let analysisStatus = 'pending';
-            
+
             // Be very explicit about the status checking
             if (analysis.analysis_status === 1) {
               analysisStatus = 'completed';
@@ -836,17 +800,17 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
             // Check agent completion from agent_insights
             const insights = analysis.agent_insights || {};
-            
+
             // Check if we have the full_analysis field which contains workflow steps
             const fullAnalysis = analysis.full_analysis || {};
             const workflowSteps = fullAnalysis.workflowSteps || [];
-            
+
             console.log(`📊 Full analysis for ${analysis.ticker}:`, {
               hasFullAnalysis: !!fullAnalysis,
               workflowStepsCount: workflowSteps.length,
               workflowSteps: workflowSteps
             });
-            
+
             // Try to get agent status from workflow steps first (more reliable)
             let agents = {
               marketAnalyst: 'pending',
@@ -854,19 +818,19 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               socialMediaAnalyst: 'pending',
               fundamentalsAnalyst: 'pending'
             };
-            
+
             // Find the analysis step in workflow
             const analysisStep = workflowSteps.find((s: any) => s.id === 'analysis');
             console.log(`📊 Analysis step for ${analysis.ticker}:`, analysisStep);
-            
+
             if (analysisStep && analysisStep.agents && analysisStep.agents.length > 0) {
               // Read the actual agent statuses from the workflow steps
               analysisStep.agents.forEach((agent: any) => {
                 const agentName = agent.name.toLowerCase().replace(/\s+/g, '');
                 const agentStatus = agent.status || 'pending';
-                
+
                 console.log(`📊 Agent ${agent.name} status from workflow: ${agentStatus}`);
-                
+
                 if (agentName.includes('market')) {
                   agents.marketAnalyst = agentStatus;
                 } else if (agentName.includes('news')) {
@@ -882,18 +846,18 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               // If analysis is running but no workflow steps yet, agents are pending/running
               // Only mark as completed if the agent actually has insights
               const isAnalysisRunning = analysisStatus === 'running';
-              
+
               agents = {
-                marketAnalyst: insights.marketAnalyst ? 'completed' : 
-                             isAnalysisRunning ? 'running' : 'pending',
-                newsAnalyst: insights.newsAnalyst ? 'completed' : 
-                           isAnalysisRunning ? 'running' : 'pending',
-                socialMediaAnalyst: insights.socialMediaAnalyst ? 'completed' : 
-                                  isAnalysisRunning ? 'running' : 'pending',
-                fundamentalsAnalyst: insights.fundamentalsAnalyst ? 'completed' : 
-                                   isAnalysisRunning ? 'running' : 'pending'
+                marketAnalyst: insights.marketAnalyst ? 'completed' :
+                  isAnalysisRunning ? 'running' : 'pending',
+                newsAnalyst: insights.newsAnalyst ? 'completed' :
+                  isAnalysisRunning ? 'running' : 'pending',
+                socialMediaAnalyst: insights.socialMediaAnalyst ? 'completed' :
+                  isAnalysisRunning ? 'running' : 'pending',
+                fundamentalsAnalyst: insights.fundamentalsAnalyst ? 'completed' :
+                  isAnalysisRunning ? 'running' : 'pending'
               };
-              
+
               console.log(`📊 Fallback agent status for ${analysis.ticker}:`, agents);
             }
 
@@ -913,13 +877,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           const completedAnalyses = stockAnalyses.filter((sa: any) => sa.status === 'completed').length;
           const runningAnalyses = stockAnalyses.filter((sa: any) => sa.status === 'running').length;
           const pendingAnalyses = stockAnalyses.filter((sa: any) => sa.status === 'pending').length;
-          
+
           console.log(`📊 Stock analyses breakdown: ${completedAnalyses} completed, ${runningAnalyses} running, ${pendingAnalyses} pending, ${stockAnalyses.length} total`);
-          
+
           // Determine overall status for the stock analysis step
           // Be very strict about when to mark as completed
           let stockAnalysisStatus = 'pending';
-          
+
           if (completedAnalyses === rebalanceAnalyses.length && completedAnalyses > 0) {
             // ALL analyses must be complete
             stockAnalysisStatus = 'completed';
@@ -933,14 +897,14 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             // Otherwise it's pending
             stockAnalysisStatus = 'pending';
           }
-          
+
           // NEVER trust DB status over our calculation
           if (stockAnalysisStep.status === 'completed' && stockAnalysisStatus !== 'completed') {
             console.warn('⚠️ DB says stock analysis completed but we have incomplete analyses - using our calculation');
           }
-          
+
           console.log(`📊 Final stock analysis status: ${stockAnalysisStatus}`);
-          
+
           workflowSteps.push({
             id: 'analysis',
             title: 'Stock Analysis',
@@ -959,17 +923,17 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         // Add Portfolio Manager step (rebalance planning)
         const rebalanceAgentStep = workflowStepsData.rebalance_agent || {};
         const portfolioManagerStep = workflowStepsData.portfolio_manager || {};
-        
+
         // Check if portfolio manager is complete or running
         // It's complete if either the rebalance_agent step is complete OR if we have a rebalance_plan
-        // It's running if status is 'planning' or 'pending_approval'
+        // It's running if status is 'planning'
         let portfolioManagerStatus = 'pending';
-        if (rebalanceAgentStep.status === 'completed' || portfolioManagerStep.status === 'completed' || rebalanceRequest.rebalance_plan) {
+        if (rebalanceAgentStep.status === 'completed' || portfolioManagerStep.status === 'completed' || rebalanceRequest.rebalance_plan || status === 'pending_approval') {
           portfolioManagerStatus = 'completed';
-        } else if (isRunning && (status === 'planning' || status === 'pending_approval')) {
+        } else if (isRunning && status === 'planning') {
           portfolioManagerStatus = 'running';
         }
-        
+
         workflowSteps.push({
           id: 'rebalance',
           title: 'Portfolio Manager',
@@ -980,10 +944,10 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         const rebalanceData = {
           id: rebalanceRequest.id,
-          status: isCompleted ? 'completed' : isRunning ? 'running' : isCancelled ? 'canceled' : isFailed ? 'error' : status,
+          status: isCompleted ? 'completed' : isPendingApproval ? 'pending_approval' : isRunning ? 'running' : isCancelled ? 'canceled' : isFailed ? 'error' : status,
           startedAt: rebalanceRequest.created_at,
           completedAt: rebalanceRequest.completed_at,
-          
+
           portfolio: {
             totalValue: portfolioSnapshot.total_value || 0,
             cashAvailable: portfolioSnapshot.cash_available || 0,
@@ -995,7 +959,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           },
 
           recommendedPositions,
-          
+
           agentInsights: {
             rebalanceAgent: rebalancePlan.rebalance_agent_insight || '',
             opportunityAgent: rebalancePlan.opportunity_agent_insight || ''
@@ -1185,7 +1149,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
       // Execute all pending orders
       const results = await Promise.allSettled(
-        pendingPositions.map((position: RebalancePosition) => 
+        pendingPositions.map((position: RebalancePosition) =>
           supabase.functions.invoke('execute-rebalance-trade', {
             body: {
               rebalanceId: rebalanceData.id,
@@ -1271,6 +1235,12 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                     Running
                   </Badge>
                 )}
+                {rebalanceData?.status === 'pending_approval' && (
+                  <Badge variant="default" className="text-sm">
+                    <Clock className="w-3 h-3 mr-1" />
+                    Pending Approval
+                  </Badge>
+                )}
                 {rebalanceData?.status === 'completed' && (
                   <Badge variant="secondary" className="text-sm">
                     <CheckCircle className="w-3 h-3 mr-1" />
@@ -1342,90 +1312,356 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                 ) : (
                   <>
                     <TabsContent value="actions" className="mt-6 space-y-4">
-                      {/* Summary Cards */}
-                      <div className="grid grid-cols-3 gap-4">
-                        <Card className="p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Total Buy Value</span>
-                            <TrendingUp className="w-4 h-4 text-green-500" />
-                          </div>
-                          <p className="text-lg font-semibold text-green-600">
-                            ${totalBuyValue.toLocaleString()}
-                          </p>
-                        </Card>
-                        <Card className="p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Total Sell Value</span>
-                            <TrendingDown className="w-4 h-4 text-red-500" />
-                          </div>
-                          <p className="text-lg font-semibold text-red-600">
-                            ${totalSellValue.toLocaleString()}
-                          </p>
-                        </Card>
-                        <Card className="p-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Net Cash Flow</span>
-                            <AlertCircle className="w-4 h-4 text-blue-500" />
-                          </div>
-                          <p className={`text-lg font-semibold ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {netCashFlow >= 0 ? '+' : ''}${netCashFlow.toLocaleString()}
-                          </p>
-                        </Card>
-                      </div>
+                      {/* Different states based on rebalance status */}
+                      {(() => {
+                        const isRunning = rebalanceData.status === 'running';
+                        const isAnalyzing = rebalanceData.status === 'analyzing' || rebalanceData.status === 'initializing';
+                        const isPlanning = rebalanceData.status === 'planning';
+                        const isPendingApproval = rebalanceData.status === 'pending_approval';
+                        const isExecuting = rebalanceData.status === 'executing' || rebalanceData.status === 'pending_trades';
+                        const isCompleted = rebalanceData.status === 'completed';
+                        const isCanceled = rebalanceData.status === 'canceled';
+                        const isError = rebalanceData.status === 'error';
+                        const hasPositions = rebalanceData.recommendedPositions && rebalanceData.recommendedPositions.length > 0;
+                        const allPositionsProcessed = rebalanceData.recommendedPositions?.every((p: RebalancePosition) => 
+                          executedTickers.has(p.ticker) || rejectedTickers.has(p.ticker) || p.shareChange === 0
+                        );
 
-                      {/* Rebalancing Positions */}
-                      <div className="space-y-3">
-                        {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
-                          const isExecuted = executedTickers.has(position.ticker);
-                          const isRejected = rejectedTickers.has(position.ticker);
-
-                          if (isRejected) return null;
-
+                        // State 1: Still analyzing stocks
+                        if (isAnalyzing) {
                           return (
-                            <RebalancePositionCard
-                              key={position.ticker}
-                              position={position}
-                              isExecuted={isExecuted}
-                              onApprove={() => handleApproveOrder(position.ticker)}
-                              onReject={() => handleRejectOrder(position.ticker)}
-                            />
+                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                              <div className="relative">
+                                <div className="w-20 h-20 rounded-full border-4 border-primary/20 animate-pulse" />
+                                <Loader2 className="w-20 h-20 absolute inset-0 animate-spin text-primary" />
+                              </div>
+                              <div className="text-center space-y-2">
+                                <h3 className="text-lg font-semibold">Analyzing Portfolio</h3>
+                                <p className="text-sm text-muted-foreground max-w-md">
+                                  Our AI agents are analyzing your holdings and market conditions to determine optimal rebalancing actions...
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                <span>This typically takes 2-5 minutes</span>
+                              </div>
+                            </div>
                           );
-                        })}
-                      </div>
+                        }
 
-                      {/* Execute Orders Button */}
-                      <div className="flex justify-between items-center mt-6">
-                        <div className="text-sm text-muted-foreground">
-                          {executedTickers.size > 0 && (
-                            <span className="text-green-600">
-                              {executedTickers.size} order{executedTickers.size !== 1 ? 's' : ''} executed
-                            </span>
-                          )}
-                          {executedTickers.size > 0 && rejectedTickers.size > 0 && ' • '}
-                          {rejectedTickers.size > 0 && (
-                            <span className="text-orange-600">
-                              {rejectedTickers.size} order{rejectedTickers.size !== 1 ? 's' : ''} skipped
-                            </span>
-                          )}
-                        </div>
-                        <Button
-                          onClick={handleExecuteAllOrders}
-                          disabled={!hasPendingOrders}
-                          className="min-w-[180px]"
-                        >
-                          {hasPendingOrders ? (
+                        // State 2: Planning rebalance (only when still planning and no positions yet)
+                        if (isPlanning && !hasPositions) {
+                          return (
+                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                              <div className="relative">
+                                <PieChart className="w-20 h-20 text-primary animate-pulse" />
+                              </div>
+                              <div className="text-center space-y-2">
+                                <h3 className="text-lg font-semibold">Calculating Optimal Strategy</h3>
+                                <p className="text-sm text-muted-foreground max-w-md">
+                                  Portfolio Manager is determining the best rebalancing strategy based on the analysis results...
+                                </p>
+                              </div>
+                              <Progress value={65} className="w-48" />
+                            </div>
+                          );
+                        }
+
+                        // State 3: Error occurred
+                        if (isError) {
+                          return (
+                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                              <div className="relative">
+                                <XCircle className="w-20 h-20 text-destructive" />
+                              </div>
+                              <div className="text-center space-y-2">
+                                <h3 className="text-lg font-semibold">Rebalance Failed</h3>
+                                <p className="text-sm text-muted-foreground max-w-md">
+                                  An error occurred during the rebalancing process. Please try again or contact support if the issue persists.
+                                </p>
+                              </div>
+                              <Button variant="outline" onClick={onClose}>
+                                Close
+                              </Button>
+                            </div>
+                          );
+                        }
+
+                        // State 4: Canceled
+                        if (isCanceled) {
+                          return (
+                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                              <div className="relative">
+                                <XCircle className="w-20 h-20 text-muted-foreground" />
+                              </div>
+                              <div className="text-center space-y-2">
+                                <h3 className="text-lg font-semibold">Rebalance Canceled</h3>
+                                <p className="text-sm text-muted-foreground max-w-md">
+                                  This rebalancing session was canceled. No orders were executed.
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // State 5: No actions needed
+                        if (hasPositions && rebalanceData.recommendedPositions.every((p: RebalancePosition) => p.shareChange === 0)) {
+                          return (
+                            <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                              <div className="relative">
+                                <CheckCircle className="w-20 h-20 text-green-500" />
+                              </div>
+                              <div className="text-center space-y-2">
+                                <h3 className="text-lg font-semibold">Portfolio is Balanced</h3>
+                                <p className="text-sm text-muted-foreground max-w-md">
+                                  Your portfolio is already well-balanced. No rebalancing actions are needed at this time.
+                                </p>
+                              </div>
+                              <Card className="p-4 bg-green-500/5 border-green-500/20">
+                                <div className="flex items-center gap-3">
+                                  <Shield className="w-5 h-5 text-green-500" />
+                                  <div className="text-sm">
+                                    <p className="font-medium">All positions within target allocations</p>
+                                    <p className="text-xs text-muted-foreground">Next review recommended in 30 days</p>
+                                  </div>
+                                </div>
+                              </Card>
+                            </div>
+                          );
+                        }
+
+                        // State 6: Has positions to show (including pending approval)
+                        if (hasPositions || isPendingApproval) {
+                          return (
                             <>
-                              <Activity className="w-4 h-4 mr-2" />
-                              Execute All Pending ({pendingPositions.length})
+                              {/* Status Banner for pending approval state */}
+                              {isPendingApproval && (
+                                <Card className="p-4 bg-blue-500/5 border-blue-500/20">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <AlertCircle className="w-5 h-5 text-blue-500" />
+                                      <div>
+                                        <p className="font-medium">Ready for Approval</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Review the recommended trades below and approve to execute
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <Badge variant="default" className="text-xs">
+                                      {(() => {
+                                        const tradesCount = rebalanceData.recommendedPositions?.filter((p: RebalancePosition) => p.shareChange !== 0).length || 0;
+                                        console.log('🔍 Trades count calculation:', {
+                                          recommendedPositions: rebalanceData.recommendedPositions,
+                                          positionsLength: rebalanceData.recommendedPositions?.length,
+                                          tradesWithChanges: rebalanceData.recommendedPositions?.filter((p: RebalancePosition) => p.shareChange !== 0),
+                                          tradesCount
+                                        });
+                                        return `${tradesCount} trades`;
+                                      })()}
+                                    </Badge>
+                                  </div>
+                                </Card>
+                              )}
+
+                              {/* Status Banner for running/executing states */}
+                              {(isRunning || isExecuting) && (
+                                <Card className="p-4 bg-primary/5 border-primary/20">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                                      <div>
+                                        <p className="font-medium">
+                                          {isExecuting ? 'Executing Orders' : 'Rebalance in Progress'}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {isExecuting 
+                                            ? 'Orders are being submitted to your broker...' 
+                                            : 'Preparing rebalancing recommendations...'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {isExecuting && (
+                                      <Badge variant="outline" className="text-xs">
+                                        <Activity className="w-3 h-3 mr-1" />
+                                        Live Trading
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </Card>
+                              )}
+
+                              {/* Completion Banner */}
+                              {isCompleted && allPositionsProcessed && (
+                                <Card className="p-4 bg-green-500/5 border-green-500/20">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <CheckCircle className="w-5 h-5 text-green-500" />
+                                      <div>
+                                        <p className="font-medium">Rebalance Complete</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          All orders have been processed successfully
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-sm font-medium">
+                                        {executedTickers.size} executed
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {rejectedTickers.size} skipped
+                                      </p>
+                                    </div>
+                                  </div>
+                                </Card>
+                              )}
+
+                              {/* Summary Cards */}
+                              <div className="grid grid-cols-3 gap-4">
+                                <Card className="p-4">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">Total Buy Value</span>
+                                    <TrendingUp className="w-4 h-4 text-green-500" />
+                                  </div>
+                                  <p className="text-lg font-semibold text-green-600">
+                                    ${totalBuyValue.toLocaleString()}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {pendingPositions.filter((p: RebalancePosition) => p.action === 'BUY').length} positions
+                                  </p>
+                                </Card>
+                                <Card className="p-4">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">Total Sell Value</span>
+                                    <TrendingDown className="w-4 h-4 text-red-500" />
+                                  </div>
+                                  <p className="text-lg font-semibold text-red-600">
+                                    ${totalSellValue.toLocaleString()}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {pendingPositions.filter((p: RebalancePosition) => p.action === 'SELL').length} positions
+                                  </p>
+                                </Card>
+                                <Card className="p-4">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">Net Cash Flow</span>
+                                    <DollarSign className="w-4 h-4 text-blue-500" />
+                                  </div>
+                                  <p className={`text-lg font-semibold ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {netCashFlow >= 0 ? '+' : ''}${Math.abs(netCashFlow).toLocaleString()}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {netCashFlow >= 0 ? 'Cash inflow' : 'Cash needed'}
+                                  </p>
+                                </Card>
+                              </div>
+
+                              {/* Section Header */}
+                              {pendingPositions.length > 0 && (
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h3 className="font-medium">Pending Orders</h3>
+                                    <p className="text-xs text-muted-foreground">
+                                      Review and approve each order before execution
+                                    </p>
+                                  </div>
+                                  <Badge variant="outline">
+                                    {pendingPositions.length} pending
+                                  </Badge>
+                                </div>
+                              )}
+
+                              {/* Rebalancing Positions */}
+                              <div className="space-y-3">
+                                {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
+                                  const isExecuted = executedTickers.has(position.ticker);
+                                  const isRejected = rejectedTickers.has(position.ticker);
+
+                                  if (isRejected) return null;
+
+                                  return (
+                                    <RebalancePositionCard
+                                      key={position.ticker}
+                                      position={position}
+                                      isExecuted={isExecuted}
+                                      onApprove={() => handleApproveOrder(position.ticker)}
+                                      onReject={() => handleRejectOrder(position.ticker)}
+                                    />
+                                  );
+                                })}
+                              </div>
+
+                              {/* Execute Orders Section with better states */}
+                              <div className="border-t pt-6">
+                                <div className="flex justify-between items-center">
+                                  <div className="space-y-1">
+                                    <div className="text-sm text-muted-foreground">
+                                      {executedTickers.size > 0 && (
+                                        <div className="flex items-center gap-2">
+                                          <CheckCircle className="w-4 h-4 text-green-600" />
+                                          <span className="text-green-600 font-medium">
+                                            {executedTickers.size} order{executedTickers.size !== 1 ? 's' : ''} executed
+                                          </span>
+                                        </div>
+                                      )}
+                                      {rejectedTickers.size > 0 && (
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <XCircle className="w-4 h-4 text-orange-600" />
+                                          <span className="text-orange-600 font-medium">
+                                            {rejectedTickers.size} order{rejectedTickers.size !== 1 ? 's' : ''} skipped
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {hasPendingOrders && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Execute all pending orders with one click
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    onClick={handleExecuteAllOrders}
+                                    disabled={!hasPendingOrders || isExecuting}
+                                    className="min-w-[200px]"
+                                    variant={hasPendingOrders ? "default" : "secondary"}
+                                  >
+                                    {isExecuting ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Executing Orders...
+                                      </>
+                                    ) : hasPendingOrders ? (
+                                      <>
+                                        <Zap className="w-4 h-4 mr-2" />
+                                        Execute All ({pendingPositions.length})
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        All Orders Processed
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
                             </>
-                          ) : (
-                            <>
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              All Orders Processed
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                          );
+                        }
+
+                        // Default empty state
+                        return (
+                          <div className="flex flex-col items-center justify-center p-12 space-y-6">
+                            <div className="relative">
+                              <Target className="w-20 h-20 text-muted-foreground/50" />
+                            </div>
+                            <div className="text-center space-y-2">
+                              <h3 className="text-lg font-semibold">No Actions Available</h3>
+                              <p className="text-sm text-muted-foreground max-w-md">
+                                Waiting for rebalancing recommendations...
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </TabsContent>
 
                     <TabsContent value="workflow" className="mt-6">
@@ -1458,7 +1694,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                     </p>
                                   </div>
                                 </div>
-                                
+
                                 {thresholdStep.insights.positionDrifts && thresholdStep.insights.positionDrifts.length > 0 && (
                                   <div className="border-t pt-3">
                                     <p className="text-sm font-medium mb-2">
@@ -1478,9 +1714,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                     </div>
                                   </div>
                                 )}
-                                
+
                                 <div className="border-t pt-3">
-                                  <p className="text-sm text-muted-foreground italic">{thresholdStep.insights.reasoning}</p>
+                                  <MarkdownRenderer content={thresholdStep.insights.reasoning} className="text-sm text-muted-foreground italic" />
                                 </div>
                               </CardContent>
                             </Card>
@@ -1508,13 +1744,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                 <CardContent className="pt-4">
                                   <div className="p-3 bg-muted/30 rounded">
                                     <p className="text-sm text-muted-foreground mb-2">AI Response (JSON parsing failed):</p>
-                                    <pre className="text-xs whitespace-pre-wrap font-mono">{parsedInsights}</pre>
+                                    <MarkdownRenderer content={parsedInsights} className="text-xs" />
                                   </div>
                                 </CardContent>
                               </Card>
                             );
                           }
-                          
+
                           return (
                             <Card className="overflow-hidden">
                               <CardHeader className="bg-muted/30">
@@ -1540,7 +1776,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                     </div>
                                   )}
                                 </div>
-                                
+
                                 {parsedInsights.selectedStocks && parsedInsights.selectedStocks.length > 0 && (
                                   <div className="border-t pt-3">
                                     <p className="text-sm font-medium mb-2">
@@ -1555,15 +1791,15 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                               {stock.priority}
                                             </Badge>
                                           </div>
-                                          <p className="text-sm text-muted-foreground">{stock.reason}</p>
+                                          <MarkdownRenderer content={stock.reason} className="text-sm text-muted-foreground" />
                                         </div>
                                       ))}
                                     </div>
                                   </div>
                                 )}
-                                
+
                                 <div className="border-t pt-3">
-                                  <p className="text-sm text-muted-foreground italic">{parsedInsights.reasoning}</p>
+                                  <MarkdownRenderer content={parsedInsights.reasoning} className="text-sm text-muted-foreground italic" />
                                 </div>
                               </CardContent>
                             </Card>
@@ -1654,10 +1890,10 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       {/* Portfolio Manager Insights */}
                       {(() => {
                         const portfolioStep = rebalanceData.workflowSteps?.find((s: any) => s.id === 'rebalance');
-                        const hasPortfolioInsights = rebalanceData.rebalance_plan?.portfolioManagerInsights || 
-                                                    rebalanceData.agentInsights?.portfolioManager ||
-                                                    rebalanceData.agentInsights?.rebalanceAgent;
-                        
+                        const hasPortfolioInsights = rebalanceData.rebalance_plan?.portfolioManagerInsights ||
+                          rebalanceData.agentInsights?.portfolioManager ||
+                          rebalanceData.agentInsights?.rebalanceAgent;
+
                         if (portfolioStep?.status === 'completed' && hasPortfolioInsights) {
                           return (
                             <Card className="overflow-hidden">

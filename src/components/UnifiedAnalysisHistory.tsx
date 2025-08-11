@@ -165,16 +165,19 @@ export default function UnifiedAnalysisHistory() {
     }
   }, [isAuthenticated, user]);
 
-  // Poll for updates every 2 seconds
+  // Poll for updates only when there are running analyses
   useEffect(() => {
     if (!user) return;
     
     const interval = setInterval(() => {
-      loadAllAnalyses();
-    }, 2000);
+      // Only poll if there are running analyses
+      if (runningAnalyses.length > 0) {
+        loadAllAnalyses();
+      }
+    }, 3000); // Poll every 3 seconds instead of 2
     
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, runningAnalyses.length]);
 
   const viewRunningAnalysis = (ticker: string) => {
     setSelectedTicker(ticker);

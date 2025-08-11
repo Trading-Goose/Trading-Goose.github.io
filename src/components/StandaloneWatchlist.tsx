@@ -433,12 +433,13 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       }
 
       try {
-        // Start analysis via edge function
-        // Don't send any credentials from frontend - edge function will fetch from database
-        const { data, error } = await supabase.functions.invoke('analyze-stock', {
+        // Start analysis via unified coordinator
+        // Don't send any credentials from frontend - coordinator will fetch from database
+        const { data, error } = await supabase.functions.invoke('analyze-stock-coordinator', {
           body: {
             ticker,
             userId: user?.id,
+            // No phase/agent/action - indicates new analysis request
           }
         });
 

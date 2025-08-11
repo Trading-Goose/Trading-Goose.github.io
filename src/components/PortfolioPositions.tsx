@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye } from "lucide-react";
+import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
 import { useAuth } from "@/lib/auth-supabase";
 import { supabase } from "@/lib/supabase";
@@ -39,6 +39,10 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   const [showRebalanceModal, setShowRebalanceModal] = useState(false);
   const [showRebalanceDetailModal, setShowRebalanceDetailModal] = useState(false);
   const [rebalancing, setRebalancing] = useState(false);
+  const [runningRebalance, setRunningRebalance] = useState<string | null>(null); // Store rebalance_request_id
+  
+  // Use ref to track previous running rebalance
+  const previousRunningRef = useRef<string | null>(null);
   
   const handleRebalanceClick = () => {
     if (!isAuthenticated) {
@@ -105,6 +109,57 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
     return () => clearInterval(interval);
   }, [apiSettings]);
 
+  // Check for running rebalance requests
+  useEffect(() => {
+    const checkRunningRebalance = async () => {
+      if (!user) return;
+      
+      try {
+        // Check for active rebalance requests
+        const { data, error } = await supabase
+          .from('rebalance_requests')
+          .select('id, status, created_at')
+          .eq('user_id', user.id)
+          .in('status', ['initializing', 'analyzing', 'pending_trades'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (!error && data && data.length > 0) {
+          const activeRebalance = data[0];
+          setRunningRebalance(activeRebalance.id);
+          
+          // Check if rebalance just started (wasn't running before)
+          if (!previousRunningRef.current && activeRebalance.id) {
+            console.log('New rebalance detected:', activeRebalance.id);
+          }
+          
+          previousRunningRef.current = activeRebalance.id;
+        } else {
+          // Check if rebalance just completed
+          if (previousRunningRef.current) {
+            console.log('Rebalance completed:', previousRunningRef.current);
+            toast({
+              title: "Rebalance Complete",
+              description: "Portfolio rebalancing has been completed",
+            });
+            // Refresh positions to show updated holdings
+            fetchPositions();
+          }
+          
+          setRunningRebalance(null);
+          previousRunningRef.current = null;
+        }
+      } catch (error) {
+        console.error('Error checking running rebalance:', error);
+      }
+    };
+    
+    checkRunningRebalance();
+    // Check every 5 seconds for rebalance status
+    const interval = setInterval(checkRunningRebalance, 5000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   return (
     <>
     <Card>
@@ -119,22 +174,29 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
             )}
           </div>
           <div className="flex items-center gap-2">
+            {runningRebalance && (
+              <Badge variant="secondary" className="animate-pulse">
+                <Activity className="h-3 w-3 mr-1" />
+                Rebalancing...
+              </Badge>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowRebalanceDetailModal(true)}
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              Rebalance Demo
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRebalanceClick}
+              onClick={runningRebalance ? () => setShowRebalanceDetailModal(true) : handleRebalanceClick}
               disabled={loading}
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Rebalance Holdings
+              {runningRebalance ? (
+                <>
+                  <Eye className="h-4 w-4 mr-2" />
+                  Rebalance Detail
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Rebalance Holdings
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -228,35 +290,29 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
     <RebalanceModal 
       isOpen={showRebalanceModal} 
       onClose={() => setShowRebalanceModal(false)}
-      onApprove={async (selectedPositions, config) => {
+      onApprove={async (selectedPositions, config, modalPortfolioData) => {
         console.log('Rebalancing positions:', selectedPositions);
         console.log('Rebalance config:', config);
+        console.log('Portfolio data from modal:', modalPortfolioData);
         
         setRebalancing(true);
         
         try {
-          // Build target allocations from selected positions
+          // Don't pre-calculate individual stock allocations
+          // Let the Portfolio Manager agent decide based on analysis results
+          // We only pass the total stock/cash allocation split
           const targetAllocations: Record<string, number> = {};
           
-          // For now, distribute equally among selected stocks
-          // (In production, you might want to allow custom allocation per stock)
-          const stockAllocationPercent = 100 - config.targetCashAllocation;
-          const perStockAllocation = selectedPositions.length > 0 
-            ? stockAllocationPercent / selectedPositions.length 
-            : 0;
-          
-          selectedPositions.forEach(pos => {
-            targetAllocations[pos.ticker] = perStockAllocation;
-          });
+          // Leave targetAllocations empty - Portfolio Manager will decide
+          // The constraints object below includes targetCashAllocation
+          // which tells the Portfolio Manager the stock/cash split
           
           // Build constraints object
+          // Note: When useDefaultSettings is true, config already has the values from apiSettings
+          // (loaded in RebalanceModal's loadData function)
           const constraints = {
-            maxPositionSize: config.useDefaultSettings 
-              ? (apiSettings?.default_max_position_size || config.maxPosition)
-              : config.maxPosition,
-            minPositionSize: config.useDefaultSettings
-              ? (apiSettings?.default_min_position_size || config.minPosition)
-              : config.minPosition,
+            maxPositionSize: config.maxPosition,
+            minPositionSize: config.minPosition,
             rebalanceThreshold: config.rebalanceThreshold,
             targetCashAllocation: config.targetCashAllocation,
             includeTickers: selectedPositions.map(p => p.ticker),
@@ -267,13 +323,38 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
             skipThresholdCheck: config.skipThresholdCheck
           };
           
-          // Call portfolio-manager edge function for rebalancing
-          const { data, error } = await supabase.functions.invoke('portfolio-manager', {
+          // Use portfolio data from modal if available, otherwise calculate from positions
+          const portfolioData = modalPortfolioData || {
+            totalValue: positions.reduce((sum, p) => sum + (p.marketValue || 0), 0),
+            positions: selectedPositions.map(pos => ({
+              ticker: pos.ticker,
+              value: pos.currentValue || 0,
+              costBasis: pos.costBasis || (pos.currentShares * pos.averageCost) || 0,
+              dayChangePercent: pos.dayChangePercent || 0,
+              shares: pos.currentShares || 0
+            }))
+          };
+          
+          console.log('Sending to coordinator:', {
+            tickers: selectedPositions.map(p => p.ticker),
+            portfolioData,
+            targetAllocations,
+            constraints
+          });
+          
+          // Call analyze-stock-coordinator edge function with rebalance context
+          // Note: Do NOT pass apiSettings or credentials - edge function will fetch from database
+          const { data, error } = await supabase.functions.invoke('analyze-stock-coordinator', {
             body: {
               userId: user?.id,
+              tickers: selectedPositions.map(p => p.ticker),
+              action: 'start-rebalance',
               targetAllocations,
               constraints,
-              action: 'rebalance'
+              portfolioData,
+              skipOpportunityAgent: config.skipOpportunityAgent,
+              rebalanceThreshold: config.rebalanceThreshold,
+              useDefaultSettings: config.useDefaultSettings
             }
           });
           
@@ -305,8 +386,9 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       }}
     />
     
-    {/* Rebalance Detail Modal (Demo) */}
+    {/* Rebalance Detail Modal */}
     <RebalanceDetailModal
+      rebalanceId={runningRebalance || undefined}
       isOpen={showRebalanceDetailModal}
       onClose={() => setShowRebalanceDetailModal(false)}
     />

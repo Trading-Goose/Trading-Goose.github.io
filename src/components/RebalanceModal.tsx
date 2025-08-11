@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import {
   RefreshCw,
   TrendingUp,
@@ -23,10 +24,12 @@ import {
   Settings,
   List,
   ArrowRight,
-  Loader2
+  Loader2,
+  Eye
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-supabase";
 import { alpacaAPI } from "@/lib/alpaca";
+import { supabase } from "@/lib/supabase";
 
 interface RebalancePosition {
   ticker: string;
@@ -50,7 +53,7 @@ interface RebalanceConfig {
 interface RebalanceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApprove: (positions: RebalancePosition[], config: RebalanceConfig) => void;
+  onApprove: (positions: RebalancePosition[], config: RebalanceConfig, portfolioData?: { totalValue: number; cashBalance: number }) => void;
 }
 
 // Generate a random color for each stock
@@ -77,6 +80,11 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
   const [cashAllocation, setCashAllocation] = useState(0);
   const [selectedPositions, setSelectedPositions] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [includeWatchlist, setIncludeWatchlist] = useState(false);
+  const [watchlistStocks, setWatchlistStocks] = useState<string[]>([]);
+  const [loadingWatchlist, setLoadingWatchlist] = useState(false);
+  const [portfolioTotalValue, setPortfolioTotalValue] = useState(0);
+  const [portfolioCashBalance, setPortfolioCashBalance] = useState(0);
 
   // Configuration state
   const [config, setConfig] = useState<RebalanceConfig>({
@@ -101,8 +109,73 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
       setSelectedPositions(new Set());
       setError(null);
       setActiveTab("config");
+      setIncludeWatchlist(false);
+      setWatchlistStocks([]);
     }
   }, [isOpen, apiSettings]);
+
+  // Load watchlist stocks when includeWatchlist changes
+  useEffect(() => {
+    if (includeWatchlist && user) {
+      loadWatchlistStocks();
+    } else if (!includeWatchlist) {
+      // Remove watchlist stocks from selection when disabled
+      const newSelection = new Set(selectedPositions);
+      watchlistStocks.forEach(ticker => {
+        newSelection.delete(ticker);
+      });
+      setSelectedPositions(newSelection);
+      setWatchlistStocks([]);
+    }
+  }, [includeWatchlist, user, positions]);
+
+  const loadWatchlistStocks = async () => {
+    if (!user) return;
+    
+    setLoadingWatchlist(true);
+    try {
+      const { data, error } = await supabase
+        .from('watchlist')
+        .select('ticker')
+        .eq('user_id', user.id)
+        .order('ticker');
+      
+      if (error) {
+        console.error('Error loading watchlist:', error);
+        return;
+      }
+      
+      if (data) {
+        // Filter out stocks that are already in positions
+        const positionTickers = new Set(positions.map(p => p.ticker));
+        const watchlistOnlyStocks = data
+          .map(item => item.ticker)
+          .filter(ticker => !positionTickers.has(ticker));
+        
+        setWatchlistStocks(watchlistOnlyStocks);
+        
+        // Auto-select all watchlist stocks when loaded
+        if (watchlistOnlyStocks.length > 0) {
+          setSelectedPositions(prev => {
+            const newSelection = new Set(prev);
+            watchlistOnlyStocks.forEach(ticker => {
+              newSelection.add(ticker);
+            });
+            return newSelection;
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading watchlist:', error);
+    } finally {
+      setLoadingWatchlist(false);
+    }
+  };
+
+  const handleIncludeWatchlistChange = (checked: boolean) => {
+    setIncludeWatchlist(checked);
+    // The actual selection/deselection happens in the useEffect and loadWatchlistStocks
+  };
 
   const loadData = async () => {
     // Check if API settings are available
@@ -153,6 +226,10 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
       if (totalEquity === 0) {
         throw new Error('Account has no equity');
       }
+      
+      // Store portfolio values
+      setPortfolioTotalValue(totalEquity);
+      setPortfolioCashBalance(cashBalance);
 
       // Process positions if any exist
       if (positionsData && Array.isArray(positionsData) && positionsData.length > 0) {
@@ -196,10 +273,32 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
   };
 
   const handleRebalance = () => {
-    const positionsToRebalance = positions.filter(p =>
+    // Include both positions and watchlist stocks if selected
+    let positionsToRebalance = positions.filter(p =>
       selectedPositions.has(p.ticker)
     );
-    onApprove(positionsToRebalance, config);
+    
+    // Add watchlist stocks as zero-position entries if included
+    if (includeWatchlist) {
+      const watchlistPositions = watchlistStocks
+        .filter(ticker => selectedPositions.has(ticker))
+        .map(ticker => ({
+          ticker,
+          currentShares: 0,
+          currentValue: 0,
+          currentAllocation: 0
+        }));
+      
+      positionsToRebalance = [...positionsToRebalance, ...watchlistPositions];
+    }
+    
+    // Pass portfolio data if available
+    const portfolioData = portfolioTotalValue > 0 ? {
+      totalValue: portfolioTotalValue,
+      cashBalance: portfolioCashBalance
+    } : undefined;
+    
+    onApprove(positionsToRebalance, config, portfolioData);
     onClose();
   };
 
@@ -321,7 +420,7 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
                         className="w-full"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Minimum deviation from target allocation to trigger rebalancing
+                        Minimum allocation drift to trigger rebalancing. When drift is below this threshold, only stocks with compelling market signals will be analyzed (via Opportunity Agent).
                       </p>
 
                       {/* Skip Threshold Check Option */}
@@ -364,13 +463,13 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
                           className={`text-sm font-normal cursor-pointer ${config.skipThresholdCheck ? 'opacity-50' : ''
                             }`}
                         >
-                          Skip opportunity analysis
+                          Skip opportunity analysis (analyze all selected stocks)
                         </Label>
                       </div>
                       <p className="text-xs text-muted-foreground pl-6">
                         {config.skipThresholdCheck
-                          ? "Opportunity analysis is automatically skipped when skip threshold check is enabled"
-                          : "When enabled, rebalance agent will skip opportunity analysis regardless of rebalance threshold"
+                          ? "Opportunity analysis is automatically skipped when forcing rebalance (skip threshold check)"
+                          : "When disabled, the Opportunity Agent evaluates market conditions to filter stocks for analysis when drift is below threshold"
                         }
                       </p>
                     </div>
@@ -404,6 +503,39 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
                     </div>
                   </div>
 
+                  {/* Workflow Explanation */}
+                  {!config.skipThresholdCheck && !config.skipOpportunityAgent && (
+                    <div className="pt-4 border-t">
+                      <h4 className="text-sm font-semibold mb-2">How Rebalancing Works</h4>
+                      <div className="space-y-2 text-xs text-muted-foreground">
+                        <div className="flex items-start gap-2">
+                          <span className="font-medium">1.</span>
+                          <span>Calculate allocation drift for all selected stocks</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="font-medium">2.</span>
+                          <span>
+                            If max drift &lt; {config.rebalanceThreshold}%: Opportunity Agent evaluates market signals to identify high-priority stocks
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="font-medium">3.</span>
+                          <span>
+                            If max drift &ge; {config.rebalanceThreshold}%: Analyze all selected stocks immediately
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="font-medium">4.</span>
+                          <span>Run full multi-agent analysis on selected stocks</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="font-medium">5.</span>
+                          <span>Portfolio Manager creates optimal rebalance trades</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Summary */}
                   <div className="pt-4 border-t">
                     <h4 className="text-sm font-semibold mb-3">Configuration Summary</h4>
@@ -431,12 +563,19 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Opportunity Analysis:</span>
                         <span className="font-medium">
-                          {config.skipOpportunityAgent || config.skipThresholdCheck ? 'Disabled' : 'Enabled'}
+                          {config.skipOpportunityAgent || config.skipThresholdCheck ? 
+                            'Disabled (all stocks analyzed)' : 
+                            'Enabled (smart filtering)'}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Selected Stocks:</span>
-                        <span className="font-medium">{selectedPositions.size} stocks</span>
+                        <span className="font-medium">
+                          {selectedPositions.size} {selectedPositions.size === 1 ? 'stock' : 'stocks'}
+                          {includeWatchlist && watchlistStocks.filter(t => selectedPositions.has(t)).length > 0 && 
+                            ` (${watchlistStocks.filter(t => selectedPositions.has(t)).length} from watchlist)`
+                          }
+                        </span>
                       </div>
                     </div>
                     {config.skipThresholdCheck && (
@@ -449,7 +588,7 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
                     {!config.skipThresholdCheck && !config.skipOpportunityAgent && (
                       <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                         <p className="text-xs text-blue-700 dark:text-blue-400">
-                          💡 Opportunity analysis enabled - AI may suggest additional stocks beyond your selection
+                          💡 Opportunity analysis enabled - When allocation drift is below threshold, AI will evaluate selected stocks (including watchlist) to identify which ones have compelling market signals and warrant full analysis
                         </p>
                       </div>
                     )}
@@ -549,14 +688,79 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
                   </Card>
                 )}
 
+                {/* Include Watchlist Stocks Option */}
+                <Card className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label htmlFor="include-watchlist" className="text-sm font-semibold">
+                          Include Watchlist Stocks
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Add stocks from your watchlist to the rebalancing analysis
+                        </p>
+                      </div>
+                      <Switch
+                        id="include-watchlist"
+                        checked={includeWatchlist}
+                        onCheckedChange={handleIncludeWatchlistChange}
+                        disabled={loadingWatchlist}
+                      />
+                    </div>
+                    
+                    {includeWatchlist && watchlistStocks.length > 0 && (
+                      <div className="pt-2 border-t">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Watchlist stocks available for analysis (not in portfolio):
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {watchlistStocks.map(ticker => {
+                            const isSelected = selectedPositions.has(ticker);
+                            return (
+                              <Badge 
+                                key={ticker} 
+                                variant={isSelected ? "default" : "secondary"}
+                                className="text-xs cursor-pointer"
+                                onClick={() => togglePosition(ticker)}
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                {ticker}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {includeWatchlist && !config.skipOpportunityAgent && !config.skipThresholdCheck && (
+                      <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-md">
+                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                          🎯 When allocation drift is below threshold, only stocks with strong market signals will be analyzed
+                        </p>
+                      </div>
+                    )}
+                    
+                    {loadingWatchlist && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span className="text-xs">Loading watchlist...</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
                 {/* Stock Selection List */}
-                {positions.length === 0 ? (
+                {positions.length === 0 && watchlistStocks.length === 0 ? (
                   <Card className="p-6 text-center">
                     <p className="text-muted-foreground">No positions found in your account</p>
                   </Card>
                 ) : (
                   <div className="space-y-3">
-                    {positions.map((position) => {
+                    {/* Current Portfolio Positions */}
+                    {positions.length > 0 && (
+                      <>
+                        <h4 className="text-sm font-semibold text-muted-foreground">Portfolio Holdings</h4>
+                        {positions.map((position) => {
                       const isSelected = selectedPositions.has(position.ticker);
 
                       return (
@@ -610,6 +814,50 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
                         </div>
                       );
                     })}
+                      </>
+                    )}
+                    
+                    {/* Watchlist Stocks (if included) */}
+                    {includeWatchlist && watchlistStocks.length > 0 && (
+                      <>
+                        <h4 className="text-sm font-semibold text-muted-foreground mt-4">Watchlist Stocks (Not in Portfolio)</h4>
+                        {watchlistStocks.map((ticker) => {
+                          const isSelected = selectedPositions.has(ticker);
+                          
+                          return (
+                            <div
+                              key={ticker}
+                              className={`p-4 rounded-lg border transition-all cursor-pointer ${isSelected ? 'bg-muted/50 border-primary' : 'bg-background border-border'
+                                }`}
+                              onClick={() => togglePosition(ticker)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() => togglePosition(ticker)}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <span className="font-semibold">{ticker}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    <Eye className="w-3 h-3 mr-1" />
+                                    Watchlist
+                                  </Badge>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm text-muted-foreground">
+                                    Not currently owned
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Available for opportunity analysis
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -628,7 +876,7 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
               disabled={selectedPositions.size === 0 || loading}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
-              Execute Rebalancing ({selectedPositions.size} positions)
+              Execute Rebalancing ({selectedPositions.size} {selectedPositions.size === 1 ? 'stock' : 'stocks'})
             </Button>
           </div>
         </div>

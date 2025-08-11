@@ -375,6 +375,9 @@ function WorkflowStepsLayout({ analysisData, onApproveOrder, onRejectOrder, isOr
   onRejectOrder?: () => void;
   isOrderExecuted?: boolean;
 }) {
+  // Check if this analysis is part of a rebalance request
+  const isRebalanceAnalysis = !!analysisData.rebalance_request_id;
+  
   const workflowSteps = [
     {
       id: 'analysis',
@@ -419,8 +422,13 @@ function WorkflowStepsLayout({ analysisData, onApproveOrder, onRejectOrder, isOr
         { name: 'Neutral Analyst', key: 'neutralAnalyst', icon: Activity },
         { name: 'Risk Manager', key: 'riskManager', icon: Shield }
       ]
-    },
-    {
+    }
+  ];
+  
+  // Only add Portfolio Management step if this is NOT a rebalance analysis
+  // For rebalance analyses, the portfolio manager runs once for all stocks together
+  if (!isRebalanceAnalysis) {
+    workflowSteps.push({
       id: 'portfolio',
       title: 'Portfolio Management',
       description: 'Position sizing and trade order generation',
@@ -428,8 +436,8 @@ function WorkflowStepsLayout({ analysisData, onApproveOrder, onRejectOrder, isOr
       agents: [
         { name: 'Portfolio Manager', key: 'portfolioManager', icon: Briefcase }
       ]
-    }
-  ];
+    });
+  }
 
   const getAgentStatus = (agentKey: string, stepId?: string) => {
     // Special handling for research phase agents
@@ -762,7 +770,9 @@ function WorkflowStepsLayout({ analysisData, onApproveOrder, onRejectOrder, isOr
               Overall Progress
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Analysis workflow execution status
+              {isRebalanceAnalysis 
+                ? "Stock analysis for rebalance workflow (Portfolio Manager runs after all stocks complete)"
+                : "Analysis workflow execution status"}
             </p>
           </div>
           <div>
@@ -1050,7 +1060,15 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
           if (analysisToLoad.analysis_status === -1) {
             status = analysisToLoad.is_canceled ? 'canceled' : 'error';
           } else if (analysisToLoad.analysis_status === 0) {
-            status = 'running';
+            // Check if this is a rebalance analysis and Risk Manager has completed
+            if (analysisToLoad.rebalance_request_id && 
+                analysisToLoad.agent_insights?.riskManager) {
+              // For rebalance workflows, consider complete when Risk Manager finishes
+              console.log('Rebalance analysis with Risk Manager complete - marking as completed');
+              status = 'completed';
+            } else {
+              status = 'running';
+            }
           } else if (analysisToLoad.analysis_status === 1) {
             status = 'completed';
           }
@@ -1123,15 +1141,13 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
 
           // Start polling if running
           if (status === 'running' && !analysisDate) {
-            console.log('Starting polling...');
             if (intervalRef.current) {
               clearInterval(intervalRef.current);
             }
             intervalRef.current = setInterval(() => {
               loadAnalysis();
-            }, 2000);
+            }, 3000); // Poll every 3 seconds
           } else if (status !== 'running' && intervalRef.current) {
-            console.log('Stopping polling, analysis completed');
             clearInterval(intervalRef.current);
             intervalRef.current = undefined;
           }
@@ -1371,7 +1387,17 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                 <ScrollArea className="h-[calc(90vh-280px)]">
                   <div className="px-6 pb-6">
                     <TabsContent value="actions" className="mt-6 space-y-4">
-                      {/* Trade Order Section */}
+                      {/* For rebalance analyses, show a message that actions are handled at rebalance level */}
+                      {analysisData.rebalance_request_id ? (
+                        <div className="rounded-lg border bg-muted/20 p-6 text-center">
+                          <Shield className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                          <h3 className="text-lg font-semibold mb-2">Part of Rebalance Workflow</h3>
+                          <p className="text-sm text-muted-foreground">
+                            This analysis is part of a portfolio rebalance. Trade orders will be generated 
+                            after all stock analyses complete and are managed in the Rebalance view.
+                          </p>
+                        </div>
+                      ) : (
                       <div className="space-y-4">
                         {/* Summary Cards */}
                         <div className="grid grid-cols-3 gap-4">
@@ -1455,6 +1481,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                           </Card>
                         )}
                       </div>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="workflow" className="mt-6">
@@ -1528,6 +1555,11 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                           // Sort entries based on the defined order
                           // Get entries from agent_insights
                           let entries = Object.entries(analysisData.agent_insights);
+                          
+                          // Filter out Portfolio Manager for rebalance analyses
+                          if (analysisData.rebalance_request_id) {
+                            entries = entries.filter(([agent]) => agent !== 'portfolioManager');
+                          }
                           
                           // Add missing agents that have messages but no insights
                           const missingAgents = ['fundamentalsAnalyst', 'safeAnalyst'];

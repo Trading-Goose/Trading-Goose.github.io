@@ -138,9 +138,9 @@ export interface Watchlist {
 
 // Supabase Edge Functions for secure operations
 export const supabaseFunctions = {
-  // Call edge function to analyze stock with TradingGoose
+  // Call unified coordinator to analyze stock with TradingGoose
   analyzeStock: async (ticker: string, date: string) => {
-    const { data, error } = await supabase.functions.invoke('analyze-stock', {
+    const { data, error } = await supabase.functions.invoke('analyze-stock-coordinator', {
       body: { ticker, date }
     });
 

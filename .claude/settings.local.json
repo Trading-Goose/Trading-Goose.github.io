@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(npx supabase:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy analyze-stock-coordinator --project-ref lnvjsqyvhczgxvygbqer)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase db push --project-ref lnvjsqyvhczgxvygbqer)"
+    ],
+    "deny": []
+  }
+}

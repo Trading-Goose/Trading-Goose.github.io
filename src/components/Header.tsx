@@ -8,7 +8,8 @@ import {
   LogOut,
   User as UserIcon,
   FileText,
-  Home
+  Home,
+  RefreshCw
 } from "lucide-react";
 import { useAuth, hasRequiredApiKeys } from "@/lib/auth-supabase";
 import LoginModal from "./LoginModal";
@@ -55,6 +56,12 @@ export default function Header() {
                     <Button variant="ghost" size="sm">
                       <FileText className="h-4 w-4 mr-2" />
                       Analysis Records
+                    </Button>
+                  </Link>
+                  <Link to="/rebalance-records">
+                    <Button variant="ghost" size="sm">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Rebalance Records
                     </Button>
                   </Link>
                 </>

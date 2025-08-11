@@ -33,11 +33,12 @@ export class ServerAnalysisManager {
     userId: string
   ): Promise<string> {
     try {
-      // Don't send any credentials from frontend - edge function will fetch from database
-      const { data, error } = await supabase.functions.invoke('analyze-stock', {
+      // Don't send any credentials from frontend - coordinator will fetch from database
+      const { data, error } = await supabase.functions.invoke('analyze-stock-coordinator', {
         body: {
           ticker,
           userId,
+          // No phase/agent/action - indicates new analysis request
         }
       });
 

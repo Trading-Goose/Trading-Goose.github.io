@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import AnalysisRecords from "./pages/AnalysisRecords";
+import RebalanceRecords from "./pages/RebalanceRecords";
 import AlphaVantageTest from "./pages/AlphaVantageTest";
 import NotFound from "./pages/NotFound";
 import { supabase, supabaseHelpers } from "@/lib/supabase";
@@ -22,6 +23,7 @@ const AppRoutes = () => {
       <Route path="/settings" element={<Settings />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/analysis-records" element={<AnalysisRecords />} />
+      <Route path="/rebalance-records" element={<RebalanceRecords />} />
       <Route path="/alpha-vantage-test" element={<AlphaVantageTest />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

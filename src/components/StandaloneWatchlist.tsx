@@ -148,8 +148,17 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
               const currentPrice = data.quote.ap || data.quote.bp || 0;
               updates.currentPrice = currentPrice;
               
-              // Calculate price change if we have previous bar
-              if (data.previousBar) {
+              // Calculate today's change from open (during market hours)
+              // Use currentBar (today's bar) instead of previousBar
+              if (data.currentBar) {
+                const todayOpen = data.currentBar.o; // Today's open price
+                const dayChange = currentPrice - todayOpen;
+                const dayChangePercent = todayOpen > 0 ? (dayChange / todayOpen) * 100 : 0;
+                updates.priceChange = dayChange;
+                updates.priceChangePercent = dayChangePercent;
+                console.log(`${item.ticker}: Open: ${todayOpen}, Current: ${currentPrice}, Change: ${dayChange} (${dayChangePercent.toFixed(2)}%)`);
+              } else if (data.previousBar) {
+                // Fallback to previous close if no current bar (market closed)
                 const previousClose = data.previousBar.c;
                 const dayChange = currentPrice - previousClose;
                 const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;
@@ -388,8 +397,15 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           const currentPrice = data.quote.ap || data.quote.bp || 0;
           updates.currentPrice = currentPrice;
           
-          // Calculate price change if we have previous bar
-          if (data.previousBar) {
+          // Calculate today's change from open (during market hours)
+          if (data.currentBar) {
+            const todayOpen = data.currentBar.o; // Today's open price
+            const dayChange = currentPrice - todayOpen;
+            const dayChangePercent = todayOpen > 0 ? (dayChange / todayOpen) * 100 : 0;
+            updates.priceChange = dayChange;
+            updates.priceChangePercent = dayChangePercent;
+          } else if (data.previousBar) {
+            // Fallback to previous close if no current bar (market closed)
             const previousClose = data.previousBar.c;
             const dayChange = currentPrice - previousClose;
             const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;

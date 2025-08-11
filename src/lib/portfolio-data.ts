@@ -38,7 +38,12 @@ const formatTimestamp = (timestamp: number, period: string): string => {
   
   switch (period) {
     case '1D':
-      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      // Use 24-hour format for clarity, display in user's local timezone
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false
+      });
     case '1W':
       return date.toLocaleDateString('en-US', { weekday: 'short' });
     case '1M':
@@ -105,12 +110,41 @@ const convertAlpacaHistory = (
     return [];
   }
 
-  const baseValue = history.base_value || history.equity[0];
+  // For 1D period, we want to use the value at market open (9:30 AM ET) as reference
+  // not the base_value which might be from previous close
+  let baseValue = history.base_value || history.equity[0];
+  
+  if (period === '1D' && history.timestamp.length > 0) {
+    // Find the first timestamp that's at or after 9:30 AM ET (market open)
+    // Alpaca timestamps are in seconds since epoch
+    let marketOpenIndex = 0;
+    
+    for (let i = 0; i < history.timestamp.length; i++) {
+      const date = new Date(history.timestamp[i] * 1000);
+      // Get the time in ET
+      const etTime = date.toLocaleTimeString('en-US', {
+        timeZone: 'America/New_York',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
+      // Check if this is at or after 09:30
+      if (etTime >= '09:30') {
+        marketOpenIndex = i;
+        break;
+      }
+    }
+    
+    // Use the value at market open as the base
+    baseValue = history.equity[marketOpenIndex];
+    console.log(`Portfolio 1D: Using market open value as base: ${baseValue} (index: ${marketOpenIndex})`);
+  }
   
   return history.timestamp.map((timestamp: number, index: number) => {
     const value = history.equity[index];
     const pnl = value - baseValue;
-    const pnlPercent = ((value - baseValue) / baseValue) * 100;
+    const pnlPercent = baseValue > 0 ? ((value - baseValue) / baseValue) * 100 : 0;
     
     return {
       time: formatTimestamp(timestamp, period),
@@ -166,8 +200,7 @@ export const fetchPortfolioData = async (): Promise<PortfolioData> => {
 // Helper to convert Alpaca bar data to our format
 const convertBarsToDataPoints = (
   bars: any[],
-  period: string,
-  previousClose?: number
+  period: string
 ): PortfolioDataPoint[] => {
   if (!bars || bars.length === 0) {
     console.log(`No bars to convert for period ${period}`);
@@ -185,9 +218,9 @@ const convertBarsToDataPoints = (
     return [];
   }
   
-  // For 1D period with previousClose, use previousClose as the reference point
-  // Otherwise use the first bar's price
-  const referencePrice = (period === '1D' && previousClose !== undefined) ? previousClose : firstPrice;
+  // For 1D period, use the first bar's price (market open) as reference
+  // This shows today's change from open, not from previous close
+  const referencePrice = firstPrice;
   
   return bars.map((bar: any) => {
     const price = bar.c !== undefined ? bar.c : bar.close;
@@ -207,12 +240,13 @@ const convertBarsToDataPoints = (
     
     switch (period) {
       case '1D':
-        // Use 24-hour format to make it clearer, and specify timezone
+        // Display in user's local timezone - the date object already has the correct time
+        // from Alpaca's RFC3339 timestamps which include timezone info
         timeLabel = date.toLocaleTimeString('en-US', { 
           hour: '2-digit', 
           minute: '2-digit',
-          hour12: false,
-          timeZone: 'America/New_York' // Use ET for market hours
+          hour12: false
+          // Don't specify timeZone - let it use the user's local timezone
         });
         break;
       case '1W':
@@ -409,48 +443,54 @@ export const fetchStockData = async (ticker: string): Promise<StockData[string]>
           });
           
           // Find the most recent trading day
+          // Compare dates in market timezone (ET) to avoid timezone issues
           const mostRecentBar = sortedBars[sortedBars.length - 1];
-          const mostRecentDate = new Date(mostRecentBar.t || mostRecentBar.timestamp);
-          mostRecentDate.setHours(0, 0, 0, 0); // Start of that day
+          const mostRecentBarTime = new Date(mostRecentBar.t || mostRecentBar.timestamp);
           
-          // Get previous trading day's close
-          try {
-            // Look back up to 5 days to find the previous trading day (handles weekends/holidays)
-            const prevDayEnd = new Date(mostRecentDate);
-            prevDayEnd.setDate(prevDayEnd.getDate() - 1);
-            const prevDayStart = new Date(mostRecentDate);
-            prevDayStart.setDate(prevDayStart.getDate() - 5);
-            
-            const prevDayBars = await alpacaAPI.getStockBars(
-              ticker, 
-              '1Day', 
-              prevDayStart.toISOString().split('T')[0], 
-              prevDayEnd.toISOString().split('T')[0],
-              5
-            );
-            
-            if (prevDayBars && prevDayBars.length > 0) {
-              // Get the most recent bar's close as previous close
-              const lastBar = prevDayBars[prevDayBars.length - 1];
-              previousClose = lastBar.c; // closing price
-              console.log(`Previous close for ${ticker}: ${previousClose} from ${new Date(lastBar.t).toISOString()}`);
-            }
-          } catch (err) {
-            console.warn(`Could not fetch previous close for ${ticker}:`, err);
-          }
+          // Get the market date (ET) for the most recent bar
+          const marketDateStr = mostRecentBarTime.toLocaleDateString('en-US', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          });
           
           // Filter to only include bars from the most recent trading day
+          // Compare dates in ET timezone to ensure correct filtering
           filteredBars = sortedBars.filter((bar: any) => {
             const barTime = new Date(bar.t || bar.timestamp);
-            const barDate = new Date(barTime);
-            barDate.setHours(0, 0, 0, 0);
-            return barDate.getTime() === mostRecentDate.getTime();
+            const barMarketDate = barTime.toLocaleDateString('en-US', {
+              timeZone: 'America/New_York',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            });
+            return barMarketDate === marketDateStr;
           });
+          
+          // For logging purposes, show the gap from previous close
+          // But we'll use today's open as reference for the chart
+          try {
+            const batchData = await alpacaAPI.getBatchData([ticker], {
+              includeQuotes: true,
+              includeBars: true
+            });
+            
+            if (batchData[ticker]?.previousBar && filteredBars.length > 0) {
+              const prevClose = batchData[ticker].previousBar.c;
+              const todayOpen = filteredBars[0].c || filteredBars[0].close;
+              const gapFromPrevClose = todayOpen - prevClose;
+              const gapPercent = prevClose > 0 ? (gapFromPrevClose / prevClose) * 100 : 0;
+              console.log(`${ticker} - Previous close: ${prevClose}, Today's open: ${todayOpen}, Gap: ${gapFromPrevClose.toFixed(2)} (${gapPercent.toFixed(2)}%)`);
+            }
+          } catch (err) {
+            console.warn(`Could not fetch previous close for logging:`, err);
+          }
           
           console.log(`1D data filtered to most recent trading day:`, {
             originalBars: sortedBars.length,
             filteredBars: filteredBars.length,
-            date: mostRecentDate.toDateString(),
+            marketDate: marketDateStr,
             previousClose,
             firstBar: filteredBars[0] ? new Date(filteredBars[0].t || filteredBars[0].timestamp).toLocaleString() : 'none',
             lastBar: filteredBars[filteredBars.length - 1] ? new Date(filteredBars[filteredBars.length - 1].t || filteredBars[filteredBars.length - 1].timestamp).toLocaleString() : 'none'
@@ -458,10 +498,8 @@ export const fetchStockData = async (ticker: string): Promise<StockData[string]>
         }
         
         // Convert and downsample the data for display
-        // For 1D, pass previousClose to calculate change from previous day
-        const fullData = period === '1D' && previousClose !== null 
-          ? convertBarsToDataPoints(filteredBars, period, previousClose)
-          : convertBarsToDataPoints(filteredBars, period);
+        // For 1D, we use open price as reference (already handled in convertBarsToDataPoints)
+        const fullData = convertBarsToDataPoints(filteredBars, period);
         
         // Log the actual time labels for 1D data
         if (period === '1D' && fullData.length > 0) {

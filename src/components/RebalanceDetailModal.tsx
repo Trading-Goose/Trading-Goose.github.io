@@ -387,7 +387,7 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
             </p>
           </div>
           <div>
-            {workflowData.status === 'completed' && (
+            {(workflowData.status === 'completed' || workflowData.status === 'pending_approval') && (
               <Badge variant="secondary" className="text-sm">
                 <CheckCircle className="w-3 h-3 mr-1" />
                 Complete
@@ -605,8 +605,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         // Determine status
         let status = rebalanceRequest.status;
-        const isRunning = ['initializing', 'analyzing', 'planning', 'executing', 'pending_trades'].includes(status);
-        const isPendingApproval = status === 'pending_approval';
+        // If we're in pending_trades state but have a rebalance plan (portfolio manager is done), 
+        // consider it as pending_approval since the planning is complete
+        if (status === 'pending_trades' && rebalanceRequest.rebalance_plan) {
+          status = 'pending_approval';
+        }
+        const isRunning = ['initializing', 'analyzing', 'planning', 'executing'].includes(status);
+        const isPendingApproval = status === 'pending_approval' || (status === 'pending_trades' && rebalanceRequest.rebalance_plan);
         const isCompleted = status === 'completed' || status === 'no_action_needed';
         const isCancelled = status === 'cancelled';
         const isFailed = status === 'failed';
@@ -942,9 +947,21 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           completedAt: rebalanceAgentStep.data?.completedAt || portfolioManagerStep.data?.completedAt || rebalanceRequest.plan_generated_at
         });
 
+        // Check if the portfolio manager is complete
+        const portfolioManagerComplete = portfolioManagerStatus === 'completed' || rebalanceRequest.rebalance_plan;
+        
+        // Overall workflow status should be 'completed' when portfolio manager is done, even if orders are pending
+        let overallStatus;
+        if (portfolioManagerComplete && !isRunning) {
+          // Portfolio manager is done and no agents are running - mark as complete
+          overallStatus = 'completed';
+        } else {
+          overallStatus = isCompleted ? 'completed' : isPendingApproval ? 'pending_approval' : isRunning ? 'running' : isCancelled ? 'canceled' : isFailed ? 'error' : status;
+        }
+
         const rebalanceData = {
           id: rebalanceRequest.id,
-          status: isCompleted ? 'completed' : isPendingApproval ? 'pending_approval' : isRunning ? 'running' : isCancelled ? 'canceled' : isFailed ? 'error' : status,
+          status: overallStatus,
           startedAt: rebalanceRequest.created_at,
           completedAt: rebalanceRequest.completed_at,
 

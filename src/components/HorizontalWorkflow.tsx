@@ -310,6 +310,7 @@ export default function HorizontalWorkflow() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [searchTicker, setSearchTicker] = useState('');
   const [showAnalysisDetail, setShowAnalysisDetail] = useState(false);
+  const [isRebalanceContext, setIsRebalanceContext] = useState(false);
   const previousRunningRef = useRef<Set<string>>(new Set());
 
   // Handle starting a new analysis
@@ -328,6 +329,9 @@ export default function HorizontalWorkflow() {
     try {
       // Start the analysis using analysisManager (note: parameter order is ticker, apiSettings, userId)
       const analysisId = await analysisManager.startAnalysis(ticker, apiSettings, user.id);
+      
+      // This is an individual analysis, not part of rebalance
+      setIsRebalanceContext(false);
       
       // Set the active ticker and open the detail modal
       setActiveAnalysisTicker(ticker);
@@ -367,7 +371,7 @@ export default function HorizontalWorkflow() {
           // Check both analysis_status = 0 and full_analysis->>'status' = 'running'
           const { data, error } = await supabase
             .from('analysis_history')
-            .select('ticker, analysis_status, full_analysis, created_at, id, decision, agent_insights')
+            .select('ticker, analysis_status, full_analysis, created_at, id, decision, agent_insights, rebalance_request_id')
             .eq('user_id', user.id)
             .or('analysis_status.eq.0,full_analysis->>status.eq.running');
 
@@ -397,10 +401,15 @@ export default function HorizontalWorkflow() {
               const mostRecent = runningData.sort((a, b) => 
                 new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
               )[0];
+              console.log('Most recent running analysis:', {
+                ticker: mostRecent.ticker,
+                rebalance_request_id: mostRecent.rebalance_request_id,
+                analysis_status: mostRecent.analysis_status
+              });
               setCurrentAnalysis(mostRecent);
               setActiveAnalysisTicker(mostRecent.ticker);
-              setIsAnalyzing(true);
-              updateWorkflowFromAnalysis(mostRecent);
+              const stillRunning = updateWorkflowFromAnalysis(mostRecent);
+              setIsAnalyzing(stillRunning);
             }
           }
         } catch (error) {
@@ -427,8 +436,8 @@ export default function HorizontalWorkflow() {
           if (!error && data) {
             setCurrentAnalysis(data);
             setActiveAnalysisTicker(data.ticker);
-            setIsAnalyzing(false);
-            updateWorkflowFromAnalysis(data);
+            const stillRunning = updateWorkflowFromAnalysis(data);
+            setIsAnalyzing(stillRunning);
           }
         } catch (error) {
           console.error('Error fetching completed analysis:', error);
@@ -458,8 +467,8 @@ export default function HorizontalWorkflow() {
           if (!error && data) {
             setCurrentAnalysis(data);
             setActiveAnalysisTicker(data.ticker);
-            setIsAnalyzing(false);
-            updateWorkflowFromAnalysis(data);
+            const stillRunning = updateWorkflowFromAnalysis(data);
+            setIsAnalyzing(stillRunning);
           }
         } catch (error) {
           console.error('Error fetching recent analysis:', error);
@@ -501,8 +510,8 @@ export default function HorizontalWorkflow() {
           // New analysis started - update immediately
           setCurrentAnalysis(payload.new);
           setActiveAnalysisTicker(payload.new.ticker);
-          updateWorkflowFromAnalysis(payload.new);
-          setIsAnalyzing(true);
+          const stillRunning = updateWorkflowFromAnalysis(payload.new);
+          setIsAnalyzing(stillRunning);
         }
       )
       .on(
@@ -517,9 +526,8 @@ export default function HorizontalWorkflow() {
           // Analysis updated - check if it's the current one
           if (payload.new && payload.new.ticker === activeAnalysisTicker) {
             setCurrentAnalysis(payload.new);
-            updateWorkflowFromAnalysis(payload.new);
-            const isRunning = payload.new.analysis_status === 0;
-            setIsAnalyzing(isRunning);
+            const updatedIsAnalyzing = updateWorkflowFromAnalysis(payload.new);
+            setIsAnalyzing(updatedIsAnalyzing);
           }
         }
       )
@@ -597,19 +605,49 @@ export default function HorizontalWorkflow() {
   };
 
   // Update workflow based on analysis data
-  const updateWorkflowFromAnalysis = (analysis: any) => {
-    if (!analysis) return;
+  // Returns true if the analysis is still running, false if complete
+  const updateWorkflowFromAnalysis = (analysis: any): boolean => {
+    if (!analysis) return false;
 
     // First try to use full_analysis if available for more detailed agent data
     const fullAnalysis = analysis.full_analysis;
     const insights = analysis.agent_insights || {};
     
-    // Determine if analysis is completed or running (same logic as AnalysisDetailModal)
-    const isCompleted = analysis.analysis_status === 1 || 
-                       (analysis.analysis_status !== 0 && 
-                        (!fullAnalysis?.status || fullAnalysis.status !== 'running'));
-    const isRunning = analysis.analysis_status === 0 || 
-                     (fullAnalysis?.status === 'running');
+    // Check if this is a rebalance analysis
+    const isRebalanceAnalysis = !!analysis.rebalance_request_id;
+    
+    console.log('Analysis rebalance check:', {
+      rebalance_request_id: analysis.rebalance_request_id,
+      isRebalanceAnalysis
+    });
+    
+    // Update the rebalance context state
+    setIsRebalanceContext(isRebalanceAnalysis);
+    
+    // Determine if analysis is completed or running
+    // For rebalance analyses, consider complete after risk stage (no portfolio manager)
+    let isCompleted = analysis.analysis_status === 1 || 
+                     (analysis.analysis_status !== 0 && 
+                      (!fullAnalysis?.status || fullAnalysis.status !== 'running'));
+    
+    // Special handling for rebalance analyses
+    if (isRebalanceAnalysis && analysis.analysis_status === 0) {
+      // For rebalance analyses, check if risk assessment is complete
+      // Risk Manager is the final agent for individual stock analysis in rebalance
+      const hasRiskManagerInsights = insights.riskManager || insights.riskJudge;
+      
+      // Also check if all risk agents have completed
+      const riskAgentsComplete = insights.riskyAnalyst && insights.safeAnalyst && 
+                                 insights.neutralAnalyst && (insights.riskManager || insights.riskJudge);
+      
+      if (hasRiskManagerInsights || riskAgentsComplete) {
+        console.log('Rebalance analysis - risk assessment complete, marking as done');
+        isCompleted = true;
+      }
+    }
+    
+    const isRunning = !isCompleted && (analysis.analysis_status === 0 || 
+                     (fullAnalysis?.status === 'running'));
     
     
     // If full_analysis has workflowSteps, use them directly
@@ -631,15 +669,23 @@ export default function HorizontalWorkflow() {
         const totalAgents = agents.length;
         
         // Simple rule: 0 = pending, some = running, all = completed
-        const stepStatus = completedAgents === 0 ? 'pending' :
-                          completedAgents === totalAgents ? 'completed' :
-                          'running';
+        let stepStatus = completedAgents === 0 ? 'pending' :
+                        completedAgents === totalAgents ? 'completed' :
+                        'running';
+        
+        // Special handling for rebalance analyses - mark as complete if risk stage is done
+        if (isRebalanceAnalysis && step.id === 'risk' && stepStatus === 'completed') {
+          // This is the last step for rebalance analyses
+          console.log('Rebalance analysis - risk stage complete, marking analysis as done');
+        }
         
         console.log(`Step ${step.name}:`, {
+          id: step.id,
           completedAgents,
           totalAgents,
           calculatedStatus: stepStatus,
-          originalStatus: step.status
+          originalStatus: step.status,
+          isRebalanceAnalysis
         });
         
         return {
@@ -656,18 +702,32 @@ export default function HorizontalWorkflow() {
         };
       });
       
-      setWorkflowData(mappedSteps);
-      return;
+      // Filter out portfolio management step for rebalance analyses
+      console.log('Before filtering mappedSteps:', mappedSteps.map((s: any) => ({ id: s.id, name: s.name })));
+      const filteredSteps = isRebalanceAnalysis 
+        ? mappedSteps.filter((step: any) => 
+            step.id !== 'portfolio-management' && 
+            step.id !== 'portfolio' && 
+            !step.name.toLowerCase().includes('portfolio'))
+        : mappedSteps;
+      console.log('After filtering filteredSteps:', filteredSteps.map((s: any) => ({ id: s.id, name: s.name })));
+      
+      setWorkflowData(filteredSteps);
+      return isRunning;
     }
     
     // Otherwise, build from agent insights
-    const updatedSteps = [...getInitialWorkflowSteps()];
+    // Start with initial steps, but filter out portfolio management for rebalance
+    let updatedSteps = isRebalanceAnalysis 
+      ? getInitialWorkflowSteps().filter(step => step.id !== 'portfolio-management')
+      : [...getInitialWorkflowSteps()];
     
     // If the analysis is completed but we don't have detailed insights, mark all steps as completed
     if (isCompleted && Object.keys(insights).length === 0) {
       updatedSteps.forEach((step, index) => {
         // Mark all steps as completed for a finished analysis
-        if (index <= 3) { // First 4 phases are always part of the analysis
+        const maxSteps = isRebalanceAnalysis ? 3 : 4; // 4 steps for rebalance, 5 for regular
+        if (index <= maxSteps) {
           step.status = 'completed';
           step.currentActivity = 'Completed';
           step.agents.forEach(agent => {
@@ -675,8 +735,8 @@ export default function HorizontalWorkflow() {
             agent.lastAction = 'Analysis complete';
           });
         }
-        // Portfolio management might not always run
-        if (index === 4 && analysis.decision) {
+        // Portfolio management only for non-rebalance analyses
+        if (!isRebalanceAnalysis && index === 4 && analysis.decision) {
           step.status = 'completed';
           step.currentActivity = 'Completed';
           step.agents.forEach(agent => {
@@ -686,7 +746,7 @@ export default function HorizontalWorkflow() {
         }
       });
       setWorkflowData(updatedSteps);
-      return;
+      return false; // Analysis is complete
     }
 
     // If we have full analysis, extract more detailed agent information
@@ -747,14 +807,14 @@ export default function HorizontalWorkflow() {
           {
             ...updatedSteps[0].agents[2],
             status: 'idle',
-            lastAction: newsAnalystComplete ? 'News analysis complete' : 'Waiting...',
-            progress: newsAnalystComplete ? 100 : 0
+            lastAction: insights['newsAnalyst'] ? 'News analysis complete' : 'Waiting...',
+            progress: insights['newsAnalyst'] ? 100 : 0
           },
           {
             ...updatedSteps[0].agents[3],
             status: 'idle',
-            lastAction: fundamentalsAnalystComplete ? 'Fundamentals analyzed' : 'Waiting...',
-            progress: fundamentalsAnalystComplete ? 100 : 0
+            lastAction: insights['fundamentalsAnalyst'] ? 'Fundamentals analyzed' : 'Waiting...',
+            progress: insights['fundamentalsAnalyst'] ? 100 : 0
           }
         ]
       };
@@ -859,32 +919,49 @@ export default function HorizontalWorkflow() {
         ]
       };
 
-    // SIMPLIFIED: Portfolio Management - single agent
-    const hasPortfolioData = insights['portfolioManager'];
-    
-    updatedSteps[4] = {
-      ...updatedSteps[4],
-      status: hasPortfolioData ? 'completed' : 'pending',
-      currentActivity: hasPortfolioData ? 'Position sizing complete' : 'Awaiting activation',
-        agents: [
-          {
-            ...updatedSteps[4].agents[0],
-            status: 'idle',
-            lastAction: hasPortfolioData ? 'Position sizing calculated' : 'Waiting...',
-            progress: hasPortfolioData ? 100 : 0
-          }
-        ]
-      };
+    // SIMPLIFIED: Portfolio Management - single agent (only for non-rebalance analyses)
+    if (!isRebalanceAnalysis) {
+      const hasPortfolioData = insights['portfolioManager'];
+      
+      // Find the portfolio management step index (it might be at index 4 if not filtered)
+      const portfolioStepIndex = updatedSteps.findIndex(s => s.id === 'portfolio-management');
+      if (portfolioStepIndex !== -1) {
+        updatedSteps[portfolioStepIndex] = {
+          ...updatedSteps[portfolioStepIndex],
+          status: hasPortfolioData ? 'completed' : 'pending',
+          currentActivity: hasPortfolioData ? 'Position sizing complete' : 'Awaiting activation',
+          agents: [
+            {
+              ...updatedSteps[portfolioStepIndex].agents[0],
+              status: 'idle',
+              lastAction: hasPortfolioData ? 'Position sizing calculated' : 'Waiting...',
+              progress: hasPortfolioData ? 100 : 0
+            }
+          ]
+        };
+      }
+    }
 
     // Removed override logic - we're using simple agent-based status determination
     
+    // Filter out portfolio management step for rebalance analyses before setting
+    const finalSteps = isRebalanceAnalysis 
+      ? updatedSteps.filter(step => 
+          step.id !== 'portfolio-management' && 
+          step.id !== 'portfolio' && 
+          !step.name.toLowerCase().includes('portfolio'))
+      : updatedSteps;
+    
     // Set the workflow data directly - status is already determined by agent completion
-    console.log('Final workflow steps before setting:', updatedSteps.map(step => ({
+    console.log('Final workflow steps before setting:', finalSteps.map(step => ({
       name: step.name,
       status: step.status,
       agents: step.agents.filter(a => a.progress === 100).length + '/' + step.agents.length
     })));
-    setWorkflowData(updatedSteps);
+    setWorkflowData(finalSteps);
+    
+    // Return the running state
+    return isRunning;
   };
 
   // Helper function to get agent message from various possible agent names
@@ -903,10 +980,15 @@ export default function HorizontalWorkflow() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
+            <CardTitle className="text-lg flex items-center gap-2">
               {isAnalyzing ? 'Analysis Progress' : 
                activeAnalysisTicker ? `Most Recent Analysis: ${activeAnalysisTicker}` : 
                'Analysis Progress'}
+              {isRebalanceContext && (
+                <Badge variant="secondary" className="text-xs font-normal">
+                  Rebalance
+                </Badge>
+              )}
             </CardTitle>
             {isAnalyzing ? (
               <Badge variant="default" className="flex items-center gap-1">
@@ -974,7 +1056,22 @@ export default function HorizontalWorkflow() {
 
           {/* Horizontal workflow steps */}
           <div className="flex items-center justify-center overflow-hidden">
-            {workflowData.map((step, index) => {
+            {(() => {
+              const filteredSteps = isRebalanceContext 
+                ? workflowData.filter(step => 
+                    step.id !== 'portfolio-management' && 
+                    step.id !== 'portfolio' && 
+                    !step.name.toLowerCase().includes('portfolio'))
+                : workflowData;
+              console.log('Displaying workflow steps:', {
+                isRebalanceContext,
+                totalSteps: workflowData.length,
+                filteredSteps: filteredSteps.length,
+                stepNames: filteredSteps.map(s => s.name)
+              });
+              return filteredSteps;
+            })()
+              .map((step, index) => {
               const Icon = step.icon;
               return (
                 <div key={step.id} className="flex items-center">
@@ -1026,7 +1123,13 @@ export default function HorizontalWorkflow() {
             
             {expandedAgents && (
               <div className="mt-4 space-y-4">
-                {workflowData.map((step) => (
+                {(isRebalanceContext 
+                  ? workflowData.filter(step => 
+                      step.id !== 'portfolio-management' && 
+                      step.id !== 'portfolio' && 
+                      !step.name.toLowerCase().includes('portfolio'))
+                  : workflowData)
+                  .map((step) => (
                   <div key={step.id} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1104,6 +1207,9 @@ export default function HorizontalWorkflow() {
                       <>Analysis completed for {activeAnalysisTicker}</>
                     ) : (
                       <>Ready to analyze • LangGraph orchestrated</>
+                    )}
+                    {isRebalanceContext && (
+                      <> • Rebalance mode (Portfolio Manager runs at rebalance level)</>
                     )}
                   </p>
                 </div>

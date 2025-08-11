@@ -131,12 +131,18 @@ export default function RebalanceHistoryTable() {
       const cancelled: RebalanceRequest[] = [];
 
       for (const item of data || []) {
-        if (['initializing', 'analyzing', 'planning', 'pending_approval', 'executing', 'pending_trades'].includes(item.status)) {
+        // If status is pending_approval or pending_trades with a rebalance plan, treat as completed
+        if ((item.status === 'pending_approval' || item.status === 'pending_trades') && item.rebalance_plan) {
+          completed.push(item);
+        } else if (['initializing', 'analyzing', 'planning', 'executing'].includes(item.status)) {
           running.push(item);
-        } else if (item.status === 'completed') {
+        } else if (item.status === 'completed' || item.status === 'no_action_needed') {
           completed.push(item);
         } else if (item.status === 'cancelled' || item.status === 'failed') {
           cancelled.push(item);
+        } else if (item.status === 'pending_approval' || item.status === 'pending_trades') {
+          // If we're here, there's no rebalance plan yet, so it's still running
+          running.push(item);
         }
       }
 

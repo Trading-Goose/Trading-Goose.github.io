@@ -51,7 +51,7 @@ interface RebalanceAnalysis {
 interface RebalanceRequest {
   id: string;
   user_id: string;
-  status: 'initializing' | 'analyzing' | 'planning' | 'pending_approval' | 'executing' | 'completed' | 'cancelled' | 'failed' | 'pending_trades';
+  status: 'initializing' | 'analyzing' | 'planning' | 'pending_approval' | 'executing' | 'completed' | 'cancelled' | 'failed' | 'pending_trades' | 'portfolio_management_started';
   created_at: string;
   total_stocks: number;
   stocks_analyzed: number;
@@ -134,7 +134,7 @@ export default function RebalanceHistoryTable() {
         // If status is pending_approval or pending_trades with a rebalance plan, treat as completed
         if ((item.status === 'pending_approval' || item.status === 'pending_trades') && item.rebalance_plan) {
           completed.push(item);
-        } else if (['initializing', 'analyzing', 'planning', 'executing'].includes(item.status)) {
+        } else if (['initializing', 'analyzing', 'planning', 'executing', 'portfolio_management_started'].includes(item.status)) {
           running.push(item);
         } else if (item.status === 'completed' || item.status === 'no_action_needed') {
           completed.push(item);
@@ -288,6 +288,7 @@ export default function RebalanceHistoryTable() {
       case 'analyzing':
       case 'initializing':
       case 'planning':
+      case 'portfolio_management_started':
         return <Loader2 className="h-3 w-3 animate-spin" />;
       case 'pending_trades':
       case 'pending_approval':
@@ -311,6 +312,7 @@ export default function RebalanceHistoryTable() {
       case 'planning':
       case 'pending_approval':
       case 'executing':
+      case 'portfolio_management_started':
         return 'secondary';
       default:
         return 'outline';
@@ -385,7 +387,7 @@ export default function RebalanceHistoryTable() {
                         
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            {(item.status === 'analyzing' || item.status === 'initializing' || item.status === 'planning') && (
+                            {(item.status === 'analyzing' || item.status === 'initializing' || item.status === 'planning' || item.status === 'portfolio_management_started') && (
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                                   <div 

@@ -14,20 +14,96 @@ import {
   Activity,
   TrendingUp,
   AlertCircle,
-  LogOut
+  LogOut,
+  Lock
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-supabase";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, apiSettings, logout, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [activityStats, setActivityStats] = useState({
     totalAnalyses: 0,
     executedTrades: 0,
     rebalances: 0
   });
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [sendingResetEmail, setSendingResetEmail] = useState(false);
+
+  const handleSendResetEmail = async () => {
+    if (!user?.email) return;
+    
+    setSendingResetEmail(true);
+    try {
+      // Build the correct redirect URL
+      const origin = window.location.origin;
+      let redirectUrl: string;
+      
+      if (origin.includes('github.io')) {
+        redirectUrl = `${origin}/TradingGoose/#/reset-password`;
+      } else {
+        redirectUrl = `${origin}/reset-password`;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        console.error('Reset email error:', error);
+        
+        // Handle specific error cases
+        if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+          toast({
+            title: "Too Many Requests",
+            description: "Please wait a few minutes before requesting another password reset email.",
+            variant: "destructive",
+          });
+        } else if (error.message?.includes('not found')) {
+          toast({
+            title: "Error",
+            description: "Email address not found. Please check your account settings.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to send reset email. Please try again later.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Email Sent",
+          description: `Password reset link has been sent to ${user.email}. Please check your inbox.`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error:', error);
+      
+      // Check if it's a rate limit error from the network request
+      if (error?.status === 429) {
+        toast({
+          title: "Rate Limit Exceeded",
+          description: "You've requested too many password resets. Please wait 60 minutes before trying again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setSendingResetEmail(false);
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -158,12 +234,42 @@ export default function ProfilePage() {
 
               <Separator />
 
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  To update your profile information or change your password, please contact support.
-                </AlertDescription>
-              </Alert>
+              <div className="flex flex-col space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Password</p>
+                    <p className="text-xs text-muted-foreground">Keep your account secure with a strong password</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowChangePasswordModal(true)}
+                      title="Change password if you know your current password"
+                    >
+                      <Lock className="mr-2 h-4 w-4" />
+                      Change Password
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={handleSendResetEmail}
+                      disabled={sendingResetEmail}
+                      title="Send a password reset link to your email (use if you forgot your current password)"
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      {sendingResetEmail ? "Sending..." : "Forgot Password?"}
+                    </Button>
+                  </div>
+                </div>
+                
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    To update other profile information, please contact support.
+                  </AlertDescription>
+                </Alert>
+              </div>
             </CardContent>
           </Card>
 
@@ -272,6 +378,12 @@ export default function ProfilePage() {
           </Card>
         </div>
       </main>
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal 
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+      />
     </div>
   );
 }

@@ -44,13 +44,13 @@ export default function ForgotPassword() {
       if (error) {
         console.error('Supabase error:', error);
         // Provide more specific error messages
-        if (error.message.includes('rate limit')) {
-          setError('Too many reset attempts. Please wait a few minutes and try again.');
-        } else if (error.message.includes('not found')) {
+        if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+          setError('Too many password reset attempts. Please wait 60 minutes before trying again.');
+        } else if (error.message?.includes('not found')) {
           // Don't reveal if email exists for security
           setSuccess(true);
         } else {
-          setError(error.message);
+          setError(error.message || 'Failed to send reset email. Please try again later.');
         }
       } else {
         console.log('Password reset email sent successfully:', data);

@@ -31,11 +31,12 @@ export default function ResetPassword() {
         const errorCode = hashParams.get('error_code');
         const errorDescription = hashParams.get('error_description');
         
-        console.log('Hash params:', { 
+        console.log('ResetPassword - Hash params:', { 
           type, 
           hasToken: !!accessToken,
           errorCode,
-          errorDescription 
+          errorDescription,
+          fullHash: window.location.hash
         });
 
         // Check for errors first (expired token, etc.)
@@ -60,15 +61,18 @@ export default function ResetPassword() {
         // Check if this is a recovery link
         if (type === 'recovery' && accessToken) {
           console.log('Valid recovery token found');
+          // The recovery token is valid, allow password reset
           setIsValidSession(true);
           setCheckingSession(false);
           return;
         }
 
-        // Also check for existing session
+        // Also check for existing session (for users who are already in password reset mode)
         const { data: { session } } = await supabase.auth.getSession();
         console.log('Current session:', session);
         
+        // If we have a session, we can allow password reset
+        // This happens after the user has clicked the email link and Supabase has created a session
         if (session) {
           setIsValidSession(true);
         } else {

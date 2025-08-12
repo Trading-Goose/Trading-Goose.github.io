@@ -69,15 +69,15 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           const yesterdayStr = yesterday.toISOString().split('T')[0];
-          
+
           // Fetch previous day's bar for close price
           const bars = await alpacaAPI.getStockBars(ticker, '1Day', yesterdayStr, yesterdayStr, 1);
-          
+
           if (bars && bars.length > 0) {
             const previousClose = bars[0].c; // closing price
             const dayChange = currentPrice - previousClose;
             const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;
-            
+
             result.priceChange = dayChange;
             result.priceChangePercent = dayChangePercent;
           } else {
@@ -101,7 +101,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
 
   const loadWatchlist = async () => {
     if (!user) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('watchlist')
@@ -120,34 +120,34 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           lastDecision: item.last_decision as 'BUY' | 'SELL' | 'HOLD' | undefined,
           status: 'idle' as const
         }));
-        
+
         setWatchlist(watchlistItems);
-        
+
         // Fetch all stock data in a single batch request
         try {
           const tickers = watchlistItems.map(item => item.ticker);
-          const batchData = await alpacaAPI.getBatchData(tickers, { 
-            includeQuotes: true, 
-            includeBars: true 
+          const batchData = await alpacaAPI.getBatchData(tickers, {
+            includeQuotes: true,
+            includeBars: true
           });
-          
+
           // Update watchlist with batch data
           setWatchlist(prev => prev.map(item => {
             const data = batchData[item.ticker];
             if (!data) return item;
-            
+
             const updates: Partial<WatchlistItem> = {};
-            
+
             // Add description from asset data
             if (data.asset?.name) {
               updates.description = data.asset.name;
             }
-            
+
             // Add price data from quote
             if (data.quote) {
               const currentPrice = data.quote.ap || data.quote.bp || 0;
               updates.currentPrice = currentPrice;
-              
+
               // Calculate today's change from open (during market hours)
               // Use currentBar (today's bar) instead of previousBar
               if (data.currentBar) {
@@ -169,7 +169,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                 updates.priceChangePercent = 0;
               }
             }
-            
+
             return { ...item, ...updates };
           }));
         } catch (batchError) {
@@ -177,7 +177,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           // Fallback to individual fetches if batch fails
           for (const item of watchlistItems) {
             const stockData = await fetchStockData(item.ticker);
-            setWatchlist(prev => prev.map(w => 
+            setWatchlist(prev => prev.map(w =>
               w.ticker === item.ticker ? { ...w, ...stockData } : w
             ));
           }
@@ -230,17 +230,17 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
             // Filter to only actually running analyses
             const runningData = data.filter(item => {
               // Consider running if analysis_status is 0 OR full_analysis.status is 'running'
-              const isRunning = item.analysis_status === 0 || 
-                              (item.full_analysis && item.full_analysis.status === 'running');
+              const isRunning = item.analysis_status === 0 ||
+                (item.full_analysis && item.full_analysis.status === 'running');
               return isRunning;
             });
-            
+
             // Only log if there are actually running analyses
             if (runningData.length > 0) {
-              console.log('Running analyses from DB:', runningData.map(d => ({ 
-                ticker: d.ticker, 
+              console.log('Running analyses from DB:', runningData.map(d => ({
+                ticker: d.ticker,
                 status: d.analysis_status,
-                fullAnalysisStatus: d.full_analysis?.status 
+                fullAnalysisStatus: d.full_analysis?.status
               })));
             }
             for (const item of runningData) {
@@ -285,7 +285,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
 
   const addToWatchlist = async () => {
     if (!user || !newTicker) return;
-    
+
     const ticker = newTicker.toUpperCase();
     if (watchlist.find(item => item.ticker === ticker)) {
       toast({
@@ -315,13 +315,13 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           addedAt: new Date(data.added_at).toISOString().split('T')[0],
           status: 'idle' as const
         };
-        
+
         setWatchlist([...watchlist, newItem]);
         setNewTicker('');
-        
+
         // Fetch stock data for the new item
         const stockData = await fetchStockData(ticker);
-        setWatchlist(prev => prev.map(w => 
+        setWatchlist(prev => prev.map(w =>
           w.ticker === ticker ? { ...w, ...stockData } : w
         ));
 
@@ -342,7 +342,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
 
   const removeFromWatchlist = async (ticker: string) => {
     if (!user) return;
-    
+
     const item = watchlist.find(i => i.ticker === ticker);
     if (!item?.id) return;
 
@@ -371,7 +371,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
 
   const refreshPrices = async () => {
     if (watchlist.length === 0) return;
-    
+
     toast({
       title: "Refreshing prices",
       description: "Updating stock prices...",
@@ -380,23 +380,23 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
     try {
       // Fetch all prices in a single batch request
       const tickers = watchlist.map(item => item.ticker);
-      const batchData = await alpacaAPI.getBatchData(tickers, { 
-        includeQuotes: true, 
-        includeBars: true 
+      const batchData = await alpacaAPI.getBatchData(tickers, {
+        includeQuotes: true,
+        includeBars: true
       });
-      
+
       // Update watchlist with batch data
       setWatchlist(prev => prev.map(item => {
         const data = batchData[item.ticker];
         if (!data) return item;
-        
+
         const updates: Partial<WatchlistItem> = {};
-        
+
         // Update price data from quote
         if (data.quote) {
           const currentPrice = data.quote.ap || data.quote.bp || 0;
           updates.currentPrice = currentPrice;
-          
+
           // Calculate today's change from open (during market hours)
           if (data.currentBar) {
             const todayOpen = data.currentBar.o; // Today's open price
@@ -413,10 +413,10 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
             updates.priceChangePercent = dayChangePercent;
           }
         }
-        
+
         return { ...item, ...updates };
       }));
-      
+
       toast({
         title: "Prices updated",
         description: "Stock prices have been refreshed",
@@ -426,7 +426,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       // Fallback to individual fetches if batch fails
       for (const item of watchlist) {
         const stockData = await fetchStockData(item.ticker);
-        setWatchlist(prev => prev.map(w => 
+        setWatchlist(prev => prev.map(w =>
           w.ticker === item.ticker ? { ...w, ...stockData } : w
         ));
       }
@@ -491,7 +491,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
 
   const getDecisionBadge = (decision?: 'BUY' | 'SELL' | 'HOLD') => {
     if (!decision) return null;
-    
+
     const variants = {
       BUY: 'buy' as const,
       SELL: 'sell' as const,
@@ -556,11 +556,10 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
               {watchlist.map((item) => (
                 <div
                   key={item.ticker}
-                  className={`flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer ${
-                    selectedStock === item.ticker 
-                      ? 'border-primary bg-primary/10' 
-                      : 'border-border hover:bg-muted/50'
-                  }`}
+                  className={`flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer ${selectedStock === item.ticker
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:bg-muted/50'
+                    }`}
                   onClick={(e) => {
                     // Only trigger selection if not clicking on buttons
                     if ((e.target as HTMLElement).closest('button')) return;
@@ -583,9 +582,8 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                         </span>
                       )}
                       {item.priceChangePercent !== undefined && (
-                        <div className={`flex items-center gap-1 ${
-                          item.priceChangePercent >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
+                        <div className={`flex items-center gap-1 ${item.priceChangePercent >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
                           {item.priceChangePercent >= 0 ? (
                             <TrendingUp className="h-3 w-3" />
                           ) : (
@@ -605,7 +603,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                       className="border border-slate-700"
                       onClick={(e) => {
                         e.stopPropagation();

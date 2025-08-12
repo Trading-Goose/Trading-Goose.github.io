@@ -11,6 +11,8 @@ import AnalysisRecords from "./pages/AnalysisRecords";
 import RebalanceRecords from "./pages/RebalanceRecords";
 import AlphaVantageTest from "./pages/AlphaVantageTest";
 import NotFound from "./pages/NotFound";
+import ForgotPassword from "./components/ForgotPassword";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { supabase, supabaseHelpers } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-supabase";
 
@@ -25,6 +27,8 @@ const AppRoutes = () => {
       <Route path="/analysis-records" element={<AnalysisRecords />} />
       <Route path="/rebalance-records" element={<RebalanceRecords />} />
       <Route path="/alpha-vantage-test" element={<AlphaVantageTest />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

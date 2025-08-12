@@ -59,7 +59,7 @@ interface AiProvider {
 // Helper function to validate credentials via edge function
 const validateCredential = async (provider: string, apiKey: string): Promise<{ valid: boolean; message: string }> => {
   try {
-    const { data, error } = await supabase.functions.invoke('credentials-proxy', {
+    const { data, error } = await supabase.functions.invoke('settings-proxy', {
       body: {
         action: 'validate',
         provider,
@@ -78,7 +78,7 @@ const validateCredential = async (provider: string, apiKey: string): Promise<{ v
 // Helper function to check which providers are configured
 const checkConfiguredProviders = async (): Promise<{ configured: Record<string, boolean>, additionalProviders?: any[] }> => {
   try {
-    const { data, error } = await supabase.functions.invoke('credentials-proxy', {
+    const { data, error } = await supabase.functions.invoke('settings-proxy', {
       body: {
         action: 'check_configured'
       }
@@ -326,8 +326,8 @@ export default function SettingsPage() {
         // Save provider settings
         const newErrors: Record<string, string> = {};
         
-        // Validate Alpha Vantage key via edge function
-        if (alphaVantageApiKey) {
+        // Validate Alpha Vantage key via edge function (skip if masked)
+        if (alphaVantageApiKey && alphaVantageApiKey !== '***configured***') {
           const validation = await validateCredential('alpha_vantage', alphaVantageApiKey);
           if (!validation.valid) {
             newErrors.alphaVantageApiKey = validation.message;
@@ -339,37 +339,52 @@ export default function SettingsPage() {
           return;
         }
 
-        // Build settings object with finnhub key
-        settingsToSave = {
-          alpha_vantage_api_key: alphaVantageApiKey
-        };
+        // Build settings object with Alpha Vantage key (only if not masked)
+        settingsToSave = {};
+        if (alphaVantageApiKey && alphaVantageApiKey !== '***configured***') {
+          settingsToSave.alpha_vantage_api_key = alphaVantageApiKey;
+        }
         
         // Save each provider
         for (let index = 0; index < aiProviders.length; index++) {
           const provider = aiProviders[index];
           if (provider.provider && provider.apiKey && provider.nickname) {
-            // Validate provider via edge function
-            const validation = await validateCredential(provider.provider, provider.apiKey);
-            let isValid = validation.valid;
-            
-            if (!isValid) {
-              newErrors[`provider_${provider.id}`] = validation.message;
+            // Validate provider via edge function (skip if masked)
+            let isValid = true;
+            if (provider.apiKey !== '***configured***') {
+              const validation = await validateCredential(provider.provider, provider.apiKey);
+              isValid = validation.valid;
+              
+              if (!isValid) {
+                newErrors[`provider_${provider.id}`] = validation.message;
+              }
             }
             
             if (isValid) {
               // Always save the Default AI provider (ID '1') to api_settings
               if (provider.id === '1') {
                 settingsToSave.ai_provider = provider.provider as any;
-                settingsToSave.ai_api_key = provider.apiKey;
+                // Only update API key if it's not masked
+                if (provider.apiKey !== '***configured***') {
+                  settingsToSave.ai_api_key = provider.apiKey;
+                }
                 settingsToSave.ai_model = defaultAiModel === 'custom' ? defaultCustomModel : (defaultAiModel || getModelOptions(provider.provider)[0]);
               } else {
-                // Save additional providers to provider_configurations table
-                const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
-                  nickname: provider.nickname,
-                  provider: provider.provider,
-                  api_key: provider.apiKey,
-                  is_default: false
-                });
+                // Save additional providers to provider_configurations table (only if API key is not masked)
+                if (provider.apiKey !== '***configured***') {
+                  const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
+                    nickname: provider.nickname,
+                    provider: provider.provider,
+                    api_key: provider.apiKey,
+                    is_default: false
+                  });
+                } else {
+                  // Just update nickname/provider if API key is masked
+                  const saved = await supabaseHelpers.updateProviderConfiguration(user.id, provider.id, {
+                    nickname: provider.nickname,
+                    provider: provider.provider
+                  });
+                }
                 
                 // Fallback: save to provider-specific columns if table doesn't exist
                 if (!saved) {

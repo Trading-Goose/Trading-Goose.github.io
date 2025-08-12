@@ -9,11 +9,8 @@ SUPABASE_ACCESS_TOKEN="sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6"
 PROJECT_REF="lnvjsqyvhczgxvygbqer"
 
 # Deploy analyze-stock (main entry point - critical fix for Alpaca credentials)
-echo "📦 Deploying analyze-stock..."
-SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy analyze-stock --project-ref $PROJECT_REF
-
-echo "📦 Deploying credentials-proxy..."
-SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy credentials-proxy --project-ref $PROJECT_REF
+echo "📦 Deploying alpaca-batch..."
+SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy alpaca-batch --project-ref $PROJECT_REF
 
 echo "📦 Deploying alpaca-proxy..."
 SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy alpaca-proxy --project-ref $PROJECT_REF
@@ -29,6 +26,12 @@ SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy execu
 # Deploy coordinator
 echo "📦 Deploying analyze-stock-coordinator..."
 SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy analyze-stock-coordinator --project-ref $PROJECT_REF
+
+
+# Deploy process-scheduled-rebalances
+echo "📦 Deploying process-scheduled-rebalances..."
+SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy process-scheduled-rebalances --project-ref $PROJECT_REF
+
 
 # Deploy all agent functions
 agents=(

@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { 
-  TrendingUp, 
-  MessageSquare, 
+import {
+  TrendingUp,
+  MessageSquare,
   Shield,
   CheckCircle,
   Clock,
@@ -30,9 +30,7 @@ import {
   Briefcase
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-supabase";
-// import { tradingAgentsAPI } from "@/lib/tradingAgents"; // Not needed - using server-side analysis
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-supabase"; import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { analysisManager } from "@/lib/analysisManager";
 import type { WorkflowStep as EngineWorkflowStep } from "@/lib/tradingEngine";
@@ -270,17 +268,17 @@ const getStatusIcon = (status: string) => {
 
 const getStepProgress = (step: WorkflowStep): number => {
   if (step.status === 'completed') return 100;
-  
+
   // Always calculate actual progress, even for pending/running status
   const totalAgents = step.agents.length;
   if (totalAgents === 0) return 0;
-  
+
   const completedAgents = step.agents.filter(a => a.progress === 100).length;
   const activeAgent = step.agents.find(a => a.status === 'processing');
-  
+
   const baseProgress = (completedAgents / totalAgents) * 100;
   const activeProgress = activeAgent ? (activeAgent.progress || 0) / totalAgents : 0;
-  
+
   return Math.round(baseProgress + activeProgress);
 };
 
@@ -325,26 +323,26 @@ export default function HorizontalWorkflow() {
     }
 
     const ticker = searchTicker.toUpperCase();
-    
+
     try {
       // Start the analysis using analysisManager (note: parameter order is ticker, apiSettings, userId)
       const analysisId = await analysisManager.startAnalysis(ticker, apiSettings, user.id);
-      
+
       // This is an individual analysis, not part of rebalance
       setIsRebalanceContext(false);
-      
+
       // Set the active ticker and open the detail modal
       setActiveAnalysisTicker(ticker);
       setShowAnalysisDetail(true);
-      
+
       // Set current analysis with the ID if returned
       if (analysisId) {
         setCurrentAnalysis({ id: analysisId, ticker });
       }
-      
+
       // Clear the search field
       setSearchTicker('');
-      
+
       toast({
         title: "Analysis Started",
         description: `Starting comprehensive analysis for ${ticker}`,
@@ -379,26 +377,26 @@ export default function HorizontalWorkflow() {
             // Filter to only actually running analyses
             const runningData = data.filter(item => {
               // Consider running if analysis_status is 0 OR full_analysis.status is 'running'
-              const isRunning = item.analysis_status === 0 || 
-                              (item.full_analysis && item.full_analysis.status === 'running');
+              const isRunning = item.analysis_status === 0 ||
+                (item.full_analysis && item.full_analysis.status === 'running');
               return isRunning;
             });
-            
+
             // Only log if there are actually running analyses
             if (runningData.length > 0) {
-              console.log('Running analyses from DB:', runningData.map(d => ({ 
-                ticker: d.ticker, 
+              console.log('Running analyses from DB:', runningData.map(d => ({
+                ticker: d.ticker,
                 status: d.analysis_status,
-                fullAnalysisStatus: d.full_analysis?.status 
+                fullAnalysisStatus: d.full_analysis?.status
               })));
             }
             for (const item of runningData) {
               running.add(item.ticker);
             }
-            
+
             // Use the most recent running analysis for display
             if (runningData.length > 0) {
-              const mostRecent = runningData.sort((a, b) => 
+              const mostRecent = runningData.sort((a, b) =>
                 new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
               )[0];
               console.log('Most recent running analysis:', {
@@ -421,7 +419,7 @@ export default function HorizontalWorkflow() {
       const justCompleted = Array.from(previousRunningRef.current).filter(ticker => !running.has(ticker));
       if (justCompleted.length > 0) {
         console.log('Analyses completed, reloading for:', justCompleted);
-        
+
         // Fetch the completed analysis data
         try {
           const { data, error } = await supabase
@@ -432,7 +430,7 @@ export default function HorizontalWorkflow() {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-            
+
           if (!error && data) {
             setCurrentAnalysis(data);
             setActiveAnalysisTicker(data.ticker);
@@ -453,7 +451,7 @@ export default function HorizontalWorkflow() {
         try {
           const thirtyMinutesAgo = new Date();
           thirtyMinutesAgo.setMinutes(thirtyMinutesAgo.getMinutes() - 30);
-          
+
           const { data, error } = await supabase
             .from('analysis_history')
             .select('*')
@@ -463,7 +461,7 @@ export default function HorizontalWorkflow() {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-            
+
           if (!error && data) {
             setCurrentAnalysis(data);
             setActiveAnalysisTicker(data.ticker);
@@ -531,7 +529,7 @@ export default function HorizontalWorkflow() {
           }
         }
       )
-      .subscribe() : { unsubscribe: () => {} };
+      .subscribe() : { unsubscribe: () => { } };
 
     return () => {
       clearInterval(interval);
@@ -557,7 +555,7 @@ export default function HorizontalWorkflow() {
   // Helper function to get agent status (same logic as AnalysisDetailModal)
   const getAgentStatus = (agentKey: string, stepId: string, analysis: any) => {
     const insights = analysis.agent_insights || {};
-    
+
     // Special handling for research phase agents
     if (stepId === 'research' || stepId === 'research-debate') {
       // For research phase, only mark Bull/Bear as complete when Research Manager is done
@@ -585,7 +583,7 @@ export default function HorizontalWorkflow() {
         }
       }
     }
-    
+
     // Default behavior for other agents
     if (insights && insights[agentKey]) {
       return 'completed';
@@ -593,7 +591,7 @@ export default function HorizontalWorkflow() {
     // Check in workflow steps if available
     if (analysis.full_analysis?.workflowSteps) {
       for (const step of analysis.full_analysis.workflowSteps) {
-        const agent = step.agents?.find((a: any) => 
+        const agent = step.agents?.find((a: any) =>
           a.name.toLowerCase().replace(/\s+/g, '').includes(agentKey.toLowerCase().replace(/analyst|researcher|manager/g, '').trim())
         );
         if (agent) {
@@ -612,44 +610,44 @@ export default function HorizontalWorkflow() {
     // First try to use full_analysis if available for more detailed agent data
     const fullAnalysis = analysis.full_analysis;
     const insights = analysis.agent_insights || {};
-    
+
     // Check if this is a rebalance analysis
     const isRebalanceAnalysis = !!analysis.rebalance_request_id;
-    
+
     console.log('Analysis rebalance check:', {
       rebalance_request_id: analysis.rebalance_request_id,
       isRebalanceAnalysis
     });
-    
+
     // Update the rebalance context state
     setIsRebalanceContext(isRebalanceAnalysis);
-    
+
     // Determine if analysis is completed or running
     // For rebalance analyses, consider complete after risk stage (no portfolio manager)
-    let isCompleted = analysis.analysis_status === 1 || 
-                     (analysis.analysis_status !== 0 && 
-                      (!fullAnalysis?.status || fullAnalysis.status !== 'running'));
-    
+    let isCompleted = analysis.analysis_status === 1 ||
+      (analysis.analysis_status !== 0 &&
+        (!fullAnalysis?.status || fullAnalysis.status !== 'running'));
+
     // Special handling for rebalance analyses
     if (isRebalanceAnalysis && analysis.analysis_status === 0) {
       // For rebalance analyses, check if risk assessment is complete
       // Risk Manager is the final agent for individual stock analysis in rebalance
       const hasRiskManagerInsights = insights.riskManager || insights.riskJudge;
-      
+
       // Also check if all risk agents have completed
-      const riskAgentsComplete = insights.riskyAnalyst && insights.safeAnalyst && 
-                                 insights.neutralAnalyst && (insights.riskManager || insights.riskJudge);
-      
+      const riskAgentsComplete = insights.riskyAnalyst && insights.safeAnalyst &&
+        insights.neutralAnalyst && (insights.riskManager || insights.riskJudge);
+
       if (hasRiskManagerInsights || riskAgentsComplete) {
         console.log('Rebalance analysis - risk assessment complete, marking as done');
         isCompleted = true;
       }
     }
-    
-    const isRunning = !isCompleted && (analysis.analysis_status === 0 || 
-                     (fullAnalysis?.status === 'running'));
-    
-    
+
+    const isRunning = !isCompleted && (analysis.analysis_status === 0 ||
+      (fullAnalysis?.status === 'running'));
+
+
     // If full_analysis has workflowSteps, use them directly
     if (fullAnalysis?.workflowSteps && Array.isArray(fullAnalysis.workflowSteps)) {
       console.log('Using fullAnalysis.workflowSteps data');
@@ -659,26 +657,26 @@ export default function HorizontalWorkflow() {
           name: agent.name,
           icon: getAgentIcon(agent.name),
           status: agent.status === 'completed' ? 'idle' : agent.status === 'processing' ? 'processing' : 'idle',
-          lastAction: agent.status === 'completed' ? 'Analysis complete' : 
-                      agent.status === 'processing' ? 'Analyzing...' : 'Waiting...',
+          lastAction: agent.status === 'completed' ? 'Analysis complete' :
+            agent.status === 'processing' ? 'Analyzing...' : 'Waiting...',
           progress: agent.progress || (agent.status === 'completed' ? 100 : 0)
         }));
-        
+
         // SIMPLIFIED: Calculate step status based on agent completion
         const completedAgents = agents.filter((agent: any) => agent.progress === 100).length;
         const totalAgents = agents.length;
-        
+
         // Simple rule: 0 = pending, some = running, all = completed
         let stepStatus = completedAgents === 0 ? 'pending' :
-                        completedAgents === totalAgents ? 'completed' :
-                        'running';
-        
+          completedAgents === totalAgents ? 'completed' :
+            'running';
+
         // Special handling for rebalance analyses - mark as complete if risk stage is done
         if (isRebalanceAnalysis && step.id === 'risk' && stepStatus === 'completed') {
           // This is the last step for rebalance analyses
           console.log('Rebalance analysis - risk stage complete, marking analysis as done');
         }
-        
+
         console.log(`Step ${step.name}:`, {
           id: step.id,
           completedAgents,
@@ -687,41 +685,41 @@ export default function HorizontalWorkflow() {
           originalStatus: step.status,
           isRebalanceAnalysis
         });
-        
+
         return {
           id: step.id,
           name: step.name,
           icon: workflowStepIcons[step.id] || Brain,
           status: stepStatus,
           currentActivity: stepStatus === 'completed' ? 'Completed' :
-                          stepStatus === 'running' ? 'Processing...' :
-                          'Pending',
+            stepStatus === 'running' ? 'Processing...' :
+              'Pending',
           details: step.description,
           agents: agents,
           insights: []
         };
       });
-      
+
       // Filter out portfolio management step for rebalance analyses
       console.log('Before filtering mappedSteps:', mappedSteps.map((s: any) => ({ id: s.id, name: s.name })));
-      const filteredSteps = isRebalanceAnalysis 
-        ? mappedSteps.filter((step: any) => 
-            step.id !== 'portfolio-management' && 
-            step.id !== 'portfolio' && 
-            !step.name.toLowerCase().includes('portfolio'))
+      const filteredSteps = isRebalanceAnalysis
+        ? mappedSteps.filter((step: any) =>
+          step.id !== 'portfolio-management' &&
+          step.id !== 'portfolio' &&
+          !step.name.toLowerCase().includes('portfolio'))
         : mappedSteps;
       console.log('After filtering filteredSteps:', filteredSteps.map((s: any) => ({ id: s.id, name: s.name })));
-      
+
       setWorkflowData(filteredSteps);
       return isRunning;
     }
-    
+
     // Otherwise, build from agent insights
     // Start with initial steps, but filter out portfolio management for rebalance
-    let updatedSteps = isRebalanceAnalysis 
+    let updatedSteps = isRebalanceAnalysis
       ? getInitialWorkflowSteps().filter(step => step.id !== 'portfolio-management')
       : [...getInitialWorkflowSteps()];
-    
+
     // If the analysis is completed but we don't have detailed insights, mark all steps as completed
     if (isCompleted && Object.keys(insights).length === 0) {
       updatedSteps.forEach((step, index) => {
@@ -771,12 +769,12 @@ export default function HorizontalWorkflow() {
     const analysisAgents = ['marketAnalyst', 'socialMediaAnalyst', 'newsAnalyst', 'fundamentalsAnalyst'];
     const analysisCompleted = analysisAgents.filter(agent => insights[agent]).length;
     const analysisTotal = analysisAgents.length;
-    
+
     // Simple rule: 0 = pending, some = running, all = completed
     const analysisStepStatus = analysisCompleted === 0 ? 'pending' :
-                               analysisCompleted === analysisTotal ? 'completed' :
-                               'running';
-    
+      analysisCompleted === analysisTotal ? 'completed' :
+        'running';
+
     console.log('Analysis Step Debug:', {
       insights: Object.keys(insights),
       analysisAgents,
@@ -784,145 +782,145 @@ export default function HorizontalWorkflow() {
       analysisTotal,
       calculatedStatus: analysisStepStatus
     });
-    
+
     updatedSteps[0] = {
       ...updatedSteps[0],
       status: analysisStepStatus,
       currentActivity: analysisStepStatus === 'completed' ? 'Completed' :
-                       analysisStepStatus === 'running' ? 'Processing...' :
-                       'Waiting to start',
-        agents: [
-          {
-            ...updatedSteps[0].agents[0],
-            status: 'idle',
-            lastAction: insights['marketAnalyst'] ? 'Analysis complete' : 'Waiting...',
-            progress: insights['marketAnalyst'] ? 100 : 0
-          },
-          {
-            ...updatedSteps[0].agents[1],
-            status: 'idle',
-            lastAction: insights['socialMediaAnalyst'] ? 'Social sentiment analyzed' : 'Waiting...',
-            progress: insights['socialMediaAnalyst'] ? 100 : 0
-          },
-          {
-            ...updatedSteps[0].agents[2],
-            status: 'idle',
-            lastAction: insights['newsAnalyst'] ? 'News analysis complete' : 'Waiting...',
-            progress: insights['newsAnalyst'] ? 100 : 0
-          },
-          {
-            ...updatedSteps[0].agents[3],
-            status: 'idle',
-            lastAction: insights['fundamentalsAnalyst'] ? 'Fundamentals analyzed' : 'Waiting...',
-            progress: insights['fundamentalsAnalyst'] ? 100 : 0
-          }
-        ]
-      };
+        analysisStepStatus === 'running' ? 'Processing...' :
+          'Waiting to start',
+      agents: [
+        {
+          ...updatedSteps[0].agents[0],
+          status: 'idle',
+          lastAction: insights['marketAnalyst'] ? 'Analysis complete' : 'Waiting...',
+          progress: insights['marketAnalyst'] ? 100 : 0
+        },
+        {
+          ...updatedSteps[0].agents[1],
+          status: 'idle',
+          lastAction: insights['socialMediaAnalyst'] ? 'Social sentiment analyzed' : 'Waiting...',
+          progress: insights['socialMediaAnalyst'] ? 100 : 0
+        },
+        {
+          ...updatedSteps[0].agents[2],
+          status: 'idle',
+          lastAction: insights['newsAnalyst'] ? 'News analysis complete' : 'Waiting...',
+          progress: insights['newsAnalyst'] ? 100 : 0
+        },
+        {
+          ...updatedSteps[0].agents[3],
+          status: 'idle',
+          lastAction: insights['fundamentalsAnalyst'] ? 'Fundamentals analyzed' : 'Waiting...',
+          progress: insights['fundamentalsAnalyst'] ? 100 : 0
+        }
+      ]
+    };
 
     // SIMPLIFIED: Research Debate - just count completed agents
     const researchAgents = ['bullResearcher', 'bearResearcher', 'researchManager'];
     const researchCompleted = researchAgents.filter(agent => insights[agent]).length;
     const researchTotal = researchAgents.length;
-    
+
     // Simple rule: 0 = pending, some = running, all = completed
     const researchStepStatus = researchCompleted === 0 ? 'pending' :
-                               researchCompleted === researchTotal ? 'completed' :
-                               'running';
-    
+      researchCompleted === researchTotal ? 'completed' :
+        'running';
+
     updatedSteps[1] = {
       ...updatedSteps[1],
       status: researchStepStatus,
-      currentActivity: researchStepStatus === 'completed' ? 'Completed' : 
-                       researchStepStatus === 'running' ? 'Debate in progress...' : 
-                       'Waiting for analysis',
-        agents: [
-          {
-            ...updatedSteps[1].agents[0],
-            status: 'idle',
-            lastAction: insights['bullResearcher'] ? 'Bull case presented' : 'Waiting...',
-            progress: insights['bullResearcher'] ? 100 : 0
-          },
-          {
-            ...updatedSteps[1].agents[1],
-            status: 'idle',
-            lastAction: insights['bearResearcher'] ? 'Bear case presented' : 'Waiting...',
-            progress: insights['bearResearcher'] ? 100 : 0
-          },
-          {
-            ...updatedSteps[1].agents[2],
-            status: 'idle',
-            lastAction: insights['researchManager'] ? 'Debate concluded' : 'Waiting...',
-            progress: insights['researchManager'] ? 100 : 0
-          }
-        ]
-      };
+      currentActivity: researchStepStatus === 'completed' ? 'Completed' :
+        researchStepStatus === 'running' ? 'Debate in progress...' :
+          'Waiting for analysis',
+      agents: [
+        {
+          ...updatedSteps[1].agents[0],
+          status: 'idle',
+          lastAction: insights['bullResearcher'] ? 'Bull case presented' : 'Waiting...',
+          progress: insights['bullResearcher'] ? 100 : 0
+        },
+        {
+          ...updatedSteps[1].agents[1],
+          status: 'idle',
+          lastAction: insights['bearResearcher'] ? 'Bear case presented' : 'Waiting...',
+          progress: insights['bearResearcher'] ? 100 : 0
+        },
+        {
+          ...updatedSteps[1].agents[2],
+          status: 'idle',
+          lastAction: insights['researchManager'] ? 'Debate concluded' : 'Waiting...',
+          progress: insights['researchManager'] ? 100 : 0
+        }
+      ]
+    };
 
     // SIMPLIFIED: Trading Decision - single agent
     const hasTraderData = insights['trader'] || analysis.decision;
-    
+
     updatedSteps[2] = {
       ...updatedSteps[2],
       status: hasTraderData ? 'completed' : 'pending',
-      currentActivity: hasTraderData ? `Decision: ${analysis.decision || 'Made'}` : 
-                      'Awaiting research',
-        agents: [
-          {
-            ...updatedSteps[2].agents[0],
-            status: 'idle',
-            lastAction: hasTraderData ? `${analysis.decision || 'Trading'} decision made` : 'Waiting...',
-            progress: hasTraderData ? 100 : 0
-          }
-        ]
-      };
+      currentActivity: hasTraderData ? `Decision: ${analysis.decision || 'Made'}` :
+        'Awaiting research',
+      agents: [
+        {
+          ...updatedSteps[2].agents[0],
+          status: 'idle',
+          lastAction: hasTraderData ? `${analysis.decision || 'Trading'} decision made` : 'Waiting...',
+          progress: hasTraderData ? 100 : 0
+        }
+      ]
+    };
 
     // SIMPLIFIED: Risk Assessment - just count completed agents
     const riskAgents = ['riskyAnalyst', 'safeAnalyst', 'neutralAnalyst', 'riskManager'];
     const riskCompleted = riskAgents.filter(agent => insights[agent]).length;
     const riskTotal = riskAgents.length;
-    
+
     // Simple rule: 0 = pending, some = running, all = completed
     const riskStepStatus = riskCompleted === 0 ? 'pending' :
-                          riskCompleted === riskTotal ? 'completed' :
-                          'running';
-    
+      riskCompleted === riskTotal ? 'completed' :
+        'running';
+
     updatedSteps[3] = {
       ...updatedSteps[3],
       status: riskStepStatus,
-      currentActivity: riskStepStatus === 'completed' ? 'Completed' : 
-                       riskStepStatus === 'running' ? 'Risk assessment in progress...' : 
-                       'Awaiting decision',
-        agents: [
-          {
-            ...updatedSteps[3].agents[0],
-            status: 'idle',
-            lastAction: insights['riskyAnalyst'] ? 'Risk tolerance assessed' : 'Waiting...',
-            progress: insights['riskyAnalyst'] ? 100 : 0
-          },
-          {
-            ...updatedSteps[3].agents[1],
-            status: 'idle',
-            lastAction: insights['safeAnalyst'] ? 'Conservative view analyzed' : 'Waiting...',
-            progress: insights['safeAnalyst'] ? 100 : 0
-          },
-          {
-            ...updatedSteps[3].agents[2],
-            status: 'idle',
-            lastAction: insights['neutralAnalyst'] ? 'Balanced perspective provided' : 'Waiting...',
-            progress: insights['neutralAnalyst'] ? 100 : 0
-          },
-          {
-            ...updatedSteps[3].agents[3],
-            status: 'idle',
-            lastAction: insights['riskManager'] ? 'Risk assessment complete' : 'Waiting...',
-            progress: insights['riskManager'] ? 100 : 0
-          }
-        ]
-      };
+      currentActivity: riskStepStatus === 'completed' ? 'Completed' :
+        riskStepStatus === 'running' ? 'Risk assessment in progress...' :
+          'Awaiting decision',
+      agents: [
+        {
+          ...updatedSteps[3].agents[0],
+          status: 'idle',
+          lastAction: insights['riskyAnalyst'] ? 'Risk tolerance assessed' : 'Waiting...',
+          progress: insights['riskyAnalyst'] ? 100 : 0
+        },
+        {
+          ...updatedSteps[3].agents[1],
+          status: 'idle',
+          lastAction: insights['safeAnalyst'] ? 'Conservative view analyzed' : 'Waiting...',
+          progress: insights['safeAnalyst'] ? 100 : 0
+        },
+        {
+          ...updatedSteps[3].agents[2],
+          status: 'idle',
+          lastAction: insights['neutralAnalyst'] ? 'Balanced perspective provided' : 'Waiting...',
+          progress: insights['neutralAnalyst'] ? 100 : 0
+        },
+        {
+          ...updatedSteps[3].agents[3],
+          status: 'idle',
+          lastAction: insights['riskManager'] ? 'Risk assessment complete' : 'Waiting...',
+          progress: insights['riskManager'] ? 100 : 0
+        }
+      ]
+    };
 
     // SIMPLIFIED: Portfolio Management - single agent (only for non-rebalance analyses)
     if (!isRebalanceAnalysis) {
       const hasPortfolioData = insights['portfolioManager'];
-      
+
       // Find the portfolio management step index (it might be at index 4 if not filtered)
       const portfolioStepIndex = updatedSteps.findIndex(s => s.id === 'portfolio-management');
       if (portfolioStepIndex !== -1) {
@@ -943,15 +941,15 @@ export default function HorizontalWorkflow() {
     }
 
     // Removed override logic - we're using simple agent-based status determination
-    
+
     // Filter out portfolio management step for rebalance analyses before setting
-    const finalSteps = isRebalanceAnalysis 
-      ? updatedSteps.filter(step => 
-          step.id !== 'portfolio-management' && 
-          step.id !== 'portfolio' && 
-          !step.name.toLowerCase().includes('portfolio'))
+    const finalSteps = isRebalanceAnalysis
+      ? updatedSteps.filter(step =>
+        step.id !== 'portfolio-management' &&
+        step.id !== 'portfolio' &&
+        !step.name.toLowerCase().includes('portfolio'))
       : updatedSteps;
-    
+
     // Set the workflow data directly - status is already determined by agent completion
     console.log('Final workflow steps before setting:', finalSteps.map(step => ({
       name: step.name,
@@ -959,7 +957,7 @@ export default function HorizontalWorkflow() {
       agents: step.agents.filter(a => a.progress === 100).length + '/' + step.agents.length
     })));
     setWorkflowData(finalSteps);
-    
+
     // Return the running state
     return isRunning;
   };
@@ -981,9 +979,9 @@ export default function HorizontalWorkflow() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
-              {isAnalyzing ? 'Analysis Progress' : 
-               activeAnalysisTicker ? `Most Recent Analysis: ${activeAnalysisTicker}` : 
-               'Analysis Progress'}
+              {isAnalyzing ? 'Analysis Progress' :
+                activeAnalysisTicker ? `Most Recent Analysis: ${activeAnalysisTicker}` :
+                  'Analysis Progress'}
               {isRebalanceContext && (
                 <Badge variant="secondary" className="text-xs font-normal">
                   Rebalance
@@ -1042,8 +1040,8 @@ export default function HorizontalWorkflow() {
                     }}
                   />
                 </div>
-                <Button 
-                  onClick={handleStartAnalysis} 
+                <Button
+                  onClick={handleStartAnalysis}
                   disabled={!searchTicker || isAnalyzing}
                   size="sm"
                 >
@@ -1057,11 +1055,11 @@ export default function HorizontalWorkflow() {
           {/* Horizontal workflow steps */}
           <div className="flex items-center justify-center overflow-hidden">
             {(() => {
-              const filteredSteps = isRebalanceContext 
-                ? workflowData.filter(step => 
-                    step.id !== 'portfolio-management' && 
-                    step.id !== 'portfolio' && 
-                    !step.name.toLowerCase().includes('portfolio'))
+              const filteredSteps = isRebalanceContext
+                ? workflowData.filter(step =>
+                  step.id !== 'portfolio-management' &&
+                  step.id !== 'portfolio' &&
+                  !step.name.toLowerCase().includes('portfolio'))
                 : workflowData;
               console.log('Displaying workflow steps:', {
                 isRebalanceContext,
@@ -1072,40 +1070,39 @@ export default function HorizontalWorkflow() {
               return filteredSteps;
             })()
               .map((step, index) => {
-              const Icon = step.icon;
-              return (
-                <div key={step.id} className="flex items-center">
-                  <button
-                    onClick={() => setSelectedStep(step)}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all hover:bg-muted/50 min-w-[80px] max-w-[80px] ${
-                      step.status === 'active' || step.status === 'running' ? 'bg-muted' : ''
-                    }`}
-                  >
-                    <div className="relative">
-                      <div className={`p-1.5 rounded-full ${getStatusColor(step.status)}`}>
-                        <Icon className="w-3 h-3" />
-                      </div>
-                      {step.status === 'active' && (
-                        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
-                          <div className="text-[10px] font-medium text-primary">
-                            {getStepProgress(step)}%
-                          </div>
+                const Icon = step.icon;
+                return (
+                  <div key={step.id} className="flex items-center">
+                    <button
+                      onClick={() => setSelectedStep(step)}
+                      className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all hover:bg-muted/50 min-w-[80px] max-w-[80px] ${step.status === 'active' || step.status === 'running' ? 'bg-muted' : ''
+                        }`}
+                    >
+                      <div className="relative">
+                        <div className={`p-1.5 rounded-full ${getStatusColor(step.status)}`}>
+                          <Icon className="w-3 h-3" />
                         </div>
-                      )}
-                    </div>
-                    <span className="text-xs font-medium text-center leading-tight mt-1">{step.name}</span>
-                    <div className="flex items-center gap-0.5">
-                      {getStatusIcon(step.status)}
-                      {step.agents && (
-                        <span className="text-[10px] text-muted-foreground">
-                          {step.agents.filter(a => a.progress === 100).length}/{step.agents.length}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                </div>
-              );
-            })}
+                        {step.status === 'active' && (
+                          <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
+                            <div className="text-[10px] font-medium text-primary">
+                              {getStepProgress(step)}%
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-center leading-tight mt-1">{step.name}</span>
+                      <div className="flex items-center gap-0.5">
+                        {getStatusIcon(step.status)}
+                        {step.agents && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {step.agents.filter(a => a.progress === 100).length}/{step.agents.length}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
           </div>
 
           {/* Expandable agent status details */}
@@ -1120,85 +1117,83 @@ export default function HorizontalWorkflow() {
               </span>
               {expandedAgents ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
-            
+
             {expandedAgents && (
               <div className="mt-4 space-y-4">
-                {(isRebalanceContext 
-                  ? workflowData.filter(step => 
-                      step.id !== 'portfolio-management' && 
-                      step.id !== 'portfolio' && 
-                      !step.name.toLowerCase().includes('portfolio'))
+                {(isRebalanceContext
+                  ? workflowData.filter(step =>
+                    step.id !== 'portfolio-management' &&
+                    step.id !== 'portfolio' &&
+                    !step.name.toLowerCase().includes('portfolio'))
                   : workflowData)
                   .map((step) => (
-                  <div key={step.id} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className={`text-sm font-semibold ${getStageStatusColor(step.status)}`}>
-                          {step.name}
-                        </h4>
-                        {step.description && (
-                          <p className="text-xs text-muted-foreground">{step.description}</p>
-                        )}
+                    <div key={step.id} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className={`text-sm font-semibold ${getStageStatusColor(step.status)}`}>
+                            {step.name}
+                          </h4>
+                          {step.description && (
+                            <p className="text-xs text-muted-foreground">{step.description}</p>
+                          )}
+                        </div>
+                        <Badge
+                          variant={
+                            step.status === 'completed' ? 'default' :
+                              step.status === 'active' ? 'default' :
+                                step.status === 'running' ? 'secondary' :
+                                  'outline'
+                          }
+                          className={`text-xs ${step.status === 'completed' ? 'bg-green-500/10 text-green-600 border-green-500/50' :
+                              step.status === 'running' ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/50' :
+                                ''
+                            }`}
+                        >
+                          {step.status}
+                        </Badge>
                       </div>
-                      <Badge 
-                        variant={
-                          step.status === 'completed' ? 'default' :
-                          step.status === 'active' ? 'default' : 
-                          step.status === 'running' ? 'secondary' : 
-                          'outline'
-                        } 
-                        className={`text-xs ${
-                          step.status === 'completed' ? 'bg-green-500/10 text-green-600 border-green-500/50' :
-                          step.status === 'running' ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/50' : 
-                          ''
-                        }`}
-                      >
-                        {step.status}
-                      </Badge>
-                    </div>
-                    
-                    <div className="space-y-2 ml-2">
-                      {step.agents.map((agent) => {
-                        const AgentIcon = agent.icon;
-                        return (
-                          <div
-                            key={agent.id}
-                            className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/50"
-                          >
-                            <div className="flex items-center gap-2">
-                              <AgentIcon className="h-3 w-3 text-muted-foreground" />
-                              <div className="flex-1">
-                                <p className="text-xs font-medium text-foreground">{agent.name}</p>
-                                <p className="text-xs text-muted-foreground">{agent.lastAction}</p>
+
+                      <div className="space-y-2 ml-2">
+                        {step.agents.map((agent) => {
+                          const AgentIcon = agent.icon;
+                          return (
+                            <div
+                              key={agent.id}
+                              className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/50"
+                            >
+                              <div className="flex items-center gap-2">
+                                <AgentIcon className="h-3 w-3 text-muted-foreground" />
+                                <div className="flex-1">
+                                  <p className="text-xs font-medium text-foreground">{agent.name}</p>
+                                  <p className="text-xs text-muted-foreground">{agent.lastAction}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {agent.status === 'processing' ? (
+                                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                                ) : agent.progress === 100 ? (
+                                  <CheckCircle className="h-3 w-3 text-green-500" />
+                                ) : (
+                                  <Clock className="h-3 w-3 text-muted-foreground" />
+                                )}
+                                {agent.progress !== undefined && agent.progress > 0 && (
+                                  <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full transition-all duration-500 ${agent.status === 'processing' ? 'bg-blue-500 animate-pulse' : 'bg-green-500'
+                                        }`}
+                                      style={{ width: `${agent.progress}%` }}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            
-                            <div className="flex items-center gap-2">
-                              {agent.status === 'processing' ? (
-                                <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                              ) : agent.progress === 100 ? (
-                                <CheckCircle className="h-3 w-3 text-green-500" />
-                              ) : (
-                                <Clock className="h-3 w-3 text-muted-foreground" />
-                              )}
-                              {agent.progress !== undefined && agent.progress > 0 && (
-                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full transition-all duration-500 ${
-                                      agent.status === 'processing' ? 'bg-blue-500 animate-pulse' : 'bg-green-500'
-                                    }`}
-                                    style={{ width: `${agent.progress}%` }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
-                
+                  ))}
+
                 <div className="pt-2 border-t">
                   <p className="text-xs text-muted-foreground">
                     {isAnalyzing ? (
@@ -1234,7 +1229,7 @@ export default function HorizontalWorkflow() {
               {selectedStep?.details}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedStep && (
             <div className="space-y-4">
               <div>
@@ -1257,10 +1252,9 @@ export default function HorizontalWorkflow() {
                         {agent.progress !== undefined && (
                           <div className="flex items-center gap-2">
                             <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full transition-all ${
-                                  agent.status === 'processing' ? 'bg-blue-500' : 'bg-green-500'
-                                }`}
+                              <div
+                                className={`h-full transition-all ${agent.status === 'processing' ? 'bg-blue-500' : 'bg-green-500'
+                                  }`}
                                 style={{ width: `${agent.progress}%` }}
                               />
                             </div>
@@ -1309,7 +1303,7 @@ export default function HorizontalWorkflow() {
           )}
         </DialogContent>
       </Dialog>
-      
+
       {/* Analysis Detail Modal */}
       {activeAnalysisTicker && (
         <AnalysisDetailModal

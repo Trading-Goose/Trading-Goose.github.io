@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
+  const navigate = useNavigate();
   const { login, register } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -153,7 +155,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="login-password">Password</Label>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-sm text-primary hover:underline p-0 h-auto font-normal"
+                    onClick={() => {
+                      onClose();
+                      navigate('/forgot-password');
+                    }}
+                    disabled={isLoading}
+                  >
+                    Forgot password?
+                  </Button>
+                </div>
                 <Input
                   id="login-password"
                   type="password"

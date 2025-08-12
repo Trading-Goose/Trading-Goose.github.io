@@ -210,33 +210,38 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={runningRebalance ? () => setShowRebalanceDetailModal(true) : handleRebalanceClick}
-                disabled={loading}
-              >
-                {runningRebalance ? (
+
+              {runningRebalance ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={runningRebalance ? () => setShowRebalanceDetailModal(true) : handleRebalanceClick}
+                  disabled={loading}
+                >
                   <>
                     <Eye className="h-4 w-4 mr-2" />
                     Rebalance Detail
                   </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Rebalance
-                  </>
-                )}
-              </Button>
-              {!runningRebalance && (
+                </Button>
+              ) : (
                 <Button
-                  variant="outline"
+                  onClick={handleRebalanceClick}
+                  disabled={loading}
                   size="sm"
-                  onClick={() => setShowScheduleListModal(true)}
+                  variant="default"
                 >
-                  <Clock className="h-4 w-4" />
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Rebalance
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowScheduleListModal(true)}
+              >
+                <Clock className="h-4 w-4" />
+              </Button>
+
             </div>
           </div>
           {lastRefresh && (

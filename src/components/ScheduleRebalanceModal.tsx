@@ -221,7 +221,7 @@ export default function ScheduleRebalanceModal({ isOpen, onClose }: ScheduleReba
     intervalUnit: 'weeks',
     daysOfWeek: [1], // Default to Monday
     daysOfMonth: [1], // Default to 1st of month
-    timeOfDay: '09:00', // Default to 9 AM (hour only)
+    timeOfDay: '09:00 AM', // Default to 9:00 AM
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 
@@ -348,7 +348,14 @@ export default function ScheduleRebalanceModal({ isOpen, onClose }: ScheduleReba
           intervalUnit: scheduleData.interval_unit || 'weeks',
           daysOfWeek: scheduleData.day_of_week || [1],
           daysOfMonth: scheduleData.day_of_month || [1],
-          timeOfDay: scheduleData.time_of_day?.slice(0, 2) + ':00' || '09:00',
+          timeOfDay: (() => {
+            const dbTime = scheduleData.time_of_day?.slice(0, 5) || '09:00';
+            const [hourStr, minuteStr] = dbTime.split(':');
+            const hour24 = parseInt(hourStr);
+            const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+            const period = hour24 >= 12 ? 'PM' : 'AM';
+            return `${hour12.toString().padStart(2, '0')}:${minuteStr} ${period}`;
+          })(),
           timezone: scheduleData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
         });
 
@@ -453,7 +460,20 @@ export default function ScheduleRebalanceModal({ isOpen, onClose }: ScheduleReba
         interval_unit: config.intervalUnit,
         day_of_week: config.intervalUnit === 'weeks' ? config.daysOfWeek : null,
         day_of_month: config.intervalUnit === 'months' ? config.daysOfMonth : null,
-        time_of_day: config.timeOfDay.slice(0, 2) + ':00:00', // Ensure hour only with :00:00
+        time_of_day: (() => {
+          const [time, period] = config.timeOfDay.split(' ');
+          const [hourStr, minuteStr] = time.split(':');
+          let hour24 = parseInt(hourStr);
+          
+          // Convert 12-hour to 24-hour format for database
+          if (period === 'PM' && hour24 !== 12) {
+            hour24 += 12;
+          } else if (period === 'AM' && hour24 === 12) {
+            hour24 = 0;
+          }
+          
+          return `${hour24.toString().padStart(2, '0')}:${minuteStr}:00`;
+        })(), // Convert to 24-hour format for database
         timezone: config.timezone,
         selected_tickers: includeAllPositions ? [] : Array.from(selectedPositions),
         include_watchlist: includeWatchlist,
@@ -562,8 +582,17 @@ export default function ScheduleRebalanceModal({ isOpen, onClose }: ScheduleReba
   const getNextRunTime = () => {
     // This is a simplified preview - actual calculation happens in the database
     const now = new Date();
-    const hours = parseInt(config.timeOfDay.slice(0, 2));
-    const minutes = 0; // Always 0 since we only allow hour selection
+    const [time, period] = config.timeOfDay.split(' ');
+    const [hourStr, minuteStr] = time.split(':');
+    let hours = parseInt(hourStr);
+    const minutes = parseInt(minuteStr);
+    
+    // Convert 12-hour to 24-hour format
+    if (period === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+      hours = 0;
+    }
 
     let nextRun = new Date();
     nextRun.setHours(hours, minutes, 0, 0);
@@ -763,31 +792,71 @@ export default function ScheduleRebalanceModal({ isOpen, onClose }: ScheduleReba
 
                     {/* Time of Day */}
                     <div className="space-y-2">
-                      <Label>Hour of Day</Label>
-                      <Select
-                        value={config.timeOfDay}
-                        onValueChange={(value) => setConfig(prev => ({ ...prev, timeOfDay: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-[300px]">
-                          {Array.from({ length: 24 }, (_, i) => {
-                            const hour = i.toString().padStart(2, '0');
-                            const time12 = i === 0 ? '12:00 AM' :
-                              i < 12 ? `${i}:00 AM` :
-                                i === 12 ? '12:00 PM' :
-                                  `${i - 12}:00 PM`;
-                            return (
-                              <SelectItem key={hour} value={`${hour}:00`}>
-                                {time12}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+                      <Label>Time of Day</Label>
+                      <div className="flex gap-2">
+                        {/* Hour Selection */}
+                        <Select
+                          value={config.timeOfDay.split(':')[0]}
+                          onValueChange={(hour) => {
+                            const [, minutePart] = config.timeOfDay.split(':');
+                            const [minute, period] = minutePart ? minutePart.split(' ') : ['00', 'AM'];
+                            setConfig(prev => ({ ...prev, timeOfDay: `${hour}:${minute} ${period}` }));
+                          }}
+                        >
+                          <SelectTrigger className="w-24">
+                            <SelectValue placeholder="Hour" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 12 }, (_, i) => {
+                              const hour = i === 0 ? 12 : i;
+                              return (
+                                <SelectItem key={hour} value={hour.toString().padStart(2, '0')}>
+                                  {hour}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+
+                        <span className="flex items-center">:</span>
+
+                        {/* Minute Selection */}
+                        <Select
+                          value={config.timeOfDay.split(':')[1]?.split(' ')[0] || '00'}
+                          onValueChange={(minute) => {
+                            const hour = config.timeOfDay.split(':')[0];
+                            const period = config.timeOfDay.includes('PM') ? 'PM' : 'AM';
+                            setConfig(prev => ({ ...prev, timeOfDay: `${hour}:${minute} ${period}` }));
+                          }}
+                        >
+                          <SelectTrigger className="w-24">
+                            <SelectValue placeholder="Min" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="00">00</SelectItem>
+                            <SelectItem value="30">30</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {/* AM/PM Selection */}
+                        <Select
+                          value={config.timeOfDay.includes('PM') ? 'PM' : 'AM'}
+                          onValueChange={(period) => {
+                            const [time] = config.timeOfDay.split(' ');
+                            setConfig(prev => ({ ...prev, timeOfDay: `${time} ${period}` }));
+                          }}
+                        >
+                          <SelectTrigger className="w-24">
+                            <SelectValue placeholder="AM/PM" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="AM">AM</SelectItem>
+                            <SelectItem value="PM">PM</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        Rebalances execute at the start of the selected hour (cron runs hourly)
+                        Rebalances execute at the selected time (runs every 30 minutes)
                       </p>
                     </div>
 

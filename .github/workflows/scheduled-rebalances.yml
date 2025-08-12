@@ -4,26 +4,26 @@ on:
   schedule:
     # Run at :25 and :55 past every hour
     # This gives us a 5-minute buffer before :00 and :30 schedules
-    - cron: '25,55 * * * *'
-  
+    - cron: "25, 55 * * * *"
+
   # Allow manual trigger for testing
   workflow_dispatch:
     inputs:
       debug:
-        description: 'Enable debug logging'
+        description: "Enable debug logging"
         required: false
-        default: 'false'
+        default: "false"
 
 jobs:
   process-schedules:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Check current time
         run: |
           echo "Current UTC time: $(date -u '+%Y-%m-%d %H:%M:%S')"
           echo "Running scheduled rebalance check..."
-      
+
       - name: Call Supabase Edge Function
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -34,22 +34,22 @@ jobs:
             -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
             -H "Content-Type: application/json" \
             -d '{}')
-          
+
           # Extract HTTP status code (last line)
           http_code=$(echo "$response" | tail -n1)
           # Extract response body (everything except last line)
           body=$(echo "$response" | sed '$d')
-          
+
           echo "HTTP Status: $http_code"
           echo "Response body:"
           echo "$body" | jq '.' 2>/dev/null || echo "$body"
-          
+
           # Check if request was successful
           if [ "$http_code" -ne 200 ]; then
             echo "❌ Edge function returned error status: $http_code"
             exit 1
           fi
-          
+
           # Parse and display results
           if command -v jq >/dev/null 2>&1; then
             processed=$(echo "$body" | jq -r '.processed // 0')
@@ -70,12 +70,12 @@ jobs:
               echo "⚠️ Warning: $failed schedule(s) failed to process"
             fi
           fi
-      
+
       - name: Log completion
         if: always()
         run: |
           echo "Scheduled rebalance check completed at $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
-          
+
       - name: Create issue on failure
         if: failure()
         uses: actions/github-script@v6
@@ -83,11 +83,11 @@ jobs:
           script: |
             const title = `Scheduled Rebalance Failed - ${new Date().toISOString()}`;
             const body = `The scheduled rebalance check failed at ${new Date().toISOString()}.
-            
+
             Please check the [workflow logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.
-            
+
             This issue was automatically created by the scheduled rebalance workflow.`;
-            
+
             github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,

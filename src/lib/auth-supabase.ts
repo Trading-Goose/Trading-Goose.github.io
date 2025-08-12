@@ -15,6 +15,8 @@ interface AuthState {
   loadUserData: () => Promise<void>;
   checkSession: () => Promise<void>;
   forceReload: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const useAuth = create<AuthState>()(
@@ -341,6 +343,40 @@ export const useAuth = create<AuthState>()(
         console.log('Force reload triggered');
         // Just reload the data without clearing state first
         await get().loadUserData();
+      },
+
+      resetPassword: async (email: string) => {
+        try {
+          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/reset-password`,
+          });
+
+          if (error) {
+            return { success: false, error: error.message };
+          }
+
+          return { success: true };
+        } catch (error) {
+          console.error('Reset password error:', error);
+          return { success: false, error: 'Failed to send reset email' };
+        }
+      },
+
+      updatePassword: async (newPassword: string) => {
+        try {
+          const { error } = await supabase.auth.updateUser({ 
+            password: newPassword 
+          });
+
+          if (error) {
+            return { success: false, error: error.message };
+          }
+
+          return { success: true };
+        } catch (error) {
+          console.error('Update password error:', error);
+          return { success: false, error: 'Failed to update password' };
+        }
       }
     }),
     {
@@ -458,6 +494,12 @@ if (typeof window !== 'undefined') {
         if (session) {
           await state.loadUserData();
         }
+        break;
+        
+      case 'PASSWORD_RECOVERY':
+        // Password recovery link clicked - don't load user data yet
+        console.log('Password recovery mode, session:', session);
+        // The ResetPassword component will handle this
         break;
     }
   });

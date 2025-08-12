@@ -60,7 +60,7 @@ export default function RecentTrades() {
       if (data && data.length > 0) {
         const threeDaysAgo = new Date();
         threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-        
+
         // Filter decisions: show all pending, or approved/rejected within 3 days
         const filteredData = data.filter(item => {
           if (item.status === 'pending') return true;
@@ -103,7 +103,7 @@ export default function RecentTrades() {
   // Function to update Alpaca order status for approved orders
   const updateAlpacaOrderStatus = async () => {
     if (!user?.id || !apiSettings) return;
-    
+
     try {
       // Get all approved orders with Alpaca IDs in metadata
       const { data: approvedOrders, error } = await supabase
@@ -111,21 +111,21 @@ export default function RecentTrades() {
         .select('id, metadata')
         .eq('user_id', user.id)
         .eq('status', 'approved');
-      
+
       if (error || !approvedOrders || approvedOrders.length === 0) return;
-      
+
       // Filter orders that have Alpaca order IDs
       const ordersWithAlpacaIds = approvedOrders.filter(o => o.metadata?.alpaca_order?.id);
       if (ordersWithAlpacaIds.length === 0) return;
-      
+
       // Fetch current orders from Alpaca
       const alpacaOrders = await alpacaAPI.getOrders('all');
-      
+
       // Update status for each order
       for (const order of ordersWithAlpacaIds) {
         const alpacaOrderId = order.metadata.alpaca_order.id;
         const alpacaOrder = alpacaOrders.find(o => o.id === alpacaOrderId);
-        
+
         if (alpacaOrder) {
           // Update metadata with latest Alpaca order info
           const updatedMetadata = {
@@ -138,11 +138,11 @@ export default function RecentTrades() {
               updated_at: new Date().toISOString()
             }
           };
-          
+
           const updates: any = {
             metadata: updatedMetadata
           };
-          
+
           // If order is filled, update execution details
           if (alpacaOrder.status === 'filled') {
             updates.status = 'executed';
@@ -150,14 +150,14 @@ export default function RecentTrades() {
           } else if (['canceled', 'rejected', 'expired'].includes(alpacaOrder.status)) {
             updates.status = 'rejected';
           }
-          
+
           await supabase
             .from('trading_actions')
             .update(updates)
             .eq('id', order.id);
         }
       }
-      
+
       // Refresh the decisions
       fetchAIDecisions();
     } catch (err) {
@@ -167,26 +167,26 @@ export default function RecentTrades() {
 
   useEffect(() => {
     const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
-    
+
     // Always fetch AI decisions from database
     fetchAIDecisions();
-    
+
     if (hasCredentials) {
       // Check Alpaca order status for approved orders
       updateAlpacaOrderStatus();
     }
   }, [apiSettings, user]);
-  
+
   // Periodically update Alpaca order status
   useEffect(() => {
     const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
-    
+
     if (!hasCredentials) return;
-    
+
     const interval = setInterval(() => {
       updateAlpacaOrderStatus();
     }, 30000); // Check every 30 seconds
-    
+
     return () => clearInterval(interval);
   }, [apiSettings, user]);
 
@@ -231,9 +231,9 @@ export default function RecentTrades() {
           alpacaOrderId: data.alpacaOrderId,
           alpacaOrderStatus: data.alpacaStatus
         };
-        
+
         // Update the local decisions array
-        setAiDecisions(prev => prev.map(d => 
+        setAiDecisions(prev => prev.map(d =>
           d.id === decision.id ? updatedDecision : d
         ));
 
@@ -241,7 +241,7 @@ export default function RecentTrades() {
           title: "Order Executed",
           description: `${decision.action} order for ${decision.symbol} has been submitted to Alpaca. Order ID: ${data.alpacaOrderId?.substring(0, 8)}...`,
         });
-        
+
         // Start polling for order status updates
         if (data.alpacaOrderId) {
           pollAlpacaOrderStatus(decision.id);
@@ -253,7 +253,7 @@ export default function RecentTrades() {
           variant: "destructive",
         });
       }
-      
+
       // Refresh AI decisions
       fetchAIDecisions();
     } catch (err: any) {
@@ -263,7 +263,7 @@ export default function RecentTrades() {
         description: err.message || 'Failed to execute order on Alpaca',
         variant: "destructive"
       });
-      
+
       fetchAIDecisions();
     } finally {
       setExecutingOrderId(null);
@@ -277,7 +277,7 @@ export default function RecentTrades() {
 
     const pollInterval = setInterval(async () => {
       attempts++;
-      
+
       try {
         // Fetch updated trade order from database
         const { data: tradeOrder, error } = await supabase
@@ -306,7 +306,7 @@ export default function RecentTrades() {
           const alpacaStatus = tradeOrder.metadata?.alpaca_order?.status;
           if (alpacaStatus && ['filled', 'canceled', 'rejected', 'expired'].includes(alpacaStatus)) {
             clearInterval(pollInterval);
-            
+
             if (alpacaStatus === 'filled') {
               const filledPrice = tradeOrder.metadata?.alpaca_order?.filled_avg_price;
               const filledQty = tradeOrder.metadata?.alpaca_order?.filled_qty;
@@ -403,200 +403,200 @@ export default function RecentTrades() {
               const pendingDecisions = aiDecisions.filter(d => d.status === 'pending');
               const processedDecisions = aiDecisions.filter(d => d.status === 'approved' || d.status === 'rejected');
               const executedDecisions = aiDecisions.filter(d => d.status === 'executed');
-              
+
               return (
                 <>
                   {/* Pending Decisions */}
                   {pendingDecisions.length > 0 && (
                     <>
                       {pendingDecisions.map((decision) => {
-              const isPending = decision.status === 'pending';
-              const isExecuted = decision.status === 'executed';
-              const isApproved = decision.status === 'approved';
-              const isRejected = decision.status === 'rejected';
-              
-              return (
-                <div
-                  key={decision.id}
-                  className={`p-3 rounded-lg border transition-colors ${
-                    isPending 
-                      ? 'bg-blue-500/5 border-blue-500/20 hover:bg-blue-500/10' 
-                      : isExecuted
-                      ? 'bg-green-500/5 border-green-500/20'
-                      : isApproved
-                      ? 'bg-yellow-500/5 border-yellow-500/20'
-                      : 'bg-gray-500/5 border-gray-500/20'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex gap-3 flex-1">
-                      <div className={`p-2 rounded-full h-fit ${
-                        decision.action === 'BUY' ? 'bg-green-500/10' : 'bg-red-500/10'
-                      }`}>
-                        {decision.action === 'BUY' ? (
-                          <ArrowUpRight className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <ArrowDownRight className="h-4 w-4 text-red-500" />
-                        )}
-                      </div>
-                      
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm">{decision.symbol}</span>
-                          <Badge variant={decision.action === 'BUY' ? 'secondary' : 'destructive'} className="text-xs">
-                            {decision.action}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {decision.dollarAmount && decision.dollarAmount > 0
-                              ? `$${decision.dollarAmount.toFixed(2)} order`
-                              : decision.quantity > 0
-                                ? `${decision.quantity} shares ${decision.price > 0 ? `@ $${decision.price}` : '(market price)'}`
-                                : 'Order details pending'
-                            }
-                          </span>
-                          {decision.price > 0 && (
-                            <span className="text-xs font-medium">
-                              ${decision.totalValue.toLocaleString()}
-                            </span>
-                          )}
-                          {/* Status Badge */}
-                          {isExecuted && (
-                            <Badge variant="success" className="text-xs">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Executed
-                            </Badge>
-                          )}
-                          {isApproved && (
-                            <Badge variant="outline" className="text-xs text-yellow-600">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Approved
-                            </Badge>
-                          )}
-                          {isRejected && (
-                            <Badge variant="outline" className="text-xs text-gray-600">
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Rejected
-                            </Badge>
-                          )}
-                          {isPending && (
-                            <Badge variant="outline" className="text-xs text-blue-600">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Pending
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {decision.reasoning}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
-                            <>
-                              <span>{decision.agent}</span>
-                              <span>•</span>
-                            </>
-                          )}
-                          {decision.sourceType && (
-                            <>
-                              <span className="capitalize">{decision.sourceType.replace('_', ' ')}</span>
-                              <span>•</span>
-                            </>
-                          )}
-                          <span>{decision.timestamp}</span>
-                          {decision.executedAt && (
-                            <>
-                              <span>•</span>
-                              <span>Executed {decision.executedAt}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                        const isPending = decision.status === 'pending';
+                        const isExecuted = decision.status === 'executed';
+                        const isApproved = decision.status === 'approved';
+                        const isRejected = decision.status === 'rejected';
 
-                    {/* Action buttons and details */}
-                    <div className="flex flex-col gap-1">
-                      {/* Analysis Detail Button */}
-                      {decision.analysisId && (
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 px-3 text-xs"
-                          onClick={() => setSelectedAnalysisId(decision.analysisId!)}
-                        >
-                          <FileText className="h-3 w-3 mr-1" />
-                          Analysis
-                        </Button>
-                      )}
-                      
-                      {/* Rebalance Detail Button */}
-                      {decision.rebalanceRequestId && (
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 px-3 text-xs"
-                          onClick={() => setSelectedRebalanceId(decision.rebalanceRequestId!)}
-                        >
-                          <BarChart3 className="h-3 w-3 mr-1" />
-                          Rebalance
-                        </Button>
-                      )}
-                      
-                      {/* Alpaca Order Link */}
-                      {decision.alpacaOrderId && (
-                        <div className="text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <ExternalLink className="h-3 w-3" />
-                            Order: {decision.alpacaOrderId.substring(0, 8)}...
-                          </div>
-                          {decision.alpacaOrderStatus && (
-                            <Badge variant="outline" className="text-xs mt-1">
-                              {decision.alpacaOrderStatus}
-                            </Badge>
-                          )}
-                          {decision.alpacaFilledQty && (
-                            <div className="mt-1">
-                              Filled: {decision.alpacaFilledQty} @ ${decision.alpacaFilledPrice?.toFixed(2)}
+                        return (
+                          <div
+                            key={decision.id}
+                            className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${isPending
+                              ? 'bg-blue-500/5 border-blue-500/20 hover:bg-blue-500/10'
+                              : isExecuted
+                                ? 'bg-green-500/5 border-green-500/20'
+                                : isApproved
+                                  ? 'bg-yellow-500/5 border-yellow-500/20'
+                                  : 'bg-gray-500/5 border-gray-500/20'
+                              }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex gap-3 flex-1">
+                                <div className={`p-2 rounded-full h-fit ${decision.action === 'BUY' ? 'bg-green-500/10' : 'bg-red-500/10'
+                                  }`}>
+                                  {decision.action === 'BUY' ? (
+                                    <ArrowUpRight className="h-4 w-4 text-green-500" />
+                                  ) : (
+                                    <ArrowDownRight className="h-4 w-4 text-red-500" />
+                                  )}
+                                </div>
+
+                                <div className="space-y-1 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-semibold text-sm">{decision.symbol}</span>
+                                    <Badge variant={decision.action === 'BUY' ? 'secondary' : 'destructive'} className="text-xs">
+                                      {decision.action}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      {decision.dollarAmount && decision.dollarAmount > 0
+                                        ? `$${decision.dollarAmount.toFixed(2)} order`
+                                        : decision.quantity > 0
+                                          ? `${decision.quantity} shares ${decision.price > 0 ? `@ $${decision.price}` : '(market price)'}`
+                                          : 'Order details pending'
+                                      }
+                                    </span>
+                                    {decision.price > 0 && (
+                                      <span className="text-xs font-medium">
+                                        ${decision.totalValue.toLocaleString()}
+                                      </span>
+                                    )}
+                                    {/* Status Badge */}
+                                    {isExecuted && (
+                                      <Badge variant="success" className="text-xs">
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        Executed
+                                      </Badge>
+                                    )}
+                                    {isApproved && (
+                                      <Badge variant="outline" className="text-xs text-yellow-600">
+                                        <Clock className="h-3 w-3 mr-1" />
+                                        Approved
+                                      </Badge>
+                                    )}
+                                    {isRejected && (
+                                      <Badge variant="outline" className="text-xs text-gray-600">
+                                        <XCircle className="h-3 w-3 mr-1" />
+                                        Rejected
+                                      </Badge>
+                                    )}
+                                    {isPending && (
+                                      <Badge variant="outline" className="text-xs text-blue-600">
+                                        <Clock className="h-3 w-3 mr-1" />
+                                        Pending
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground line-clamp-2">
+                                    {decision.reasoning}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Action buttons and details */}
+                              <div className="flex flex-col gap-1">
+                                {/* Analysis Detail Button - shown for all statuses */}
+                                {decision.analysisId && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs border-slate-700"
+                                    onClick={() => setSelectedAnalysisId(decision.analysisId!)}
+                                  >
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    Analysis
+                                  </Button>
+                                )}
+
+                                {/* Rebalance Detail Button - shown for all statuses */}
+                                {decision.rebalanceRequestId && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs border-slate-700"
+                                    onClick={() => setSelectedRebalanceId(decision.rebalanceRequestId!)}
+                                  >
+                                    <BarChart3 className="h-3 w-3 mr-1" />
+                                    Rebalance
+                                  </Button>
+                                )}
+
+                                {/* Alpaca Order Link */}
+                                {decision.alpacaOrderId && (
+                                  <div className="text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                      <ExternalLink className="h-3 w-3" />
+                                      Order: {decision.alpacaOrderId.substring(0, 8)}...
+                                    </div>
+                                    {decision.alpacaOrderStatus && (
+                                      <Badge variant="outline" className="text-xs mt-1">
+                                        {decision.alpacaOrderStatus}
+                                      </Badge>
+                                    )}
+                                    {decision.alpacaFilledQty && (
+                                      <div className="mt-1">
+                                        Filled: {decision.alpacaFilledQty} @ ${decision.alpacaFilledPrice?.toFixed(2)}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Only show action buttons for pending decisions */}
+                                {isPending && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-3 text-xs border-green-500/50 text-green-600 hover:bg-green-500/10 hover:border-green-500"
+                                      onClick={() => handleApproveDecision(decision)}
+                                      disabled={executingOrderId === decision.id}
+                                    >
+                                      {executingOrderId === decision.id ? (
+                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      ) : (
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                      )}
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-3 text-xs border-red-500/50 text-red-600 hover:bg-red-500/10 hover:border-red-500"
+                                      onClick={() => handleRejectDecision(decision)}
+                                      disabled={executingOrderId === decision.id}
+                                    >
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                      Reject
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Only show action buttons for pending decisions */}
-                      {isPending && (
-                        <>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="h-7 px-3 text-xs border-green-500/50 text-green-600 hover:bg-green-500/10 hover:border-green-500"
-                            onClick={() => handleApproveDecision(decision)}
-                            disabled={executingOrderId === decision.id}
-                          >
-                            {executingOrderId === decision.id ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            ) : (
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                            )}
-                            Approve
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="h-7 px-3 text-xs border-red-500/50 text-red-600 hover:bg-red-500/10 hover:border-red-500"
-                            onClick={() => handleRejectDecision(decision)}
-                            disabled={executingOrderId === decision.id}
-                          >
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                            
+                            {/* Metadata - at bottom of card */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
+                              {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
+                                <>
+                                  <span>{decision.agent}</span>
+                                  <span>•</span>
+                                </>
+                              )}
+                              {decision.sourceType && (
+                                <>
+                                  <span className="capitalize">{decision.sourceType.replace('_', ' ')}</span>
+                                  <span>•</span>
+                                </>
+                              )}
+                              <span>{decision.timestamp}</span>
+                              {decision.executedAt && (
+                                <>
+                                  <span>•</span>
+                                  <span>Executed {decision.executedAt}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </>
                   )}
-                  
+
                   {/* Processed (Approved/Rejected) Decisions */}
                   {processedDecisions.length > 0 && (
                     <>
@@ -608,32 +608,30 @@ export default function RecentTrades() {
                         const isExecuted = decision.status === 'executed';
                         const isApproved = decision.status === 'approved';
                         const isRejected = decision.status === 'rejected';
-                        
+
                         return (
                           <div
                             key={decision.id}
-                            className={`p-3 rounded-lg border transition-colors ${
-                              isPending 
-                                ? 'bg-blue-500/5 border-blue-500/20 hover:bg-blue-500/10' 
-                                : isExecuted
+                            className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${isPending
+                              ? 'bg-blue-500/5 border-blue-500/20 hover:bg-blue-500/10'
+                              : isExecuted
                                 ? 'bg-green-500/5 border-green-500/20'
                                 : isApproved
-                                ? 'bg-yellow-500/5 border-yellow-500/20'
-                                : 'bg-gray-500/5 border-gray-500/20'
-                            }`}
+                                  ? 'bg-yellow-500/5 border-yellow-500/20'
+                                  : 'bg-gray-500/5 border-gray-500/20'
+                              }`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex gap-3 flex-1">
-                                <div className={`p-2 rounded-full h-fit ${
-                                  decision.action === 'BUY' ? 'bg-green-500/10' : 'bg-red-500/10'
-                                }`}>
+                                <div className={`p-2 rounded-full h-fit ${decision.action === 'BUY' ? 'bg-green-500/10' : 'bg-red-500/10'
+                                  }`}>
                                   {decision.action === 'BUY' ? (
                                     <ArrowUpRight className="h-4 w-4 text-green-500" />
                                   ) : (
                                     <ArrowDownRight className="h-4 w-4 text-red-500" />
                                   )}
                                 </div>
-                                
+
                                 <div className="space-y-1 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-semibold text-sm">{decision.symbol}</span>
@@ -661,10 +659,10 @@ export default function RecentTrades() {
                                           Approved
                                         </Badge>
                                         {decision.alpacaOrderStatus && (
-                                          <Badge 
-                                            variant={decision.alpacaOrderStatus === 'filled' ? 'success' : 
-                                                    decision.alpacaOrderStatus === 'rejected' || decision.alpacaOrderStatus === 'canceled' ? 'destructive' : 
-                                                    'outline'}
+                                          <Badge
+                                            variant={decision.alpacaOrderStatus === 'filled' ? 'success' :
+                                              decision.alpacaOrderStatus === 'rejected' || decision.alpacaOrderStatus === 'canceled' ? 'destructive' :
+                                                'outline'}
                                             className="text-xs"
                                           >
                                             {decision.alpacaOrderStatus === 'filled' ? (
@@ -692,38 +690,15 @@ export default function RecentTrades() {
                                   <p className="text-xs text-muted-foreground line-clamp-2">
                                     {decision.reasoning}
                                   </p>
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
-                                      <>
-                                        <span>{decision.agent}</span>
-                                        <span>•</span>
-                                      </>
-                                    )}
-                                    {decision.sourceType && (
-                                      <>
-                                        <span className="capitalize">{decision.sourceType.replace('_', ' ')}</span>
-                                        <span>•</span>
-                                      </>
-                                    )}
-                                    <span>{decision.timestamp}</span>
-                                    {decision.alpacaFilledPrice && decision.alpacaFilledQty && (
-                                      <>
-                                        <span>•</span>
-                                        <span className="text-green-600">
-                                          Filled: {decision.alpacaFilledQty} @ ${decision.alpacaFilledPrice.toFixed(2)}
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
                                 </div>
                               </div>
-                              
+
                               {/* Analysis and Order details */}
                               <div className="flex flex-col gap-1">
                                 {decision.analysisId && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     className="h-7 px-2 text-xs border-slate-700"
                                     onClick={() => setSelectedAnalysisId(decision.analysisId!)}
                                   >
@@ -731,12 +706,12 @@ export default function RecentTrades() {
                                     Analysis
                                   </Button>
                                 )}
-                                
+
                                 {/* Rebalance Detail Button */}
                                 {decision.rebalanceRequestId && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     className="h-7 px-2 text-xs border-slate-700"
                                     onClick={() => setSelectedRebalanceId(decision.rebalanceRequestId!)}
                                   >
@@ -744,7 +719,7 @@ export default function RecentTrades() {
                                     Rebalance
                                   </Button>
                                 )}
-                                
+
                                 {/* Alpaca Order Link */}
                                 {decision.alpacaOrderId && (
                                   <Button
@@ -753,8 +728,8 @@ export default function RecentTrades() {
                                     className="h-7 px-2 text-xs border-slate-700"
                                     onClick={() => {
                                       const isPaper = apiSettings?.alpaca_paper_trading ?? true;
-                                      const baseUrl = isPaper 
-                                        ? 'https://paper.alpaca.markets' 
+                                      const baseUrl = isPaper
+                                        ? 'https://paper.alpaca.markets'
                                         : 'https://app.alpaca.markets';
                                       window.open(`${baseUrl}/dashboard/order/${decision.alpacaOrderId}`, '_blank');
                                     }}
@@ -763,7 +738,7 @@ export default function RecentTrades() {
                                     Alpaca
                                   </Button>
                                 )}
-                                
+
                                 {/* Alpaca Order Status Badge */}
                                 {decision.alpacaOrderId && decision.alpacaOrderStatus && (
                                   <div className="flex items-center justify-center">
@@ -772,7 +747,7 @@ export default function RecentTrades() {
                                       let variant: any = "outline";
                                       let icon = null;
                                       let displayText = decision.alpacaOrderStatus;
-                                      
+
                                       if (status === 'filled') {
                                         variant = "success";
                                         icon = <CheckCircle className="h-3 w-3 mr-1" />;
@@ -793,17 +768,16 @@ export default function RecentTrades() {
                                         icon = <XCircle className="h-3 w-3 mr-1" />;
                                         displayText = "Rejected";
                                       }
-                                      
+
                                       return (
-                                        <Badge 
-                                          variant={variant} 
-                                          className={`text-xs ${
-                                            status === 'filled' ? 'text-green-600' : 
+                                        <Badge
+                                          variant={variant}
+                                          className={`text-xs ${status === 'filled' ? 'text-green-600' :
                                             status === 'partially_filled' ? 'text-blue-600' :
-                                            ['new', 'pending_new', 'accepted'].includes(status) ? 'text-yellow-600' :
-                                            ['canceled', 'cancelled'].includes(status) ? 'text-gray-600' :
-                                            status === 'rejected' ? 'text-red-600' : ''
-                                          }`}
+                                              ['new', 'pending_new', 'accepted'].includes(status) ? 'text-yellow-600' :
+                                                ['canceled', 'cancelled'].includes(status) ? 'text-gray-600' :
+                                                  status === 'rejected' ? 'text-red-600' : ''
+                                            }`}
                                         >
                                           {icon}
                                           {displayText}
@@ -815,7 +789,7 @@ export default function RecentTrades() {
                                     })()}
                                   </div>
                                 )}
-                                
+
                                 {/* Show filled details if available */}
                                 {decision.alpacaFilledQty && decision.alpacaFilledPrice && (
                                   <div className="text-xs text-muted-foreground text-center">
@@ -824,12 +798,37 @@ export default function RecentTrades() {
                                 )}
                               </div>
                             </div>
+                            
+                            {/* Metadata - at bottom of card */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
+                              {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
+                                <>
+                                  <span>{decision.agent}</span>
+                                  <span>•</span>
+                                </>
+                              )}
+                              {decision.sourceType && (
+                                <>
+                                  <span className="capitalize">{decision.sourceType.replace('_', ' ')}</span>
+                                  <span>•</span>
+                                </>
+                              )}
+                              <span>{decision.timestamp}</span>
+                              {decision.alpacaFilledPrice && decision.alpacaFilledQty && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-green-600">
+                                    Filled: {decision.alpacaFilledQty} @ ${decision.alpacaFilledPrice.toFixed(2)}
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
                     </>
                   )}
-                  
+
                   {/* Executed Decisions */}
                   {executedDecisions.length > 0 && (
                     <>
@@ -838,24 +837,23 @@ export default function RecentTrades() {
                       )}
                       {executedDecisions.map((decision) => {
                         const isExecuted = decision.status === 'executed';
-                        
+
                         return (
                           <div
                             key={decision.id}
-                            className="p-3 rounded-lg border transition-colors bg-green-500/5 border-green-500/20"
+                            className="p-3 rounded-lg border transition-colors bg-green-500/5 border-green-500/20 flex flex-col gap-3"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex gap-3 flex-1">
-                                <div className={`p-2 rounded-full h-fit ${
-                                  decision.action === 'BUY' ? 'bg-green-500/10' : 'bg-red-500/10'
-                                }`}>
+                                <div className={`p-2 rounded-full h-fit ${decision.action === 'BUY' ? 'bg-green-500/10' : 'bg-red-500/10'
+                                  }`}>
                                   {decision.action === 'BUY' ? (
                                     <ArrowUpRight className="h-4 w-4 text-green-500" />
                                   ) : (
                                     <ArrowDownRight className="h-4 w-4 text-red-500" />
                                   )}
                                 </div>
-                                
+
                                 <div className="space-y-1 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-semibold text-sm">{decision.symbol}</span>
@@ -883,36 +881,15 @@ export default function RecentTrades() {
                                   <p className="text-xs text-muted-foreground line-clamp-2">
                                     {decision.reasoning}
                                   </p>
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
-                                      <>
-                                        <span>{decision.agent}</span>
-                                        <span>•</span>
-                                      </>
-                                    )}
-                                    {decision.sourceType && (
-                                      <>
-                                        <span className="capitalize">{decision.sourceType.replace('_', ' ')}</span>
-                                        <span>•</span>
-                                      </>
-                                    )}
-                                    <span>{decision.timestamp}</span>
-                                    {decision.executedAt && (
-                                      <>
-                                        <span>•</span>
-                                        <span>Executed {decision.executedAt}</span>
-                                      </>
-                                    )}
-                                  </div>
                                 </div>
                               </div>
-                              
+
                               {/* Analysis and Order details */}
                               <div className="flex flex-col gap-1">
                                 {decision.analysisId && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     className="h-7 px-2 text-xs border-slate-700"
                                     onClick={() => setSelectedAnalysisId(decision.analysisId!)}
                                   >
@@ -920,12 +897,12 @@ export default function RecentTrades() {
                                     Analysis
                                   </Button>
                                 )}
-                                
+
                                 {/* Rebalance Detail Button */}
                                 {decision.rebalanceRequestId && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     className="h-7 px-2 text-xs border-slate-700"
                                     onClick={() => setSelectedRebalanceId(decision.rebalanceRequestId!)}
                                   >
@@ -933,7 +910,7 @@ export default function RecentTrades() {
                                     Rebalance
                                   </Button>
                                 )}
-                                
+
                                 {/* Alpaca Order Link */}
                                 {decision.alpacaOrderId && (
                                   <Button
@@ -942,8 +919,8 @@ export default function RecentTrades() {
                                     className="h-7 px-2 text-xs border-slate-700"
                                     onClick={() => {
                                       const isPaper = apiSettings?.alpaca_paper_trading ?? true;
-                                      const baseUrl = isPaper 
-                                        ? 'https://paper.alpaca.markets' 
+                                      const baseUrl = isPaper
+                                        ? 'https://paper.alpaca.markets'
                                         : 'https://app.alpaca.markets';
                                       window.open(`${baseUrl}/dashboard/order/${decision.alpacaOrderId}`, '_blank');
                                     }}
@@ -952,7 +929,7 @@ export default function RecentTrades() {
                                     Alpaca
                                   </Button>
                                 )}
-                                
+
                                 {/* Alpaca Order Status Badge */}
                                 {decision.alpacaOrderId && decision.alpacaOrderStatus && (
                                   <div className="flex items-center justify-center">
@@ -961,7 +938,7 @@ export default function RecentTrades() {
                                       let variant: any = "success";
                                       let icon = <CheckCircle className="h-3 w-3 mr-1" />;
                                       let displayText = "Filled";
-                                      
+
                                       // For executed decisions, show filled status
                                       if (status === 'filled') {
                                         variant = "success";
@@ -972,14 +949,13 @@ export default function RecentTrades() {
                                         icon = <Clock className="h-3 w-3 mr-1" />;
                                         displayText = "Partial";
                                       }
-                                      
+
                                       return (
-                                        <Badge 
-                                          variant={variant} 
-                                          className={`text-xs ${
-                                            status === 'filled' ? 'text-green-600' : 
-                                            status === 'partially_filled' ? 'text-blue-600' : ''
-                                          }`}
+                                        <Badge
+                                          variant={variant}
+                                          className={`text-xs ${status === 'filled' ? 'text-white-600' :
+                                            status === 'partially_filled' ? 'text-blue-600' : 'text-green-600'
+                                            }`}
                                         >
                                           {icon}
                                           {displayText}
@@ -991,7 +967,7 @@ export default function RecentTrades() {
                                     })()}
                                   </div>
                                 )}
-                                
+
                                 {/* Show filled details if available */}
                                 {decision.alpacaFilledQty && decision.alpacaFilledPrice && (
                                   <div className="text-xs text-muted-foreground text-center">
@@ -999,6 +975,29 @@ export default function RecentTrades() {
                                   </div>
                                 )}
                               </div>
+                            </div>
+                            
+                            {/* Metadata - at bottom of card */}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
+                              {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
+                                <>
+                                  <span>{decision.agent}</span>
+                                  <span>•</span>
+                                </>
+                              )}
+                              {decision.sourceType && (
+                                <>
+                                  <span className="capitalize">{decision.sourceType.replace('_', ' ')}</span>
+                                  <span>•</span>
+                                </>
+                              )}
+                              <span>{decision.timestamp}</span>
+                              {decision.executedAt && (
+                                <>
+                                  <span>•</span>
+                                  <span>Executed {decision.executedAt}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         );
@@ -1019,7 +1018,7 @@ export default function RecentTrades() {
         )}
 
       </CardContent>
-      
+
       {/* Analysis Detail Modal */}
       {selectedAnalysisId && (
         <AnalysisDetailModal
@@ -1028,7 +1027,7 @@ export default function RecentTrades() {
           onClose={() => setSelectedAnalysisId(null)}
         />
       )}
-      
+
       {/* Rebalance Detail Modal */}
       {selectedRebalanceId && (
         <RebalanceDetailModal

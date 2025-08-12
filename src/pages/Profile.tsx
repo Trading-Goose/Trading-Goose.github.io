@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,17 +17,60 @@ import {
   LogOut
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-supabase";
+import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, apiSettings, logout, isAuthenticated } = useAuth();
+  const [activityStats, setActivityStats] = useState({
+    totalAnalyses: 0,
+    executedTrades: 0,
+    rebalances: 0
+  });
 
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    const fetchActivityStats = async () => {
+      if (!user?.id) return;
+
+      try {
+        // Fetch total analyses count
+        const { count: analysesCount } = await supabase
+          .from('analysis_history')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        // Fetch executed trades count
+        const { count: tradesCount } = await supabase
+          .from('trading_actions')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'executed');
+
+        // Fetch rebalances count
+        const { count: rebalancesCount } = await supabase
+          .from('rebalance_requests')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        setActivityStats({
+          totalAnalyses: analysesCount || 0,
+          executedTrades: tradesCount || 0,
+          rebalances: rebalancesCount || 0
+        });
+      } catch (error) {
+        console.error('Error fetching activity stats:', error);
+      }
+    };
+
+    fetchActivityStats();
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -193,16 +236,16 @@ export default function ProfilePage() {
             <CardContent>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="text-center p-4 border rounded-lg">
-                  <p className="text-2xl font-bold">0</p>
+                  <p className="text-2xl font-bold">{activityStats.totalAnalyses}</p>
                   <p className="text-sm text-muted-foreground">Total Analyses</p>
                 </div>
                 <div className="text-center p-4 border rounded-lg">
-                  <p className="text-2xl font-bold">0</p>
+                  <p className="text-2xl font-bold">{activityStats.executedTrades}</p>
                   <p className="text-sm text-muted-foreground">Trades Executed</p>
                 </div>
                 <div className="text-center p-4 border rounded-lg">
-                  <p className="text-2xl font-bold">0</p>
-                  <p className="text-sm text-muted-foreground">Portfolios Created</p>
+                  <p className="text-2xl font-bold">{activityStats.rebalances}</p>
+                  <p className="text-sm text-muted-foreground">Rebalances</p>
                 </div>
               </div>
             </CardContent>

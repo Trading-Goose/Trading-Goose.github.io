@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { 
+import {
   ChevronLeft,
-  User, 
-  Mail, 
+  User,
+  Mail,
   Calendar,
   Shield,
   Activity,
@@ -37,15 +37,15 @@ export default function ProfilePage() {
 
   const handleSendResetEmail = async () => {
     if (!user?.email) return;
-    
+
     setSendingResetEmail(true);
     try {
       // Build the correct redirect URL
       const origin = window.location.origin;
       let redirectUrl: string;
-      
+
       if (origin.includes('github.io')) {
-        redirectUrl = `${origin}/TradingGoose/#/reset-password`;
+        redirectUrl = `${origin}/TradingGoose/reset-password`;
       } else {
         redirectUrl = `${origin}/reset-password`;
       }
@@ -56,7 +56,7 @@ export default function ProfilePage() {
 
       if (error) {
         console.error('Reset email error:', error);
-        
+
         // Handle specific error cases
         if (error.message?.includes('429') || error.message?.includes('rate limit')) {
           toast({
@@ -85,7 +85,7 @@ export default function ProfilePage() {
       }
     } catch (error: any) {
       console.error('Error:', error);
-      
+
       // Check if it's a rate limit error from the network request
       if (error?.status === 429) {
         toast({
@@ -160,14 +160,14 @@ export default function ProfilePage() {
   const tradingMode = apiSettings?.alpaca_paper_trading ? 'Paper Trading' : 'Live Trading';
   const hasAIConfig = !!apiSettings?.ai_api_key;
   const hasMarketDataConfig = !!apiSettings?.alpha_vantage_api_key;
-  const hasAlpacaConfig = apiSettings?.alpaca_paper_trading 
-    ? !!apiSettings?.alpaca_paper_api_key 
+  const hasAlpacaConfig = apiSettings?.alpaca_paper_trading
+    ? !!apiSettings?.alpaca_paper_api_key
     : !!apiSettings?.alpaca_live_api_key;
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="container mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -241,8 +241,8 @@ export default function ProfilePage() {
                     <p className="text-xs text-muted-foreground">Keep your account secure with a strong password</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => setShowChangePasswordModal(true)}
                       title="Change password if you know your current password"
@@ -250,8 +250,8 @@ export default function ProfilePage() {
                       <Lock className="mr-2 h-4 w-4" />
                       Change Password
                     </Button>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       size="sm"
                       onClick={handleSendResetEmail}
                       disabled={sendingResetEmail}
@@ -262,7 +262,7 @@ export default function ProfilePage() {
                     </Button>
                   </div>
                 </div>
-                
+
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
@@ -311,7 +311,7 @@ export default function ProfilePage() {
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Trading Mode</span>
-                  <Badge 
+                  <Badge
                     variant={apiSettings?.alpaca_paper_trading ? "secondary" : "destructive"}
                     className="flex items-center gap-1"
                   >
@@ -321,8 +321,8 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full"
                 onClick={() => navigate('/settings')}
               >
@@ -366,8 +366,8 @@ export default function ProfilePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={handleLogout}
                 className="flex items-center gap-2"
               >
@@ -380,7 +380,7 @@ export default function ProfilePage() {
       </main>
 
       {/* Change Password Modal */}
-      <ChangePasswordModal 
+      <ChangePasswordModal
         isOpen={showChangePasswordModal}
         onClose={() => setShowChangePasswordModal(false)}
       />

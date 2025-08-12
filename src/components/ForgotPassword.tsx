@@ -25,10 +25,10 @@ export default function ForgotPassword() {
       // For GitHub Pages, we need to include the /TradingGoose/ path
       const origin = window.location.origin;
       let redirectUrl: string;
-      
+
       if (origin.includes('github.io')) {
         // GitHub Pages deployment
-        redirectUrl = `${origin}/TradingGoose/#/reset-password`;
+        redirectUrl = `${origin}/TradingGoose/reset-password`;
       } else {
         // Local development
         redirectUrl = `${origin}/reset-password`;
@@ -85,8 +85,8 @@ export default function ForgotPassword() {
                 The link will expire in 1 hour.
               </AlertDescription>
             </Alert>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
               onClick={() => navigate("/")}
             >
@@ -131,9 +131,9 @@ export default function ForgotPassword() {
             )}
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button 
-              type="submit" 
-              className="w-full" 
+            <Button
+              type="submit"
+              className="w-full"
               disabled={isLoading || !email}
             >
               {isLoading ? (
@@ -148,9 +148,9 @@ export default function ForgotPassword() {
                 </>
               )}
             </Button>
-            <Button 
+            <Button
               type="button"
-              variant="ghost" 
+              variant="ghost"
               className="w-full"
               onClick={() => navigate("/")}
               disabled={isLoading}

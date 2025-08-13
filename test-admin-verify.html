@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Admin Verification</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Admin Verification</h1>
+    
+    <div>
+        <h2>Step 1: Login First</h2>
+        <p>Make sure you're logged in at <a href="/login" target="_blank">/login</a> before testing</p>
+    </div>
+
+    <div>
+        <h2>Step 2: Test Edge Function</h2>
+        <button onclick="testEdgeFunction()">Test verify-admin Function</button>
+        <pre id="edgeResult"></pre>
+    </div>
+
+    <div>
+        <h2>Step 3: Test Direct Database Query</h2>
+        <button onclick="testDirectQuery()">Test Direct Query</button>
+        <pre id="queryResult"></pre>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const supabaseUrl = 'https://lnvjsqyvhczgxvygbqer.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxudmpzcXl2aGN6Z3h2eWdicWVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyMDU5OTAsImV4cCI6MjA2OTc4MTk5MH0.Rh085ChutzYTsGf9JHMNl435S1U-SZNj_e6GE7HmEdc';
+
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+        window.testEdgeFunction = async function() {
+            const resultEl = document.getElementById('edgeResult');
+            resultEl.textContent = 'Testing...';
+
+            try {
+                // Get current session
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError) {
+                    resultEl.innerHTML = `<span class="error">Session Error: ${sessionError.message}</span>`;
+                    return;
+                }
+
+                if (!session) {
+                    resultEl.innerHTML = `<span class="error">Not logged in. Please login first.</span>`;
+                    return;
+                }
+
+                resultEl.textContent = `Session found for: ${session.user.email}\nCalling Edge Function...\n`;
+
+                // Call Edge Function
+                const response = await fetch(`${supabaseUrl}/functions/v1/verify-admin`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const data = await response.json();
+                
+                resultEl.innerHTML = `<span class="${response.ok ? 'success' : 'error'}">
+Response Status: ${response.status}
+Response Data:
+${JSON.stringify(data, null, 2)}
+</span>`;
+
+            } catch (error) {
+                resultEl.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+
+        window.testDirectQuery = async function() {
+            const resultEl = document.getElementById('queryResult');
+            resultEl.textContent = 'Testing...';
+
+            try {
+                // Get current user
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                
+                if (userError) {
+                    resultEl.innerHTML = `<span class="error">User Error: ${userError.message}</span>`;
+                    return;
+                }
+
+                if (!user) {
+                    resultEl.innerHTML = `<span class="error">Not logged in. Please login first.</span>`;
+                    return;
+                }
+
+                resultEl.textContent = `User found: ${user.email}\nQuerying admin_roles...\n`;
+
+                // Query admin_roles directly
+                const { data: adminRoles, error: rolesError } = await supabase
+                    .from('admin_roles')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('is_active', true);
+
+                if (rolesError) {
+                    resultEl.innerHTML += `<span class="error">Query Error: ${rolesError.message}</span>\n`;
+                }
+
+                // Try RPC function
+                const { data: isAdmin, error: rpcError } = await supabase
+                    .rpc('is_admin', { user_id: user.id });
+
+                resultEl.innerHTML = `<span class="${rolesError ? 'error' : 'success'}">
+User ID: ${user.id}
+User Email: ${user.email}
+
+Admin Roles Query:
+${rolesError ? `Error: ${rolesError.message}` : JSON.stringify(adminRoles, null, 2)}
+
+RPC is_admin Result:
+${rpcError ? `Error: ${rpcError.message}` : JSON.stringify(isAdmin, null, 2)}
+</span>`;
+
+            } catch (error) {
+                resultEl.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -54,17 +54,22 @@ export const useAuth = create<AuthState>()(
       },
 
       login: async (email: string, password: string) => {
+        console.log('Login attempt for:', email);
         try {
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password
           });
 
+          console.log('Login response:', { hasUser: !!data?.user, error });
+
           if (error) {
+            console.error('Login failed:', error);
             return { success: false, error: error.message };
           }
 
           if (data.user) {
+            console.log('Login successful, loading user data...');
             await get().loadUserData();
             return { success: true };
           }
@@ -242,6 +247,10 @@ export const useAuth = create<AuthState>()(
         
         // Prevent duplicate calls
         const currentState = get();
+        if (currentState.isLoading) {
+          console.log('Already loading, skipping duplicate call...');
+          return;
+        }
         if (currentState.user && currentState.apiSettings) {
           console.log('User data already loaded, skipping...');
           set({ isLoading: false });
@@ -253,22 +262,23 @@ export const useAuth = create<AuthState>()(
         console.log('Loading state set to true');
         
         try {
-          // Get the current session with timeout
+          // Get the current session with a reasonable timeout
           console.log('Getting session...');
           
           const sessionPromise = supabase.auth.getSession();
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session timeout')), 2000)
+            setTimeout(() => reject(new Error('Session timeout')), 5000)
           );
           
           let session, sessionError;
           try {
-            const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
+            const result = await Promise.race([sessionPromise, timeoutPromise]) as { data: { session: any }, error: any };
             session = result?.data?.session;
             sessionError = result?.error;
-          } catch (timeoutErr) {
-            console.error('Session fetch timeout');
-            sessionError = timeoutErr;
+          } catch (err) {
+            console.error('Session fetch failed:', err);
+            sessionError = err;
+            session = null;
           }
           
           console.log('Session result:', { hasSession: !!session, error: sessionError });
@@ -287,32 +297,17 @@ export const useAuth = create<AuthState>()(
           const user = session.user;
           console.log('Got user:', user.id);
 
-          // Load profile and settings with timeout protection
+          // Load profile and settings - simplified without timeout
           console.log('Loading profile and settings...');
           
-          const loadDataWithTimeout = Promise.race([
-            Promise.all([
-              supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single(),
-              supabaseHelpers.getOrCreateApiSettings(user.id)
-            ]),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Loading timeout')), 5000)
-            )
+          const [profileResult, apiSettings] = await Promise.all([
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single(),
+            supabaseHelpers.getOrCreateApiSettings(user.id)
           ]);
-          
-          let profileResult, apiSettings;
-          try {
-            [profileResult, apiSettings] = await loadDataWithTimeout as any;
-          } catch (timeoutError) {
-            console.error('Timeout or error loading data:', timeoutError);
-            // Try a simpler approach - just get what we can
-            profileResult = { data: null, error: 'timeout' };
-            apiSettings = null;
-          }
           
           console.log('Profile result:', profileResult);
           console.log('API settings result:', apiSettings);
@@ -327,7 +322,11 @@ export const useAuth = create<AuthState>()(
           };
           
           // Update state with loaded data
-          console.log('Updating state with user data...');
+          console.log('Updating state with user data...', {
+            userData,
+            apiSettings: !!apiSettings,
+            email: userData.email
+          });
           set({
             user: userData,
             apiSettings: apiSettings,
@@ -425,21 +424,9 @@ if (typeof window !== 'undefined') {
     console.log('Initializing auth...');
     
     try {
-      // Get the current session from Supabase with timeout
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Init timeout')), 3000)
-      );
-      
-      let session, error;
-      try {
-        const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
-        session = result?.data?.session;
-        error = result?.error;
-      } catch (timeoutErr) {
-        console.error('Session init timeout, assuming no session');
-        error = timeoutErr;
-      }
+      // Get the current session from Supabase - simplified without timeout
+      const { data, error } = await supabase.auth.getSession();
+      const session = data?.session;
       
       if (session && !error) {
         // We have a valid session, load user data
@@ -487,8 +474,15 @@ if (typeof window !== 'undefined') {
         break;
         
       case 'SIGNED_IN':
-        // Only load if we don't have user data
-        if (!state.user || !state.apiSettings) {
+        // Check if this is an invited user completing their invitation
+        if (session?.user?.invited_at && !session?.user?.email_confirmed_at) {
+          console.log('User completing invitation signup');
+          // For invited users, we can consider them confirmed
+          // They were invited by an admin, so email is trusted
+        }
+        
+        // Only load if we don't have user data and not already loading
+        if (!state.isLoading && (!state.user || !state.apiSettings)) {
           await state.loadUserData();
         }
         break;

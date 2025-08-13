@@ -1,21 +1,13 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
-import PortfolioPositions from "@/components/PortfolioPositions";
-import RecentTrades from "@/components/RecentTrades";
-import PerformanceChart from "@/components/PerformanceChart";
-import HorizontalWorkflow from "@/components/HorizontalWorkflow";
-import StandaloneWatchlist from "@/components/StandaloneWatchlist";
-import LoginModal from "@/components/LoginModal";
 import { useAuth } from "@/lib/auth-supabase";
 import { Button } from "@/components/ui/button";
+import { TrendingUp, Shield, Users, Zap } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
-  const [selectedStock, setSelectedStock] = useState<string | undefined>(undefined);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     // Check if this is a password recovery redirect
@@ -30,97 +22,86 @@ const Index = () => {
       return;
     }
 
-    // Show login modal if not authenticated and not loading
-    if (!isAuthenticated && !isLoading) {
-      setShowLoginModal(true);
+    // Redirect authenticated users to dashboard
+    if (!isLoading && isAuthenticated) {
+      navigate('/dashboard');
     }
   }, [isAuthenticated, isLoading, navigate]);
-
-  useEffect(() => {
-    // Set a timeout to prevent infinite loading
-    if (isLoading) {
-      const timer = setTimeout(() => {
-        console.warn('Loading timeout reached, forcing completion');
-        setLoadingTimeout(true);
-        // Force the loading state to false if stuck
-        useAuth.setState({ isLoading: false });
-      }, 3000); // 3 second timeout
-      return () => clearTimeout(timer);
-    } else {
-      setLoadingTimeout(false);
-    }
-  }, [isLoading]);
-
-  const handleSelectStock = (symbol: string) => {
-    setSelectedStock(symbol);
-  };
-
-  const handleClearSelection = () => {
-    setSelectedStock(undefined);
-  };
-
-  // Show loading state while checking authentication
-  if (isLoading && !loadingTimeout) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       
       <main className="container mx-auto px-6 py-8">
-        {isAuthenticated ? (
-          <>
-            {/* Main Content */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-              {/* Left Side - Performance and Watchlist */}
-              <div className="xl:col-span-2 space-y-6">
-                <PerformanceChart 
-                  selectedStock={selectedStock}
-                  onClearSelection={handleClearSelection}
-                />
-                <StandaloneWatchlist 
-                  onSelectStock={handleSelectStock}
-                  selectedStock={selectedStock}
-                />
-              </div>
-              
-              {/* Right Side - Portfolio Holdings, Workflow, and Trading Actions */}
-              <div className="space-y-6">
-                <PortfolioPositions 
-                  onSelectStock={handleSelectStock}
-                  selectedStock={selectedStock}
-                />
-                <HorizontalWorkflow />
-                <RecentTrades />
-              </div>
+        <div className="max-w-6xl mx-auto">
+          {/* Hero Section */}
+          <div className="text-center py-16 space-y-8">
+            <div className="space-y-4">
+              <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                TradingGoose
+              </h1>
+              <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
+                AI-Powered Portfolio Management for the Modern Trader
+              </p>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Leverage cutting-edge AI to analyze markets, manage risk, and execute trades with confidence.
+              </p>
             </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <h2 className="text-2xl font-bold mb-4">Welcome to TradingGoose</h2>
-            <p className="text-muted-foreground mb-8 max-w-md">
-              Sign in to access your portfolio, execute trades, and leverage AI-powered trading insights.
-            </p>
-            <Button onClick={() => setShowLoginModal(true)} size="lg">
-              Sign In to Get Started
-            </Button>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="text-lg px-8 py-6" onClick={() => navigate('/register')}>
+                Get Started Free
+              </Button>
+              <Button variant="outline" size="lg" className="text-lg px-8 py-6" onClick={() => navigate('/login')}>
+                Sign In
+              </Button>
+            </div>
           </div>
-        )}
-      </main>
 
-      {/* Login Modal */}
-      <LoginModal 
-        isOpen={showLoginModal && !isAuthenticated} 
-        onClose={() => setShowLoginModal(false)} 
-      />
+          {/* Features Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 py-16">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <TrendingUp className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold">Smart Analysis</h3>
+              <p className="text-muted-foreground">
+                AI-powered market analysis with real-time insights and recommendations.
+              </p>
+            </div>
+            
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <Shield className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold">Risk Management</h3>
+              <p className="text-muted-foreground">
+                Advanced risk assessment and portfolio optimization tools.
+              </p>
+            </div>
+            
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <Users className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold">Team Approach</h3>
+              <p className="text-muted-foreground">
+                Multiple AI agents working together for comprehensive market coverage.
+              </p>
+            </div>
+            
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <Zap className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold">Fast Execution</h3>
+              <p className="text-muted-foreground">
+                Lightning-fast trade execution with automated portfolio rebalancing.
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 };

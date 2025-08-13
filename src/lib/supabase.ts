@@ -387,5 +387,56 @@ export const supabaseHelpers = {
       console.error('Error in deleteProviderConfiguration:', error);
       return false;
     }
+  },
+
+  // Admin invitation functions using Supabase Auth
+  async inviteUserByEmail(email: string, userData?: object): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
+        data: userData || {},
+        redirectTo: `${window.location.origin}/dashboard`
+      });
+
+      if (error) {
+        console.error('Error sending invitation:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+
+      return {
+        success: true
+      };
+    } catch (error) {
+      console.error('Error in inviteUserByEmail:', error);
+      return {
+        success: false,
+        error: 'Failed to send invitation'
+      };
+    }
+  },
+
+  async getInvitedUsers(): Promise<any[]> {
+    try {
+      // Note: This requires service_role key to access admin functions
+      const { data, error } = await supabase.auth.admin.listUsers();
+      
+      if (error) {
+        console.error('Error fetching users:', error);
+        return [];
+      }
+
+      // Filter for invited users (those without confirmed emails or with invite metadata)
+      return data.users.filter(user => 
+        user.invited_at && !user.email_confirmed_at
+      );
+    } catch (error) {
+      console.error('Error in getInvitedUsers:', error);
+      return [];
+    }
   }
 };

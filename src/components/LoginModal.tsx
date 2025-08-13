@@ -37,6 +37,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
 
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -63,7 +64,15 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setError("");
     setSuccessMessage("");
 
+    // Check if invite-only mode is enabled
+    const inviteOnlyMode = import.meta.env.VITE_INVITE_ONLY === 'true';
+
     // Validation
+    if (inviteOnlyMode && !inviteCode.trim()) {
+      setError("Invite code is required");
+      return;
+    }
+
     if (registerPassword !== registerConfirmPassword) {
       setError("Passwords do not match");
       return;
@@ -77,7 +86,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setIsLoading(true);
 
     try {
-      const result = await register(registerEmail, registerPassword, registerName);
+      const result = await register(registerEmail, registerPassword, registerName, inviteCode.trim() || undefined);
       
       setIsLoading(false); // Always stop loading after the operation
       
@@ -89,6 +98,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setRegisterEmail("");
         setRegisterPassword("");
         setRegisterConfirmPassword("");
+        setInviteCode("");
       } else {
         setError(result.error || "Registration failed");
       }
@@ -232,6 +242,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
           <TabsContent value="register" className="space-y-4 mt-6">
             <form onSubmit={handleRegister} className="space-y-5">
+              {import.meta.env.VITE_INVITE_ONLY === 'true' && (
+                <div className="space-y-2">
+                  <Label htmlFor="invite-code">Invite Code</Label>
+                  <Input
+                    id="invite-code"
+                    type="text"
+                    placeholder="Enter your invite code"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
+              
               <div className="space-y-2">
                 <Label htmlFor="register-name">Name</Label>
                 <Input

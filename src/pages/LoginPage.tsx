@@ -160,12 +160,14 @@ export default function LoginPage() {
             </Button>
             
             <div className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">
-              <div>
-                Don't have an account?{' '}
-                <Link to="/register" className="text-primary hover:underline font-medium">
-                  Create one
-                </Link>
-              </div>
+              {publicRegistrationEnabled && (
+                <div>
+                  Don't have an account?{' '}
+                  <Link to="/register" className="text-primary hover:underline font-medium">
+                    Create one
+                  </Link>
+                </div>
+              )}
               <Button
                 type="button"
                 variant="ghost"

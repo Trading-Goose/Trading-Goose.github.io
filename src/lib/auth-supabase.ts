@@ -131,12 +131,23 @@ export const useAuth = create<AuthState>()(
 
       register: async (email: string, password: string, name: string) => {
         try {
+          // Build the correct redirect URL for email confirmation
+          const origin = window.location.origin;
+          let emailRedirectTo: string;
+          
+          if (origin.includes('github.io')) {
+            emailRedirectTo = `${origin}/TradingGoose`;
+          } else {
+            emailRedirectTo = origin;
+          }
+          
           // Sign up the user
           const { data: authData, error: authError } = await supabase.auth.signUp({
             email,
             password,
             options: {
-              data: { name }
+              data: { name },
+              emailRedirectTo
             }
           });
 
@@ -347,8 +358,18 @@ export const useAuth = create<AuthState>()(
 
       resetPassword: async (email: string) => {
         try {
+          // Build the correct redirect URL
+          const origin = window.location.origin;
+          let redirectTo: string;
+          
+          if (origin.includes('github.io')) {
+            redirectTo = `${origin}/TradingGoose/reset-password`;
+          } else {
+            redirectTo = `${origin}/reset-password`;
+          }
+          
           const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/reset-password`,
+            redirectTo,
           });
 
           if (error) {

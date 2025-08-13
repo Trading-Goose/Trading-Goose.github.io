@@ -174,12 +174,13 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
   };
 
   const formatTime = (timeStr: string) => {
-    const [hours] = timeStr.split(':');
+    const [hours, minutes] = timeStr.split(':');
     const hour = parseInt(hours);
-    if (hour === 0) return '12:00 AM';
-    if (hour < 12) return `${hour}:00 AM`;
-    if (hour === 12) return '12:00 PM';
-    return `${hour - 12}:00 PM`;
+    const min = minutes ? minutes.slice(0, 2) : '00';
+    if (hour === 0) return `12:${min} AM`;
+    if (hour < 12) return `${hour}:${min} AM`;
+    if (hour === 12) return `12:${min} PM`;
+    return `${hour - 12}:${min} PM`;
   };
 
   const formatDaysList = (days?: number[]) => {

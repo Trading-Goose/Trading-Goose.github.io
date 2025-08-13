@@ -26,7 +26,6 @@ import {
   Zap,
   PieChart,
   Target,
-  Eye,
   Brain,
   MessageSquare,
   FileText,
@@ -99,6 +98,10 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
     if (step.id === 'opportunity' && workflowData.skipOpportunityAgent) {
       return 'skipped';
     }
+    // Check for error status in step data
+    if (step.data?.error || step.status === 'error') {
+      return 'error';
+    }
     return step.status || 'pending';
   };
 
@@ -121,6 +124,7 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
         const isCompleted = stepStatus === 'completed';
         const isRunning = stepStatus === 'running';
         const isPending = stepStatus === 'pending';
+        const isError = stepStatus === 'error';
 
         // Don't show skipped steps
         if (isSkipped) return null;
@@ -131,6 +135,8 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
               {/* Step Header */}
               <div className={`rounded-lg border p-4 transition-all ${isCompleted
                 ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
+                : isError
+                  ? 'bg-destructive/10 dark:bg-destructive/5 border-destructive/20 dark:border-destructive/10'
                 : isRunning
                   ? 'bg-primary/5 border-primary/20'
                   : 'bg-card border-border'
@@ -141,6 +147,8 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                       {/* Step Icon */}
                       <div className={`p-3 rounded-lg ${isCompleted
                         ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
+                        : isError
+                          ? 'bg-destructive/20 dark:bg-destructive/10 text-destructive'
                         : isRunning
                           ? 'bg-primary/10 text-primary'
                           : 'bg-muted text-muted-foreground'
@@ -170,8 +178,43 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                               Pending
                             </Badge>
                           )}
+                          {isError && (
+                            <Badge variant="destructive" className="text-xs">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Failed
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground">{step.description}</p>
+                        
+                        {/* Show error details if step failed */}
+                        {isError && step.data?.error && (
+                          <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded text-sm">
+                            <p className="text-destructive font-medium">Error:</p>
+                            <p className="text-muted-foreground mt-1">
+                              {(() => {
+                                let errorMsg = step.data.error;
+                                // Try to extract cleaner error message
+                                if (typeof errorMsg === 'string' && errorMsg.includes('{') && errorMsg.includes('}')) {
+                                  try {
+                                    const jsonMatch = errorMsg.match(/"message"\s*:\s*"([^"]+)"/i);
+                                    if (jsonMatch) {
+                                      return jsonMatch[1];
+                                    } else if (errorMsg.includes('Insufficient credits')) {
+                                      const creditMatch = errorMsg.match(/Insufficient credits[^"\}]*/i);
+                                      if (creditMatch) {
+                                        return creditMatch[0];
+                                      }
+                                    }
+                                  } catch (e) {
+                                    // Fall through to return original
+                                  }
+                                }
+                                return errorMsg;
+                              })()}
+                            </p>
+                          </div>
+                        )}
 
 
 
@@ -239,10 +282,12 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                     // Define workflow steps and determine their status based on agent completion
                     const getWorkflowStepStatus = (agentKeys: string[]) => {
                       const agentStatuses = agentKeys.map(key => stockAnalysis.agents?.[key] || 'pending');
+                      const hasError = agentStatuses.some(s => s === 'error' || s === 'failed');
                       const hasCompleted = agentStatuses.some(s => s === 'completed');
                       const hasRunning = agentStatuses.some(s => s === 'running');
                       const allCompleted = agentStatuses.every(s => s === 'completed');
 
+                      if (hasError) return 'error';
                       if (allCompleted && agentStatuses.length > 0) return 'completed';
                       if (hasCompleted || hasRunning) return 'running';
                       return 'pending';
@@ -258,10 +303,12 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
 
                       // Check if all agents in this step are completed
                       const agents = step.agents || [];
+                      const anyError = agents.some((a: any) => a.status === 'error' || a.status === 'failed');
                       const allCompleted = agents.length > 0 && agents.every((a: any) => a.status === 'completed');
                       const anyRunning = agents.some((a: any) => a.status === 'running');
                       const anyCompleted = agents.some((a: any) => a.status === 'completed');
 
+                      if (anyError) return 'error';
                       if (allCompleted) return 'completed';
                       if (anyRunning || anyCompleted) return 'running';
                       return 'pending';
@@ -590,6 +637,24 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         console.log('🔍 Full rebalance request:', rebalanceRequest);
         console.log('🔍 Rebalance request keys:', Object.keys(rebalanceRequest));
+        
+        // Deep inspection of opportunity agent data
+        console.log('🎯 OPPORTUNITY AGENT DATA INSPECTION:');
+        console.log('1. workflow_steps:', rebalanceRequest.workflow_steps);
+        console.log('2. workflow_steps.opportunity_analysis:', rebalanceRequest.workflow_steps?.opportunity_analysis);
+        console.log('3. opportunity_analysis.data:', rebalanceRequest.workflow_steps?.opportunity_analysis?.data);
+        console.log('4. rebalance_plan:', rebalanceRequest.rebalance_plan);
+        console.log('5. opportunity_agent_insight:', rebalanceRequest.rebalance_plan?.opportunity_agent_insight);
+        console.log('6. agent_insights:', rebalanceRequest.agent_insights);
+        console.log('7. opportunity_reasons:', rebalanceRequest.opportunity_reasons);
+        console.log('8. opportunity_messages:', rebalanceRequest.opportunity_messages);
+        console.log('9. opportunity_evaluation:', rebalanceRequest.opportunity_evaluation);
+        console.log('10. Type of opportunity_evaluation:', typeof rebalanceRequest.opportunity_evaluation);
+        if (rebalanceRequest.opportunity_evaluation) {
+          console.log('11. opportunity_evaluation fields:', Object.keys(rebalanceRequest.opportunity_evaluation));
+          console.log('12. opportunity_evaluation.reasoning:', rebalanceRequest.opportunity_evaluation.reasoning);
+          console.log('13. opportunity_evaluation.selectedStocks:', rebalanceRequest.opportunity_evaluation.selectedStocks);
+        }
 
         // Fetch related rebalance analyses from analysis_history table
         // Include all fields including the full_analysis JSON field that contains workflow steps
@@ -687,7 +752,20 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         }));
 
         // Build workflow steps based on status and workflow_steps data
-        const workflowStepsData = rebalanceRequest.workflow_steps || {};
+        // Handle both array and object formats for workflow_steps
+        let workflowStepsData = rebalanceRequest.workflow_steps || {};
+        
+        // If workflow_steps is an array, convert it to an object with named keys
+        if (Array.isArray(rebalanceRequest.workflow_steps)) {
+          console.log('📊 Workflow steps is an array, converting to object format');
+          workflowStepsData = {};
+          for (const step of rebalanceRequest.workflow_steps) {
+            if (step.name) {
+              workflowStepsData[step.name] = step;
+            }
+          }
+        }
+        
         console.log('📊 Workflow steps data from DB:', workflowStepsData);
         const workflowSteps = [];
 
@@ -701,13 +779,18 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           // Determine threshold step status
           // Priority: 1) Check explicit status field, 2) Check if data exists, 3) Check overall workflow status
           let thresholdStatus = 'pending';
-          if (thresholdStep.status === 'completed' || thresholdStep.data) {
+          if (thresholdStep.status === 'error' || (thresholdStep.data && thresholdStep.data.error)) {
+            thresholdStatus = 'error';
+          } else if (thresholdStep.status === 'completed' || (thresholdStep.data && !thresholdStep.data.error)) {
             thresholdStatus = 'completed';
           } else if (status === 'initializing') {
             thresholdStatus = 'running';
           } else if (['analyzing', 'planning', 'pending_approval', 'executing', 'completed'].includes(status)) {
             // If we've moved past initializing, threshold must be complete
             thresholdStatus = 'completed';
+          } else if (status === 'failed' && thresholdStep.data?.error) {
+            // If rebalance failed and threshold has error, mark it as error
+            thresholdStatus = 'error';
           }
 
           workflowSteps.push({
@@ -716,31 +799,70 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             description: 'Evaluating portfolio drift against rebalance threshold',
             status: thresholdStatus,
             completedAt: thresholdStep.data?.timestamp || thresholdStep.timestamp || thresholdStep.completedAt,
-            insights: thresholdStep.data // Add the insights data
+            insights: thresholdStep.data, // Add the insights data
+            data: thresholdStatus === 'error' ? thresholdStep.data : undefined // Include error data if failed
           });
         }
 
         // Add opportunity analysis step
         if (!rebalanceRequest.skip_opportunity_agent) {
-          const opportunityStep = workflowStepsData.opportunity_analysis || {};
+          // Try to get opportunity data from multiple sources
+          let opportunityStep = workflowStepsData.opportunity_analysis || {};
+          
+          // Also check the opportunity_evaluation field directly from rebalance_requests
+          console.log('🔍 Checking for opportunity_evaluation in rebalance_requests:', rebalanceRequest.opportunity_evaluation);
+          console.log('🔍 Type of opportunity_evaluation:', typeof rebalanceRequest.opportunity_evaluation);
+          
+          // If not found in workflow_steps, check opportunity_evaluation field directly
+          if (!opportunityStep.data && rebalanceRequest.opportunity_evaluation) {
+            console.log('📊 Using opportunity_evaluation field from rebalance_requests');
+            opportunityStep = {
+              status: 'completed',
+              data: rebalanceRequest.opportunity_evaluation,
+              timestamp: rebalanceRequest.opportunity_evaluation?.timestamp
+            };
+          }
+          
           console.log('🎯 Opportunity step data:', opportunityStep);
           console.log('🎯 Opportunity step status:', opportunityStep.status);
           console.log('🎯 Has opportunity data:', !!opportunityStep.data);
+          console.log('🎯 Type of opportunity data:', typeof opportunityStep.data);
+          console.log('🎯 Opportunity data raw:', JSON.stringify(opportunityStep.data, null, 2));
+          
+          // Also log the specific fields we're looking for
+          if (opportunityStep.data) {
+            console.log('📋 Opportunity data fields:', {
+              recommendAnalysis: opportunityStep.data.recommendAnalysis,
+              selectedStocks: opportunityStep.data.selectedStocks,
+              reasoning: opportunityStep.data.reasoning,
+              hasSelectedStocks: !!opportunityStep.data.selectedStocks,
+              selectedStocksLength: opportunityStep.data.selectedStocks?.length
+            });
+          }
 
+          // Parse the AI response if it's stored as a string (declare insights first)
+          let insights = opportunityStep.data;
+          
           // Determine opportunity step status
           // Priority: 1) Check explicit status field, 2) Check if data exists, 3) Check overall workflow status
           let opportunityStatus = 'pending';
-          if (opportunityStep.status === 'completed' || opportunityStep.data) {
+          if (opportunityStep.status === 'error' || (opportunityStep.data && opportunityStep.data.error)) {
+            opportunityStatus = 'error';
+            // If the opportunity agent failed, the whole rebalance should show as failed
+            insights = opportunityStep.data; // Keep the error data
+          } else if (opportunityStep.status === 'completed' || (opportunityStep.data && !opportunityStep.data.error)) {
             opportunityStatus = 'completed';
           } else if (status === 'initializing' || status === 'analyzing') {
             opportunityStatus = 'running';
           } else if (['planning', 'pending_approval', 'executing', 'completed'].includes(status)) {
             // If we've moved past analyzing, opportunity must be complete
             opportunityStatus = 'completed';
+          } else if (status === 'failed' && opportunityStep.data?.error) {
+            // If rebalance failed and opportunity has error, mark it as error
+            opportunityStatus = 'error';
           }
 
-          // Parse the AI response if it's stored as a string
-          let insights = opportunityStep.data;
+          // Parse insights if it's a string
           if (insights && typeof insights === 'string') {
             console.log('🔍 Parsing opportunity insights from string');
             try {
@@ -761,7 +883,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             description: 'Scanning market for new investment opportunities',
             status: opportunityStatus,
             completedAt: opportunityStep.data?.timestamp || opportunityStep.timestamp || opportunityStep.completedAt,
-            insights: insights // Use the parsed insights
+            insights: insights, // Use the parsed insights
+            data: opportunityStatus === 'error' ? opportunityStep.data : undefined // Include error data if failed
           });
         }
 
@@ -785,15 +908,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             if (analysis.analysis_status === 1) {
               analysisStatus = 'completed';
             } else if (analysis.analysis_status === 0) {
-              // For rebalance analyses, check if Risk Manager has completed
-              // In rebalance workflows, individual stock analyses are complete when Risk Manager finishes
-              // (Portfolio Manager runs after all stocks are done)
-              if (analysis.rebalance_request_id && analysis.agent_insights?.riskManager) {
-                console.log(`📊 ${analysis.ticker}: Rebalance analysis with Risk Manager complete - marking as completed`);
-                analysisStatus = 'completed';
-              } else {
-                analysisStatus = 'running';
-              }
+              // Analysis is still running (Portfolio Manager will mark it as complete)
+              analysisStatus = 'running';
             } else if (analysis.analysis_status === -1 || analysis.is_canceled) {
               analysisStatus = 'cancelled';
             } else if (analysis.analysis_status === null || analysis.analysis_status === undefined) {
@@ -952,11 +1068,14 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         
         // Overall workflow status should be 'completed' when portfolio manager is done, even if orders are pending
         let overallStatus;
-        if (portfolioManagerComplete && !isRunning) {
+        if (isFailed) {
+          // If the rebalance is marked as failed, use that status
+          overallStatus = 'failed';
+        } else if (portfolioManagerComplete && !isRunning) {
           // Portfolio manager is done and no agents are running - mark as complete
           overallStatus = 'completed';
         } else {
-          overallStatus = isCompleted ? 'completed' : isPendingApproval ? 'pending_approval' : isRunning ? 'running' : isCancelled ? 'canceled' : isFailed ? 'error' : status;
+          overallStatus = isCompleted ? 'completed' : isPendingApproval ? 'pending_approval' : isRunning ? 'running' : isCancelled ? 'canceled' : status;
         }
 
         const rebalanceData = {
@@ -977,9 +1096,16 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
           recommendedPositions,
 
+          // Include the full rebalance_plan so Portfolio Manager insights can be accessed
+          rebalance_plan: rebalancePlan,
+
           agentInsights: {
             rebalanceAgent: rebalancePlan.rebalance_agent_insight || '',
-            opportunityAgent: rebalancePlan.opportunity_agent_insight || ''
+            opportunityAgent: rebalancePlan.opportunity_agent_insight || '',
+            // Also include Portfolio Manager insights here for easier access
+            portfolioManager: rebalancePlan.portfolioManagerAnalysis || 
+                             rebalancePlan.portfolioManagerInsights || 
+                             rebalancePlan.rebalance_agent_insight || ''
           },
 
           opportunityAgentUsed: !rebalanceRequest.skip_opportunity_agent,
@@ -1264,10 +1390,10 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                     Completed
                   </Badge>
                 )}
-                {rebalanceData?.status === 'error' && (
+                {(rebalanceData?.status === 'error' || rebalanceData?.status === 'failed') && (
                   <Badge variant="destructive" className="text-sm">
                     <XCircle className="w-3 h-3 mr-1" />
-                    Error
+                    {rebalanceData?.status === 'failed' ? 'Failed' : 'Error'}
                   </Badge>
                 )}
                 {rebalanceData?.status === 'canceled' && (
@@ -1337,7 +1463,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       const isExecuting = rebalanceData.status === 'executing' || rebalanceData.status === 'pending_trades';
                       const isCompleted = rebalanceData.status === 'completed';
                       const isCanceled = rebalanceData.status === 'canceled';
-                      const isError = rebalanceData.status === 'error';
+                      const isError = rebalanceData.status === 'error' || rebalanceData.status === 'failed';
                       const hasPositions = rebalanceData.recommendedPositions && rebalanceData.recommendedPositions.length > 0;
                       const allPositionsProcessed = rebalanceData.recommendedPositions?.every((p: RebalancePosition) =>
                         executedTickers.has(p.ticker) || rejectedTickers.has(p.ticker) || p.shareChange === 0
@@ -1383,18 +1509,66 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                         );
                       }
 
-                      // State 3: Error occurred
-                      if (isError) {
+                      // State 3: Error occurred or Failed status
+                      if (isError || rebalanceData.status === 'failed') {
+                        // Extract cleaner error message from various sources
+                        let errorMessage = 'Unknown error occurred';
+                        let errorDetails = rebalanceData.rebalance_plan?.error || rebalanceData.error_message || '';
+                        
+                        // Try to parse error message if it's a JSON string
+                        if (errorDetails && typeof errorDetails === 'string') {
+                          // Check if it's a JSON error response
+                          if (errorDetails.includes('{') && errorDetails.includes('}')) {
+                            try {
+                              // Try to extract the actual error message from JSON
+                              const jsonMatch = errorDetails.match(/"message"\s*:\s*"([^"]+)"/i);
+                              if (jsonMatch) {
+                                errorMessage = jsonMatch[1];
+                              } else if (errorDetails.includes('Insufficient credits')) {
+                                // Extract the specific error message for OpenRouter
+                                const creditMatch = errorDetails.match(/Insufficient credits[^"\}]*/i);
+                                if (creditMatch) {
+                                  errorMessage = creditMatch[0];
+                                }
+                              } else {
+                                // Try parsing as JSON
+                                const parsed = JSON.parse(errorDetails);
+                                errorMessage = parsed.error?.message || parsed.message || parsed.error || errorDetails;
+                              }
+                            } catch (e) {
+                              // If not valid JSON, use as is
+                              errorMessage = errorDetails;
+                            }
+                          } else {
+                            // Plain text error
+                            errorMessage = errorDetails;
+                          }
+                        }
+                        
+                        const errorDetailsText = rebalanceData.rebalance_plan?.errorDetails || '';
+                        const failedAt = rebalanceData.rebalance_plan?.failedAt || '';
+                        
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
                               <XCircle className="w-20 h-20 text-destructive" />
                             </div>
-                            <div className="text-center space-y-2">
+                            <div className="text-center space-y-4 max-w-2xl">
                               <h3 className="text-lg font-semibold">Rebalance Failed</h3>
-                              <p className="text-sm text-muted-foreground max-w-md">
-                                An error occurred during the rebalancing process. Please try again or contact support if the issue persists.
-                              </p>
+                              <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground">
+                                  {errorMessage}
+                                </p>
+                                {errorDetailsText && errorDetailsText !== errorMessage && (
+                                  <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-left">
+                                    <p className="text-sm font-medium text-destructive mb-1">Additional Details:</p>
+                                    <p className="text-sm text-muted-foreground">{errorDetailsText}</p>
+                                    {failedAt && (
+                                      <p className="text-xs text-muted-foreground mt-2">Failed at: {failedAt.replace(/_/g, ' ')}</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <Button variant="outline" onClick={onClose}>
                               Close
@@ -1762,27 +1936,120 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       {/* Opportunity Analysis Insights */}
                       {!rebalanceData.skipOpportunityAgent && (() => {
                         const opportunityStep = rebalanceData.workflowSteps?.find((s: any) => s.id === 'opportunity');
+                        console.log('🎨 INSIGHTS TAB - Opportunity step:', opportunityStep);
+                        console.log('🎨 INSIGHTS TAB - Opportunity insights:', opportunityStep?.insights);
+                        console.log('🎨 INSIGHTS TAB - Type of insights:', typeof opportunityStep?.insights);
+                        
                         if (opportunityStep?.insights) {
                           // Handle case where insights might be a string (raw AI response)
                           let parsedInsights = opportunityStep.insights;
                           if (typeof parsedInsights === 'string') {
-                            console.log('📝 Opportunity insights is string, displaying as raw text');
-                            return (
-                              <Card className="overflow-hidden">
-                                <CardHeader className="bg-muted/30">
-                                  <CardTitle className="text-base flex items-center gap-2">
-                                    <Zap className="w-4 h-4" />
-                                    Opportunity Analysis
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="pt-4">
-                                  <div className="p-3 bg-muted/30 rounded">
-                                    <p className="text-sm text-muted-foreground mb-2">AI Response (JSON parsing failed):</p>
-                                    <MarkdownRenderer content={parsedInsights} className="text-xs" />
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            );
+                            console.log('📝 Opportunity insights is string, attempting to parse');
+                            console.log('📝 Raw string content:', parsedInsights);
+                            
+                            // Try to parse the JSON string
+                            try {
+                              parsedInsights = JSON.parse(parsedInsights);
+                              console.log('✅ Successfully parsed opportunity insights JSON');
+                            } catch (parseError) {
+                              console.error('❌ Failed to parse opportunity insights:', parseError);
+                              
+                              // Try to extract key information from the malformed JSON string
+                              const recommendMatch = parsedInsights.match(/"recommendAnalysis"\s*:\s*(true|false)/);
+                              const selectedStocksMatch = parsedInsights.match(/"selectedStocks"\s*:\s*\[(.*?)\]/s);
+                              const reasoningMatch = parsedInsights.match(/"reasoning"\s*:\s*"([^"]+)"/);
+                              
+                              if (recommendMatch || selectedStocksMatch) {
+                                // Attempt to extract meaningful data from the malformed JSON
+                                const extractedStocks: any[] = [];
+                                
+                                if (selectedStocksMatch && selectedStocksMatch[1]) {
+                                  // Try to extract stock information using regex
+                                  const stockMatches = selectedStocksMatch[1].matchAll(/"ticker"\s*:\s*"([^"]+)"[^}]*?"reason"\s*:\s*"([^"]+)"[^}]*?"priority"\s*:\s*"([^"]+)"/g);
+                                  for (const match of stockMatches) {
+                                    extractedStocks.push({
+                                      ticker: match[1],
+                                      reason: match[2],
+                                      priority: match[3]
+                                    });
+                                  }
+                                }
+                                
+                                return (
+                                  <Card className="overflow-hidden">
+                                    <CardHeader className="bg-muted/30">
+                                      <CardTitle className="text-base flex items-center gap-2">
+                                        <Zap className="w-4 h-4" />
+                                        Opportunity Analysis
+                                      </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="pt-4 space-y-3">
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                          <p className="text-sm text-muted-foreground">Recommendation</p>
+                                          <p className={`text-lg font-semibold ${recommendMatch && recommendMatch[1] === 'true' ? 'text-green-500' : 'text-gray-500'}`}>
+                                            {recommendMatch && recommendMatch[1] === 'true' ? 'Analysis Recommended' : 'No Action Needed'}
+                                          </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                          <p className="text-sm text-muted-foreground">Stocks Selected</p>
+                                          <p className="text-lg font-semibold">
+                                            {extractedStocks.length}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      
+                                      {extractedStocks.length > 0 && (
+                                        <div className="border-t pt-3">
+                                          <p className="text-sm font-medium mb-2">Selected Stocks for Analysis</p>
+                                          <div className="space-y-2">
+                                            {extractedStocks.map((stock: any, idx: number) => (
+                                              <div key={idx} className="p-2 bg-muted/30 rounded">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                  <span className="font-mono font-medium">{stock.ticker}</span>
+                                                  <Badge variant="outline" className="text-xs">
+                                                    {stock.priority}
+                                                  </Badge>
+                                                </div>
+                                                <p className="text-sm text-muted-foreground">{stock.reason}</p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {reasoningMatch && reasoningMatch[1] && (
+                                        <div className="border-t pt-3">
+                                          <p className="text-sm text-muted-foreground italic">{reasoningMatch[1]}</p>
+                                        </div>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                );
+                              }
+                              
+                              // If we can't extract anything meaningful, show a clean error message
+                              return (
+                                <Card className="overflow-hidden">
+                                  <CardHeader className="bg-muted/30">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                      <Zap className="w-4 h-4" />
+                                      Opportunity Analysis
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="pt-4">
+                                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                                      <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                                        ⚠️ Unable to display opportunity analysis details
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        The opportunity agent response could not be properly formatted. The analysis may still have been completed successfully.
+                                      </p>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            }
                           }
 
                           return (
@@ -1849,11 +2116,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                           {rebalanceData.relatedAnalyses.map((analysis: any) => (
                             <div
                               key={analysis.id}
-                              className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                              onClick={() => setSelectedAnalysis({
-                                ticker: analysis.ticker,
-                                date: analysis.analysis_date || analysis.created_at
-                              })}
+                              className="border border-border rounded-lg p-4 space-y-3"
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -1871,7 +2134,15 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                       {analysis.confidence}% confidence
                                     </span>
                                   )}
-                                  {analysis.analysis_status === 0 && (
+                                  {/* Show completed badge if risk manager is done in rebalance context */}
+                                  {(analysis.analysis_status === 1 || 
+                                    (analysis.analysis_status === 0 && analysis.agent_insights?.riskManager)) && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      Completed
+                                    </Badge>
+                                  )}
+                                  {analysis.analysis_status === 0 && !analysis.agent_insights?.riskManager && (
                                     <Badge variant="outline" className="text-xs">
                                       <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                                       Analyzing
@@ -1887,16 +2158,16 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="border border-slate-700"
+                                  className="border border-border"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedAnalysis({
                                       ticker: analysis.ticker,
-                                      date: analysis.analysis_date || analysis.created_at
+                                      date: analysis.created_at
                                     });
                                   }}
                                 >
-                                  <Eye className="h-4 w-4 mr-1" />
+                                  <FileText className="h-4 w-4 mr-1" />
                                   View Details
                                 </Button>
                               </div>
@@ -1925,11 +2196,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       {(() => {
                         const portfolioStep = rebalanceData.workflowSteps?.find((s: any) => s.id === 'rebalance');
                         // Check all possible locations where Portfolio Manager insights might be stored
-                        // Priority: portfolioManager key first, then rebalanceAgent for backward compatibility
+                        // Priority: Check new fields first, then legacy fields
                         const portfolioInsights = 
+                          rebalanceData.rebalance_plan?.portfolioManagerAnalysis ||
+                          rebalanceData.rebalance_plan?.portfolioManagerInsights ||
+                          rebalanceData.rebalance_plan?.rebalance_agent_insight ||
                           rebalanceData.rebalance_plan?.agentInsights?.portfolioManager ||
                           rebalanceData.rebalance_plan?.agentInsights?.rebalanceAgent ||
-                          rebalanceData.rebalance_plan?.portfolioManagerInsights ||
                           rebalanceData.agentInsights?.portfolioManager ||
                           rebalanceData.agentInsights?.rebalanceAgent;
 
@@ -1938,9 +2211,11 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                           portfolioStepStatus: portfolioStep?.status,
                           hasPortfolioInsights: !!portfolioInsights,
                           foundAt: portfolioInsights ? (
+                            rebalanceData.rebalance_plan?.portfolioManagerAnalysis ? 'rebalance_plan.portfolioManagerAnalysis' :
+                            rebalanceData.rebalance_plan?.portfolioManagerInsights ? 'rebalance_plan.portfolioManagerInsights' :
+                            rebalanceData.rebalance_plan?.rebalance_agent_insight ? 'rebalance_plan.rebalance_agent_insight' :
                             rebalanceData.rebalance_plan?.agentInsights?.portfolioManager ? 'rebalance_plan.agentInsights.portfolioManager' :
                             rebalanceData.rebalance_plan?.agentInsights?.rebalanceAgent ? 'rebalance_plan.agentInsights.rebalanceAgent' :
-                            rebalanceData.rebalance_plan?.portfolioManagerInsights ? 'rebalance_plan.portfolioManagerInsights' :
                             rebalanceData.agentInsights?.portfolioManager ? 'agentInsights.portfolioManager' :
                             rebalanceData.agentInsights?.rebalanceAgent ? 'agentInsights.rebalanceAgent' :
                             'unknown'

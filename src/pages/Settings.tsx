@@ -326,8 +326,8 @@ export default function SettingsPage() {
         // Save provider settings
         const newErrors: Record<string, string> = {};
         
-        // Validate Alpha Vantage key via edge function (skip if masked)
-        if (alphaVantageApiKey && alphaVantageApiKey !== '***configured***') {
+        // Validate Alpha Vantage key via edge function
+        if (alphaVantageApiKey) {
           const validation = await validateCredential('alpha_vantage', alphaVantageApiKey);
           if (!validation.valid) {
             newErrors.alphaVantageApiKey = validation.message;
@@ -339,9 +339,9 @@ export default function SettingsPage() {
           return;
         }
 
-        // Build settings object with Alpha Vantage key (only if not masked)
+        // Build settings object with Alpha Vantage key
         settingsToSave = {};
-        if (alphaVantageApiKey && alphaVantageApiKey !== '***configured***') {
+        if (alphaVantageApiKey) {
           settingsToSave.alpha_vantage_api_key = alphaVantageApiKey;
         }
         
@@ -349,9 +349,9 @@ export default function SettingsPage() {
         for (let index = 0; index < aiProviders.length; index++) {
           const provider = aiProviders[index];
           if (provider.provider && provider.apiKey && provider.nickname) {
-            // Validate provider via edge function (skip if masked)
+            // Validate provider via edge function
             let isValid = true;
-            if (provider.apiKey !== '***configured***') {
+            if (provider.apiKey) {
               const validation = await validateCredential(provider.provider, provider.apiKey);
               isValid = validation.valid;
               
@@ -364,14 +364,14 @@ export default function SettingsPage() {
               // Always save the Default AI provider (ID '1') to api_settings
               if (provider.id === '1') {
                 settingsToSave.ai_provider = provider.provider as any;
-                // Only update API key if it's not masked
-                if (provider.apiKey !== '***configured***') {
+                // Update API key
+                if (provider.apiKey) {
                   settingsToSave.ai_api_key = provider.apiKey;
                 }
                 settingsToSave.ai_model = defaultAiModel === 'custom' ? defaultCustomModel : (defaultAiModel || getModelOptions(provider.provider)[0]);
               } else {
-                // Save additional providers to provider_configurations table (only if API key is not masked)
-                if (provider.apiKey !== '***configured***') {
+                // Save additional providers to provider_configurations table
+                if (provider.apiKey) {
                   const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
                     nickname: provider.nickname,
                     provider: provider.provider,

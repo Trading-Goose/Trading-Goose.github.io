@@ -97,14 +97,11 @@ export default function RebalanceHistoryTable() {
         )
         .subscribe();
 
-      // Only use polling as fallback for running rebalances
-      // Check every 5 seconds if there are running rebalances (less aggressive)
+      // Poll for updates every 3 seconds to catch status changes quickly
+      // This ensures failed rebalances are detected promptly
       const interval = setInterval(() => {
-        // Only fetch if we have running rebalances that might need status updates
-        if (runningRebalances.length > 0) {
-          fetchRebalanceRequests();
-        }
-      }, 5000);
+        fetchRebalanceRequests();
+      }, 3000);
 
       return () => {
         subscription.unsubscribe();
@@ -124,6 +121,14 @@ export default function RebalanceHistoryTable() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      // Debug logging
+      console.log('Fetched rebalance requests:', data?.map(r => ({ 
+        id: r.id, 
+        status: r.status, 
+        error_message: r.error_message,
+        rebalance_plan: r.rebalance_plan ? 'exists' : 'null'
+      })));
 
       // Separate running, completed, and cancelled rebalances
       const running: RebalanceRequest[] = [];
@@ -131,15 +136,18 @@ export default function RebalanceHistoryTable() {
       const cancelled: RebalanceRequest[] = [];
 
       for (const item of data || []) {
-        // If status is pending_approval or pending_trades with a rebalance plan, treat as completed
-        if ((item.status === 'pending_approval' || item.status === 'pending_trades') && item.rebalance_plan) {
+        // Handle failed status explicitly - show in cancelled/failed section
+        if (item.status === 'failed') {
+          cancelled.push(item);
+        } else if (item.status === 'cancelled') {
+          cancelled.push(item);
+        } else if ((item.status === 'pending_approval' || item.status === 'pending_trades') && item.rebalance_plan) {
+          // If status is pending_approval or pending_trades with a rebalance plan, treat as completed
           completed.push(item);
         } else if (['initializing', 'analyzing', 'planning', 'executing', 'portfolio_management_started'].includes(item.status)) {
           running.push(item);
         } else if (item.status === 'completed' || item.status === 'no_action_needed') {
           completed.push(item);
-        } else if (item.status === 'cancelled' || item.status === 'failed') {
-          cancelled.push(item);
         } else if (item.status === 'pending_approval' || item.status === 'pending_trades') {
           // If we're here, there's no rebalance plan yet, so it's still running
           running.push(item);
@@ -569,7 +577,9 @@ export default function RebalanceHistoryTable() {
                       
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          {item.error_message || 'Rebalance was cancelled by user'}
+                          {item.status === 'failed' 
+                            ? (item.error_message || item.rebalance_plan?.error || item.rebalance_plan?.errorDetails || 'Rebalance failed') 
+                            : (item.error_message || 'Rebalance was cancelled by user')}
                         </span>
                         <div className="flex items-center gap-2">
                           <Button
@@ -642,7 +652,7 @@ export default function RebalanceHistoryTable() {
                           <Badge variant={getStatusVariant(item.status)}>
                             <span className="flex items-center gap-1">
                               {getStatusIcon(item.status)}
-                              {item.status.replace('_', ' ')}
+                              {item.status === 'failed' ? 'Failed' : item.status.replace('_', ' ')}
                             </span>
                           </Badge>
                           {item.total_stocks > 0 && (
@@ -845,7 +855,9 @@ export default function RebalanceHistoryTable() {
                       
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          {item.error_message || 'Rebalance was cancelled by user'}
+                          {item.status === 'failed' 
+                            ? (item.error_message || item.rebalance_plan?.error || item.rebalance_plan?.errorDetails || 'Rebalance failed') 
+                            : (item.error_message || 'Rebalance was cancelled by user')}
                         </span>
                         <div className="flex items-center gap-2">
                           <Button

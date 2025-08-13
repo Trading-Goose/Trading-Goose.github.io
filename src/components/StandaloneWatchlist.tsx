@@ -222,13 +222,18 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           // Check both analysis_status = 0 and full_analysis->>'status' = 'running'
           const { data, error } = await supabase
             .from('analysis_history')
-            .select('ticker, analysis_status, full_analysis')
+            .select('ticker, analysis_status, full_analysis, agent_insights, rebalance_request_id')
             .eq('user_id', user.id)
             .or('analysis_status.eq.0,full_analysis->>status.eq.running');
 
           if (!error && data) {
             // Filter to only actually running analyses
             const runningData = data.filter(item => {
+              // For rebalance analyses, consider complete if risk manager has finished
+              if (item.rebalance_request_id && item.agent_insights?.riskManager) {
+                return false; // Not running anymore - risk manager completed
+              }
+              
               // Consider running if analysis_status is 0 OR full_analysis.status is 'running'
               const isRunning = item.analysis_status === 0 ||
                 (item.full_analysis && item.full_analysis.status === 'running');

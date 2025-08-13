@@ -161,24 +161,25 @@ export const supabaseFunctions = {
 
 // Helper functions for common operations
 export const supabaseHelpers = {
-  // Get or create API settings for a user (with masked API keys for security)
+  // Get or create API settings for a user (with actual API keys for settings page)
   async getOrCreateApiSettings(userId: string): Promise<ApiSettings | null> {
     console.log('getOrCreateApiSettings called for user:', userId);
 
     try {
-      // Use settings-proxy to get sanitized settings (API keys masked)
-      console.log('Fetching sanitized settings via settings-proxy for user:', userId);
-      const { data: proxyResponse, error: proxyError } = await supabase.functions.invoke('settings-proxy', {
-        body: {
-          action: 'get_settings'
-        }
-      });
+      // Directly fetch settings from database (for settings page only)
+      // This will show actual API keys instead of masked values
+      console.log('Fetching actual settings for user:', userId);
+      const { data: settings, error: fetchError } = await supabase
+        .from('api_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
 
-      console.log('Proxy response:', { proxyResponse, proxyError });
+      console.log('Direct fetch response:', { settings, fetchError });
 
-      if (!proxyError && proxyResponse?.settings) {
-        console.log('Found existing settings (sanitized):', proxyResponse.settings);
-        return proxyResponse.settings;
+      if (!fetchError && settings) {
+        console.log('Found existing settings:', settings);
+        return settings;
       }
 
       // If no settings exist (PGRST116 error), create default ones
@@ -254,35 +255,21 @@ export const supabaseHelpers = {
     }
   },
 
-  // Update API settings (via secure proxy to handle API keys properly)
+  // Update API settings (direct database update)
   async updateApiSettings(userId: string, updates: Partial<ApiSettings>): Promise<ApiSettings | null> {
     try {
-      // Filter out any masked values before sending
+      // Clean the updates - no need to filter masked values anymore
       const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
-        if (value !== '***configured***') {
+        // Only include non-empty values
+        if (value !== undefined && value !== null) {
           acc[key] = value;
         }
         return acc;
       }, {} as Partial<ApiSettings>);
       
-      // Use settings-proxy to update settings securely
-      const { data: proxyResponse, error: proxyError } = await supabase.functions.invoke('settings-proxy', {
-        body: {
-          action: 'update_settings',
-          settings: cleanedUpdates
-        }
-      });
+      console.log('Updating settings with:', cleanedUpdates);
       
-      if (proxyError) {
-        console.error('Error updating settings via proxy:', proxyError);
-        throw proxyError;
-      }
-      
-      if (proxyResponse?.settings) {
-        return proxyResponse.settings;
-      }
-      
-      // Fallback to direct update (for backward compatibility)
+      // Direct database update
       const { data, error } = await supabase
         .from('api_settings')
         .update({
@@ -305,6 +292,7 @@ export const supabaseHelpers = {
         return null;
       }
 
+      console.log('Settings updated successfully:', data);
       return data;
     } catch (error) {
       console.error('Error in updateApiSettings:', error);

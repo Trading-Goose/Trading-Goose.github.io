@@ -151,12 +151,12 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       if (!user) return;
 
       try {
-        // Check for active rebalance requests
+        // Check for active rebalance requests (including partial/incomplete portfolio manager states)
         const { data, error } = await supabase
           .from('rebalance_requests')
           .select('id, status, created_at')
           .eq('user_id', user.id)
-          .in('status', ['initializing', 'analyzing', 'pending_trades'])
+          .in('status', ['initializing', 'analyzing', 'pending_trades', 'partial', 'portfolio_not_complete'])
           .order('created_at', { ascending: false })
           .limit(1);
 

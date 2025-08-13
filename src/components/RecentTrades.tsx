@@ -312,7 +312,7 @@ export default function RecentTrades() {
               const filledQty = tradeOrder.metadata?.alpaca_order?.filled_qty;
               toast({
                 title: "Order Filled",
-                description: `${tradeOrder.ticker} order filled at $${filledPrice?.toFixed(2)} for ${filledQty} shares`,
+                description: `${tradeOrder.ticker} order filled at $${Number(filledPrice || 0).toFixed(2)} for ${filledQty} shares`,
               });
             } else if (['canceled', 'rejected', 'expired'].includes(alpacaStatus)) {
               toast({
@@ -531,7 +531,7 @@ export default function RecentTrades() {
                                     )}
                                     {decision.alpacaFilledQty && (
                                       <div className="mt-1">
-                                        Filled: {decision.alpacaFilledQty} @ ${decision.alpacaFilledPrice?.toFixed(2)}
+                                        Filled: {decision.alpacaFilledQty} @ ${Number(decision.alpacaFilledPrice || 0).toFixed(2)}
                                       </div>
                                     )}
                                   </div>
@@ -793,7 +793,7 @@ export default function RecentTrades() {
                                 {/* Show filled details if available */}
                                 {decision.alpacaFilledQty && decision.alpacaFilledPrice && (
                                   <div className="text-xs text-muted-foreground text-center">
-                                    {decision.alpacaFilledQty} @ ${decision.alpacaFilledPrice.toFixed(2)}
+                                    {decision.alpacaFilledQty} @ ${Number(decision.alpacaFilledPrice || 0).toFixed(2)}
                                   </div>
                                 )}
                               </div>
@@ -818,7 +818,7 @@ export default function RecentTrades() {
                                 <>
                                   <span>•</span>
                                   <span className="text-green-600">
-                                    Filled: {decision.alpacaFilledQty} @ ${decision.alpacaFilledPrice.toFixed(2)}
+                                    Filled: {decision.alpacaFilledQty} @ ${Number(decision.alpacaFilledPrice || 0).toFixed(2)}
                                   </span>
                                 </>
                               )}
@@ -971,7 +971,7 @@ export default function RecentTrades() {
                                 {/* Show filled details if available */}
                                 {decision.alpacaFilledQty && decision.alpacaFilledPrice && (
                                   <div className="text-xs text-muted-foreground text-center">
-                                    {decision.alpacaFilledQty} @ ${decision.alpacaFilledPrice.toFixed(2)}
+                                    {decision.alpacaFilledQty} @ ${Number(decision.alpacaFilledPrice || 0).toFixed(2)}
                                   </div>
                                 )}
                               </div>

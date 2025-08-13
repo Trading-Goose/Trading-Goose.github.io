@@ -29,7 +29,7 @@ const Dashboard = () => {
         setLoadingTimeout(true);
         // Force the loading state to false if stuck
         useAuth.setState({ isLoading: false });
-      }, 3000); // 3 second timeout
+      }, 15000); // 15 second timeout to allow for database operations
       return () => clearTimeout(timer);
     } else {
       setLoadingTimeout(false);

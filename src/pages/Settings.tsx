@@ -184,15 +184,16 @@ export default function SettingsPage() {
     console.log('Settings page - Auth state:', {
       isAuthenticated,
       user: user?.id,
-      hasApiSettings: !!apiSettings
+      hasApiSettings: !!apiSettings,
+      isLoading
     });
     
-    // If authenticated but no user data, force reload
-    if (isAuthenticated && !user) {
+    // If authenticated but no user data and not loading, force reload
+    if (isAuthenticated && !user && !isLoading) {
       console.log('Authenticated but no user data, forcing reload...');
       forceReload();
     }
-  }, [isAuthenticated, user?.id]); // Only depend on auth state, not the full objects
+  }, [isAuthenticated, user?.id, isLoading]); // Only depend on auth state, not the full objects
 
   // Check configured providers when authenticated
   useEffect(() => {

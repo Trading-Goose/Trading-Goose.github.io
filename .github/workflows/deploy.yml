@@ -40,8 +40,8 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           # Disable public registration for production
           VITE_ENABLE_PUBLIC_REGISTRATION: 'false'
-          # Set base path for GitHub Pages
-          PUBLIC_URL: /${{ github.event.repository.name }}/
+          # Set base path for GitHub Pages (root for TradingGoose.github.io)
+          PUBLIC_URL: /
         run: npm run build
         
       - name: Setup Pages

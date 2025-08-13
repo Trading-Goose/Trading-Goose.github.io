@@ -16,7 +16,24 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    // Add storage key to avoid conflicts
+    storageKey: 'sb-auth-token',
+    // Add flow type for better compatibility
+    flowType: 'pkce'
+  },
+  // Add global fetch options with timeout
+  global: {
+    fetch: (url, options = {}) => {
+      // Add a timeout to all Supabase requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      return fetch(url, {
+        ...options,
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId));
+    }
   }
 });
 

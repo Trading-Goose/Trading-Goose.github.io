@@ -85,11 +85,7 @@ export const useAuth = create<AuthState>()(
         try {
           console.log('Logout initiated...');
           
-          // Sign out from Supabase
-          const { error } = await supabase.auth.signOut();
-          if (error) console.error('Supabase signOut error:', error);
-          
-          // Clear the store state
+          // Clear the store state first
           set({
             user: null,
             apiSettings: null,
@@ -110,6 +106,13 @@ export const useAuth = create<AuthState>()(
             console.log(`Removing ${key} from localStorage`);
             localStorage.removeItem(key);
           });
+          
+          // Sign out from Supabase last to ensure state is cleared first
+          const { error } = await supabase.auth.signOut();
+          if (error) {
+            console.error('Supabase signOut error:', error);
+            // Even if signOut fails, we've already cleared local state
+          }
           
           // Clear session storage too
           sessionStorage.clear();
@@ -138,13 +141,7 @@ export const useAuth = create<AuthState>()(
         try {
           // Build the correct redirect URL for email confirmation
           const origin = window.location.origin;
-          let emailRedirectTo: string;
-          
-          if (origin.includes('github.io')) {
-            emailRedirectTo = `${origin}/TradingGoose`;
-          } else {
-            emailRedirectTo = origin;
-          }
+          const emailRedirectTo = origin;
           
           // Sign up the user
           const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -267,29 +264,53 @@ export const useAuth = create<AuthState>()(
           
           let session, sessionError;
           
-          // Only use timeout in development
-          if (import.meta.env.DEV) {
-            const sessionPromise = supabase.auth.getSession();
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Session timeout')), 5000)
-            );
+          // Get session with proper error handling and timeout
+          try {
+            console.log('Attempting to get session from Supabase...');
             
-            try {
-              const result = await Promise.race([sessionPromise, timeoutPromise]) as { data: { session: any }, error: any };
-              session = result?.data?.session;
-              sessionError = result?.error;
-            } catch (err) {
-              console.error('Session fetch failed:', err);
-              // Fallback to direct call
-              const directResult = await supabase.auth.getSession();
-              session = directResult?.data?.session;
-              sessionError = directResult?.error;
-            }
-          } else {
-            // Production: no timeout
-            const result = await supabase.auth.getSession();
+            // Wrap getSession in a Promise with timeout
+            const getSessionWithTimeout = async () => {
+              const timeout = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('getSession timeout after 8 seconds')), 8000)
+              );
+              
+              const sessionPromise = supabase.auth.getSession();
+              
+              return Promise.race([sessionPromise, timeout]);
+            };
+            
+            const result = await getSessionWithTimeout() as any;
+            console.log('getSession completed:', { 
+              hasSession: !!result?.data?.session,
+              error: result?.error 
+            });
+            
             session = result?.data?.session;
             sessionError = result?.error;
+            
+            // If no session, try to refresh the session
+            if (!session && !sessionError) {
+              console.log('No session found, attempting to refresh...');
+              const refreshResult = await supabase.auth.refreshSession();
+              console.log('refreshSession result:', refreshResult);
+              session = refreshResult?.data?.session;
+              sessionError = refreshResult?.error;
+            }
+          } catch (err: any) {
+            console.error('Error getting session:', err?.message || err);
+            sessionError = err;
+            
+            // If it's a timeout, set a specific error state
+            if (err?.message?.includes('timeout')) {
+              console.error('Session fetch timed out - possible network or Supabase issue');
+              set({ 
+                isAuthenticated: false, 
+                user: null, 
+                apiSettings: null, 
+                isLoading: false 
+              });
+              return;
+            }
           }
           
           console.log('Session result:', { hasSession: !!session, error: sessionError });
@@ -308,10 +329,15 @@ export const useAuth = create<AuthState>()(
           const user = session.user;
           console.log('Got user:', user.id);
 
-          // Load profile and settings - simplified without timeout
+          // Load profile and settings with timeout to prevent hanging
           console.log('Loading profile and settings...');
           
-          const [profileResult, apiSettings] = await Promise.all([
+          // Add a timeout wrapper for the database calls
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Database operation timeout')), 10000)
+          );
+          
+          const dataPromise = Promise.all([
             supabase
               .from('profiles')
               .select('*')
@@ -319,6 +345,22 @@ export const useAuth = create<AuthState>()(
               .single(),
             supabaseHelpers.getOrCreateApiSettings(user.id)
           ]);
+          
+          let profileResult, apiSettings;
+          try {
+            const results = await Promise.race([dataPromise, timeoutPromise]) as any;
+            [profileResult, apiSettings] = results;
+          } catch (timeoutErr) {
+            console.error('Database operation timed out:', timeoutErr);
+            // Try sequential calls as fallback
+            console.log('Trying sequential database calls...');
+            profileResult = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+            apiSettings = await supabaseHelpers.getOrCreateApiSettings(user.id);
+          }
           
           console.log('Profile result:', profileResult);
           console.log('API settings result:', apiSettings);
@@ -370,13 +412,7 @@ export const useAuth = create<AuthState>()(
         try {
           // Build the correct redirect URL
           const origin = window.location.origin;
-          let redirectTo: string;
-          
-          if (origin.includes('github.io')) {
-            redirectTo = `${origin}/TradingGoose/reset-password`;
-          } else {
-            redirectTo = `${origin}/reset-password`;
-          }
+          const redirectTo = `${origin}/reset-password`;
           
           const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo,
@@ -465,17 +501,27 @@ if (typeof window !== 'undefined') {
   })();
   
   // Listen for auth state changes
-  let lastProcessedEvent: string | null = null;
+  let isProcessingAuthChange = false;
   
   supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('Auth state changed:', event);
+    console.log('Auth state changed:', event, { hasSession: !!session });
     
     // Prevent duplicate processing
-    if (event === 'SIGNED_IN' && lastProcessedEvent === 'SIGNED_IN') {
-      console.log('Skipping duplicate SIGNED_IN event');
+    if (isProcessingAuthChange) {
+      console.log('Already processing auth change, skipping...');
       return;
     }
-    lastProcessedEvent = event;
+    
+    // Special handling for SIGNED_IN events
+    if (event === 'SIGNED_IN') {
+      const currentState = useAuth.getState();
+      if (currentState.user && currentState.isAuthenticated) {
+        console.log('Already signed in with user data, skipping duplicate SIGNED_IN event');
+        return;
+      }
+    }
+    
+    isProcessingAuthChange = true;
     
     const state = useAuth.getState();
     
@@ -528,6 +574,9 @@ if (typeof window !== 'undefined') {
         // The ResetPassword component will handle this
         break;
     }
+    
+    // Reset the processing flag
+    isProcessingAuthChange = false;
   });
 }
 

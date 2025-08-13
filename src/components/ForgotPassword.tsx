@@ -21,18 +21,9 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      // Build the correct redirect URL for GitHub Pages
-      // For GitHub Pages, we need to include the /TradingGoose/ path
+      // Build the correct redirect URL
       const origin = window.location.origin;
-      let redirectUrl: string;
-
-      if (origin.includes('github.io')) {
-        // GitHub Pages deployment
-        redirectUrl = `${origin}/TradingGoose/reset-password`;
-      } else {
-        // Local development
-        redirectUrl = `${origin}/reset-password`;
-      }
+      const redirectUrl = `${origin}/reset-password`;
 
       console.log('Sending password reset email to:', email);
       console.log('Redirect URL:', redirectUrl);

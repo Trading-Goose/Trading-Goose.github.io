@@ -42,13 +42,7 @@ export default function ProfilePage() {
     try {
       // Build the correct redirect URL
       const origin = window.location.origin;
-      let redirectUrl: string;
-
-      if (origin.includes('github.io')) {
-        redirectUrl = `${origin}/TradingGoose/reset-password`;
-      } else {
-        redirectUrl = `${origin}/reset-password`;
-      }
+      const redirectUrl = `${origin}/reset-password`;
 
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
         redirectTo: redirectUrl,

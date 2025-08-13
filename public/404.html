@@ -8,12 +8,12 @@
     <script>
       // Check if this is a GitHub OAuth redirect first
       if (window.location.hash && window.location.hash.includes('access_token=')) {
-        // Redirect directly to /TradingGoose/ with the hash
-        window.location.replace('/TradingGoose/' + window.location.hash);
+        // Redirect directly to / with the hash
+        window.location.replace('/' + window.location.hash);
       } else {
         // Single Page Apps for GitHub Pages
         // This script redirects all 404s to index.html for client-side routing
-        const pathSegmentsToKeep = 1; // For repo pages (username.github.io/repo-name)
+        const pathSegmentsToKeep = 0; // For main domain (username.github.io)
         
         const l = window.location;
         l.replace(

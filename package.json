@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "preview:gh-pages": "vite preview --base=/TradingGoose/"
+    "preview:gh-pages": "vite preview --base=/"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

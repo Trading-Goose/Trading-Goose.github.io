@@ -38,6 +38,8 @@ jobs:
           # Public environment variables (safe to expose)
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Disable public registration for production
+          VITE_ENABLE_PUBLIC_REGISTRATION: 'false'
           # Set base path for GitHub Pages
           PUBLIC_URL: /${{ github.event.repository.name }}/
         run: npm run build

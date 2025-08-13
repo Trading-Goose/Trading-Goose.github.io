@@ -15,6 +15,9 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   
+  // Check if public registration is enabled
+  const publicRegistrationEnabled = import.meta.env.VITE_ENABLE_PUBLIC_REGISTRATION !== 'false';
+  
   // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

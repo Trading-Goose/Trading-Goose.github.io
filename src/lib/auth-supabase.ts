@@ -262,23 +262,34 @@ export const useAuth = create<AuthState>()(
         console.log('Loading state set to true');
         
         try {
-          // Get the current session with a reasonable timeout
+          // Get the current session - no timeout in production
           console.log('Getting session...');
           
-          const sessionPromise = supabase.auth.getSession();
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session timeout')), 5000)
-          );
-          
           let session, sessionError;
-          try {
-            const result = await Promise.race([sessionPromise, timeoutPromise]) as { data: { session: any }, error: any };
+          
+          // Only use timeout in development
+          if (import.meta.env.DEV) {
+            const sessionPromise = supabase.auth.getSession();
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Session timeout')), 5000)
+            );
+            
+            try {
+              const result = await Promise.race([sessionPromise, timeoutPromise]) as { data: { session: any }, error: any };
+              session = result?.data?.session;
+              sessionError = result?.error;
+            } catch (err) {
+              console.error('Session fetch failed:', err);
+              // Fallback to direct call
+              const directResult = await supabase.auth.getSession();
+              session = directResult?.data?.session;
+              sessionError = directResult?.error;
+            }
+          } else {
+            // Production: no timeout
+            const result = await supabase.auth.getSession();
             session = result?.data?.session;
             sessionError = result?.error;
-          } catch (err) {
-            console.error('Session fetch failed:', err);
-            sessionError = err;
-            session = null;
           }
           
           console.log('Session result:', { hasSession: !!session, error: sessionError });

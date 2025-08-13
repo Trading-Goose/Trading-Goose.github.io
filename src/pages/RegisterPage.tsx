@@ -16,6 +16,9 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   
+  // Check if public registration is enabled
+  const publicRegistrationEnabled = import.meta.env.VITE_ENABLE_PUBLIC_REGISTRATION !== 'false';
+  
   // Form state
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,6 +36,12 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     setSuccessMessage("");
+
+    // Check if registration is disabled
+    if (!publicRegistrationEnabled) {
+      setError("Public registration is currently disabled. Please contact an administrator for an invitation.");
+      return;
+    }
 
     // Validation
     if (password !== confirmPassword) {
@@ -134,6 +143,50 @@ export default function RegisterPage() {
               }}
             >
               Register Another Account
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show disabled message if registration is not allowed
+  if (!publicRegistrationEnabled) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Registration Closed</CardTitle>
+            <CardDescription>
+              Invitation required to join TradingGoose
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Public registration is currently disabled. Please contact an administrator to request an invitation.
+              </AlertDescription>
+            </Alert>
+            <p className="text-sm text-muted-foreground text-center">
+              If you have received an invitation email, please click the link in the email to join.
+            </p>
+          </CardContent>
+          <CardFooter className="flex flex-col space-y-2">
+            <Button 
+              variant="default" 
+              className="w-full"
+              onClick={() => navigate('/login')}
+            >
+              Go to Login
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full"
+              onClick={() => navigate('/')}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Home
             </Button>
           </CardFooter>
         </Card>

@@ -218,17 +218,71 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       // Check database for running analyses if user is authenticated
       if (user) {
         try {
-          // Get all analyses that might be running
-          // Check both analysis_status = 0 and full_analysis->>'status' = 'running'
+          // Get all analyses (running, completed, cancelled)
           const { data, error } = await supabase
             .from('analysis_history')
-            .select('ticker, analysis_status, full_analysis, agent_insights, rebalance_request_id')
+            .select('ticker, analysis_status, full_analysis, agent_insights, rebalance_request_id, is_canceled, created_at, id')
             .eq('user_id', user.id)
-            .or('analysis_status.eq.0,full_analysis->>status.eq.running');
+            .order('created_at', { ascending: false });
 
           if (!error && data) {
-            // Filter to only actually running analyses
+            // First, get all cancelled rebalance IDs
+            const cancelledRebalanceIds = new Set<string>();
+            if (data.length > 0) {
+              // Get unique rebalance request IDs from the data
+              const rebalanceIds = [...new Set(data
+                .filter(item => item.rebalance_request_id)
+                .map(item => item.rebalance_request_id))];
+              
+              if (rebalanceIds.length > 0) {
+                // Check which rebalances are cancelled
+                const { data: rebalanceData } = await supabase
+                  .from('rebalance_requests')
+                  .select('id')
+                  .in('id', rebalanceIds)
+                  .eq('status', 'cancelled');
+                
+                if (rebalanceData) {
+                  rebalanceData.forEach(r => cancelledRebalanceIds.add(r.id));
+                }
+              }
+            }
+
+            // Group by ticker to get the most recent analysis for each
+            const latestByTicker = new Map<string, any>();
+            for (const item of data) {
+              if (!latestByTicker.has(item.ticker)) {
+                latestByTicker.set(item.ticker, item);
+              }
+            }
+
+            // Check status of latest analysis for each ticker
+            for (const [ticker, item] of latestByTicker) {
+              // Skip if this analysis is cancelled or part of a cancelled rebalance
+              if (item.is_canceled || 
+                  (item.rebalance_request_id && cancelledRebalanceIds.has(item.rebalance_request_id))) {
+                continue; // Don't show as running if cancelled
+              }
+              
+              // Check if it's currently running
+              const isRunning = item.analysis_status === 0 ||
+                (item.full_analysis && item.full_analysis.status === 'running');
+              
+              // For rebalance analyses, consider complete if risk manager has finished
+              const isRebalanceComplete = item.rebalance_request_id && item.agent_insights?.riskManager;
+              
+              if (isRunning && !isRebalanceComplete) {
+                running.add(ticker);
+              }
+              // We don't add any completed analyses to viewable
+              // All completed analyses should show "Analyze" button
+            }
+
+            // Filter to only actually running analyses (for logging)
             const runningData = data.filter(item => {
+              // Skip cancelled
+              if (item.is_canceled) return false;
+              
               // For rebalance analyses, consider complete if risk manager has finished
               if (item.rebalance_request_id && item.agent_insights?.riskManager) {
                 return false; // Not running anymore - risk manager completed
@@ -247,9 +301,6 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                 status: d.analysis_status,
                 fullAnalysisStatus: d.full_analysis?.status
               })));
-            }
-            for (const item of runningData) {
-              running.add(item.ticker);
             }
           }
         } catch (error) {

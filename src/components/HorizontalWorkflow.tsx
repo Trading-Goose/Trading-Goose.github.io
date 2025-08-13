@@ -367,10 +367,12 @@ export default function HorizontalWorkflow() {
         try {
           // Get all analyses that might be running
           // Check both analysis_status = 0 and full_analysis->>'status' = 'running'
+          // Also filter out cancelled analyses
           const { data, error } = await supabase
             .from('analysis_history')
-            .select('ticker, analysis_status, full_analysis, created_at, id, decision, agent_insights, rebalance_request_id')
+            .select('ticker, analysis_status, full_analysis, created_at, id, decision, agent_insights, rebalance_request_id, is_canceled')
             .eq('user_id', user.id)
+            .eq('is_canceled', false)
             .or('analysis_status.eq.0,full_analysis->>status.eq.running');
 
           if (!error && data) {
@@ -426,6 +428,7 @@ export default function HorizontalWorkflow() {
             .from('analysis_history')
             .select('*')
             .eq('user_id', user.id)
+            .eq('is_canceled', false)
             .in('ticker', justCompleted)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -614,16 +617,19 @@ export default function HorizontalWorkflow() {
     // Check if this is a rebalance analysis
     const isRebalanceAnalysis = !!analysis.rebalance_request_id;
 
-    console.log('Analysis rebalance check:', {
+    console.log('Analysis type check:', {
+      ticker: analysis.ticker,
       rebalance_request_id: analysis.rebalance_request_id,
-      isRebalanceAnalysis
+      isRebalanceAnalysis,
+      analysis_status: analysis.analysis_status,
+      hasInsights: Object.keys(insights).length,
+      insightKeys: Object.keys(insights)
     });
 
     // Update the rebalance context state
     setIsRebalanceContext(isRebalanceAnalysis);
 
     // Determine if analysis is completed or running
-    // For rebalance analyses, consider complete after risk stage (no portfolio manager)
     let isCompleted = analysis.analysis_status === 1 ||
       (analysis.analysis_status !== 0 &&
         (!fullAnalysis?.status || fullAnalysis.status !== 'running'));
@@ -640,6 +646,14 @@ export default function HorizontalWorkflow() {
 
       if (hasRiskManagerInsights || riskAgentsComplete) {
         console.log('Rebalance analysis - risk assessment complete, marking as done');
+        isCompleted = true;
+      }
+    } else if (!isRebalanceAnalysis && analysis.analysis_status === 0) {
+      // For individual analyses, check if portfolio manager has completed
+      const hasPortfolioManagerInsights = insights.portfolioManager;
+      
+      if (hasPortfolioManagerInsights) {
+        console.log('Individual analysis - portfolio management complete, marking as done');
         isCompleted = true;
       }
     }
@@ -924,16 +938,21 @@ export default function HorizontalWorkflow() {
       // Find the portfolio management step index (it might be at index 4 if not filtered)
       const portfolioStepIndex = updatedSteps.findIndex(s => s.id === 'portfolio-management');
       if (portfolioStepIndex !== -1) {
+        // Check if risk is complete to determine if portfolio management should be pending or running
+        const riskComplete = riskStepStatus === 'completed';
+        
         updatedSteps[portfolioStepIndex] = {
           ...updatedSteps[portfolioStepIndex],
-          status: hasPortfolioData ? 'completed' : 'pending',
-          currentActivity: hasPortfolioData ? 'Position sizing complete' : 'Awaiting activation',
+          status: hasPortfolioData ? 'completed' : (riskComplete ? 'running' : 'pending'),
+          currentActivity: hasPortfolioData ? 'Position sizing complete' : 
+            (riskComplete ? 'Calculating position size...' : 'Awaiting risk assessment'),
           agents: [
             {
               ...updatedSteps[portfolioStepIndex].agents[0],
-              status: 'idle',
-              lastAction: hasPortfolioData ? 'Position sizing calculated' : 'Waiting...',
-              progress: hasPortfolioData ? 100 : 0
+              status: hasPortfolioData ? 'idle' : (riskComplete ? 'processing' : 'idle'),
+              lastAction: hasPortfolioData ? 'Position sizing calculated' : 
+                (riskComplete ? 'Analyzing portfolio...' : 'Waiting...'),
+              progress: hasPortfolioData ? 100 : (riskComplete ? 50 : 0)
             }
           ]
         };

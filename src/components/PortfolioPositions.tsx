@@ -154,9 +154,9 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         // Check for active rebalance requests (including partial/incomplete portfolio manager states)
         const { data, error } = await supabase
           .from('rebalance_requests')
-          .select('id, status, created_at')
+          .select('id, status, created_at, completed_at, rebalance_plan')
           .eq('user_id', user.id)
-          .in('status', ['initializing', 'analyzing', 'pending_trades', 'partial', 'portfolio_not_complete'])
+          .in('status', ['initializing', 'analyzing', 'pending_trades', 'partial', 'portfolio_not_complete', 'portfolio_management_started'])
           .order('created_at', { ascending: false })
           .limit(1);
 
@@ -171,15 +171,34 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
 
           previousRunningRef.current = activeRebalance.id;
         } else {
-          // Check if rebalance just completed
+          // Only show completion toast if a rebalance actually finished with portfolio manager
           if (previousRunningRef.current) {
-            console.log('Rebalance completed:', previousRunningRef.current);
-            toast({
-              title: "Rebalance Complete",
-              description: "Portfolio rebalancing has been completed",
-            });
-            // Refresh positions to show updated holdings
-            fetchPositions();
+            // Fetch the completed rebalance to check if it actually ran portfolio manager
+            const { data: completedRebalance } = await supabase
+              .from('rebalance_requests')
+              .select('id, status, rebalance_plan')
+              .eq('id', previousRunningRef.current)
+              .single();
+
+            if (completedRebalance?.status === 'completed' && 
+                completedRebalance?.rebalance_plan?.trades?.length > 0) {
+              // Only show toast if portfolio manager actually ran and created trades
+              console.log('Rebalance completed with trades:', previousRunningRef.current);
+              toast({
+                title: "Rebalance Complete",
+                description: "Portfolio rebalancing has been completed",
+              });
+              // Refresh positions to show updated holdings
+              fetchPositions();
+            } else if (completedRebalance?.status === 'completed' &&
+                       completedRebalance?.rebalance_plan?.recommendation === 'no_action_needed') {
+              // Show different message when no opportunities were found
+              console.log('Rebalance completed with no action needed:', previousRunningRef.current);
+              toast({
+                title: "Rebalance Analysis Complete",
+                description: completedRebalance?.rebalance_plan?.message || "No rebalancing opportunities found",
+              });
+            }
           }
 
           setRunningRebalance(null);

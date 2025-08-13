@@ -44,6 +44,9 @@ jobs:
           PUBLIC_URL: /
         run: npm run build
         
+      - name: Copy index.html to 404.html for SPA routing
+        run: cp ./dist/index.html ./dist/404.html
+        
       - name: Setup Pages
         uses: actions/configure-pages@v4
         

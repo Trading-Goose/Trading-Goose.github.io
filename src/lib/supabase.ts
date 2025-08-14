@@ -36,18 +36,66 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   },
   // Add global fetch options with timeout and better error handling
   global: {
-    fetch: async (url, options = {}) => {
-      // Add a timeout to all Supabase requests
+    fetch: async (url: RequestInfo | URL, options: RequestInit = {}) => {
+      // Check if this is an Edge Function call
+      const isEdgeFunction = typeof url === 'string' && url.includes('/functions/v1/');
+      
+      // For Edge Functions, use a longer timeout and respect existing signals
+      if (isEdgeFunction) {
+        // If there's already a signal in options, respect it
+        if (options.signal) {
+          try {
+            const response = await fetch(url, {
+              ...options,
+              credentials: 'same-origin',
+              cache: 'no-cache'
+            });
+            return response;
+          } catch (error) {
+            console.error('Supabase Edge Function fetch error:', error);
+            throw error;
+          }
+        }
+        
+        // For Edge Functions without existing signal, use 60 second timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for Edge Functions
+        
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            credentials: 'same-origin',
+            cache: 'no-cache'
+          });
+          clearTimeout(timeoutId);
+          return response;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          console.error('Supabase Edge Function fetch error:', error);
+          throw error;
+        }
+      }
+      
+      // For regular Supabase requests, use standard timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      // Merge signals if one already exists
+      let signal = controller.signal;
+      if (options.signal) {
+        // Create a combined signal that aborts if either signal aborts
+        const combinedController = new AbortController();
+        options.signal.addEventListener('abort', () => combinedController.abort());
+        controller.signal.addEventListener('abort', () => combinedController.abort());
+        signal = combinedController.signal;
+      }
       
       try {
         const response = await fetch(url, {
           ...options,
-          signal: controller.signal,
-          // Ensure credentials are included for CORS
+          signal,
           credentials: 'same-origin',
-          // Add cache control for better performance
           cache: 'no-cache'
         });
         clearTimeout(timeoutId);

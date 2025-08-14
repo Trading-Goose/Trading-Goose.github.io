@@ -11,7 +11,9 @@ import {
   RefreshCw,
   UserPlus
 } from "lucide-react";
-import { useAuth, hasRequiredApiKeys } from "@/lib/auth-supabase";
+import { useAuth, hasRequiredApiKeys } from "@/lib/auth";
+import { useRBAC } from "@/hooks/useRBAC";
+import { RoleBadge, RoleGate } from "@/components/RoleBasedAccess";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,9 +25,11 @@ import {
 
 export default function Header() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout, apiSettings } = useAuth();
+  const { user, profile, isAuthenticated, logout, apiSettings } = useAuth();
+  const { hasPermission } = useRBAC();
   
   const hasApiKeys = hasRequiredApiKeys(apiSettings);
+  const canManageInvitations = hasPermission('invitations.create');
 
   return (
     <>
@@ -63,6 +67,14 @@ export default function Header() {
                       Rebalance Records
                     </Button>
                   </Link>
+                  <RoleGate permissions={['invitations.create']}>
+                    <Link to="/admin/invitations">
+                      <Button variant="ghost" size="sm">
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Invitations
+                      </Button>
+                    </Link>
+                  </RoleGate>
                 </div>
               )}
             </div>
@@ -74,11 +86,16 @@ export default function Header() {
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="max-w-[150px] sm:max-w-none">
                         <UserIcon className="h-4 w-4 mr-2" />
-                        <span className="truncate">{user?.name || user?.email}</span>
+                        <span className="truncate">{profile?.name || profile?.full_name || user?.email || 'Profile'}</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                      <DropdownMenuLabel>
+                        <div className="flex flex-col gap-1">
+                          <span>My Account</span>
+                          <RoleBadge className="mt-1" />
+                        </div>
+                      </DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
                         <Link to="/profile" className="flex items-center">
@@ -110,6 +127,28 @@ export default function Header() {
                           Rebalance Records
                         </Link>
                       </DropdownMenuItem>
+                      <RoleGate permissions={['admin.access']}>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">Admin</DropdownMenuLabel>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/invitations" className="flex items-center">
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Invitations
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/users" className="flex items-center">
+                            <UserIcon className="h-4 w-4 mr-2" />
+                            User Management
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/roles" className="flex items-center">
+                            <Settings className="h-4 w-4 mr-2" />
+                            Role Management
+                          </Link>
+                        </DropdownMenuItem>
+                      </RoleGate>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onSelect={logout} className="text-red-600">
                         <LogOut className="h-4 w-4 mr-2" />

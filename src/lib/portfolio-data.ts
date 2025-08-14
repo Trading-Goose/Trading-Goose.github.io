@@ -1,5 +1,5 @@
 import { alpacaAPI } from './alpaca';
-import { useAuth } from './auth-supabase';
+import { useAuth } from './auth';
 
 export interface PortfolioDataPoint {
   time: string;

@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import MarkdownRenderer from "./MarkdownRenderer";
 import AnalysisDetailModal from "./AnalysisDetailModal";

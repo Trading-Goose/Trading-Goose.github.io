@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/components/AuthProvider";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import LoginPage from "./pages/LoginPage";
@@ -12,14 +13,12 @@ import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import AnalysisRecords from "./pages/AnalysisRecords";
 import RebalanceRecords from "./pages/RebalanceRecords";
-import AlphaVantageTest from "./pages/AlphaVantageTest";
-import AdminInvitations from "./pages/AdminInvitations";
-import AdminInvitationsDebug from "./pages/AdminInvitations-Debug";
+import AdminInvitations from "./pages/AdminInvitationsNew";
+import AdminRoleManager from "./pages/AdminRoleManager";
+import AdminUserManager from "./pages/AdminUserManager";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
-import { supabase, supabaseHelpers } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-supabase";
 
 const queryClient = new QueryClient();
 
@@ -34,9 +33,9 @@ const AppRoutes = () => {
       <Route path="/profile" element={<Profile />} />
       <Route path="/analysis-records" element={<AnalysisRecords />} />
       <Route path="/rebalance-records" element={<RebalanceRecords />} />
-      <Route path="/alpha-vantage-test" element={<AlphaVantageTest />} />
       <Route path="/admin/invitations" element={<AdminInvitations />} />
-      <Route path="/admin/debug" element={<AdminInvitationsDebug />} />
+      <Route path="/admin/roles" element={<AdminRoleManager />} />
+      <Route path="/admin/users" element={<AdminUserManager />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="*" element={<NotFound />} />
@@ -45,20 +44,20 @@ const AppRoutes = () => {
 };
 
 const App = () => {
-  // Auth state is managed in auth-supabase.ts
-  
   // Get basename from Vite's base configuration
   const basename = import.meta.env.BASE_URL || '/';
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter basename={basename}>
-          <AppRoutes />
-        </BrowserRouter>
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter basename={basename}>
+            <AppRoutes />
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };

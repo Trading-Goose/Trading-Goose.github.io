@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { alpacaAPI } from "@/lib/alpaca";
 import { cn } from "@/lib/utils";
 

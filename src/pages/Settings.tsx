@@ -44,7 +44,7 @@ import {
   RefreshCw,
   DollarSign
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { supabaseHelpers, supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import type { ApiSettings } from "@/lib/supabase";

@@ -6,7 +6,7 @@ import { TrendingUp, TrendingDown, X, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { alpacaAPI } from "@/lib/alpaca";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { fetchPortfolioData, fetchStockData, type PortfolioData, type StockData } from "@/lib/portfolio-data";
 
 interface PerformanceChartProps {

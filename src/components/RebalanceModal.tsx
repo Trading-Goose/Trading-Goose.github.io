@@ -27,7 +27,7 @@ import {
   Loader2,
   Eye
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { alpacaAPI } from "@/lib/alpaca";
 import { supabase } from "@/lib/supabase";
 

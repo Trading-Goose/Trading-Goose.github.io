@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw, Loader2, ExternalLink, FileText, BarChart3 } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import AnalysisDetailModal from "@/components/AnalysisDetailModal";

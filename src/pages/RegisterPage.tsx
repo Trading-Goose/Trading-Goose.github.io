@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Loader2, UserPlus, AlertCircle, ArrowLeft, Mail, CheckCircle } from "lucide-react";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 export default function RegisterPage() {

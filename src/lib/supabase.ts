@@ -20,19 +20,43 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
     // Add storage key to avoid conflicts
     storageKey: 'sb-auth-token',
     // Add flow type for better compatibility
-    flowType: 'pkce'
+    flowType: 'pkce',
+    // Store session for offline access
+    storage: {
+      getItem: (key) => {
+        return localStorage.getItem(key);
+      },
+      setItem: (key, value) => {
+        localStorage.setItem(key, value);
+      },
+      removeItem: (key) => {
+        localStorage.removeItem(key);
+      }
+    }
   },
-  // Add global fetch options with timeout
+  // Add global fetch options with timeout and better error handling
   global: {
-    fetch: (url, options = {}) => {
+    fetch: async (url, options = {}) => {
       // Add a timeout to all Supabase requests
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      return fetch(url, {
-        ...options,
-        signal: controller.signal
-      }).finally(() => clearTimeout(timeoutId));
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          // Ensure credentials are included for CORS
+          credentials: 'same-origin',
+          // Add cache control for better performance
+          cache: 'no-cache'
+        });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        console.error('Supabase fetch error:', error);
+        throw error;
+      }
     }
   }
 });

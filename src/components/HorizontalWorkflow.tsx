@@ -30,7 +30,7 @@ import {
   Briefcase
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-supabase"; import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth"; import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { analysisManager } from "@/lib/analysisManager";
 import type { WorkflowStep as EngineWorkflowStep } from "@/lib/tradingEngine";

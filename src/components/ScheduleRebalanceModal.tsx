@@ -33,7 +33,7 @@ import {
   Eye,
   CheckCircle,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { alpacaAPI } from "@/lib/alpaca";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";

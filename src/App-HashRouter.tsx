@@ -12,14 +12,13 @@ import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import AnalysisRecords from "./pages/AnalysisRecords";
 import RebalanceRecords from "./pages/RebalanceRecords";
-import AlphaVantageTest from "./pages/AlphaVantageTest";
 import AdminInvitations from "./pages/AdminInvitations";
 import AdminInvitationsDebug from "./pages/AdminInvitations-Debug";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { supabase, supabaseHelpers } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 
 const queryClient = new QueryClient();
 
@@ -34,7 +33,6 @@ const AppRoutes = () => {
       <Route path="/profile" element={<Profile />} />
       <Route path="/analysis-records" element={<AnalysisRecords />} />
       <Route path="/rebalance-records" element={<RebalanceRecords />} />
-      <Route path="/alpha-vantage-test" element={<AlphaVantageTest />} />
       <Route path="/admin/invitations" element={<AdminInvitations />} />
       <Route path="/admin/debug" element={<AdminInvitationsDebug />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -45,8 +43,8 @@ const AppRoutes = () => {
 };
 
 const App = () => {
-  // Auth state is managed in auth-supabase.ts
-  
+  // Auth state is managed in auth.ts
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

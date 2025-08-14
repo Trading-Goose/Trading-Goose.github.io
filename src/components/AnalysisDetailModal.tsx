@@ -34,7 +34,7 @@ import {
   X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";

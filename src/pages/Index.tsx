@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Shield, Users, Zap } from "lucide-react";
 

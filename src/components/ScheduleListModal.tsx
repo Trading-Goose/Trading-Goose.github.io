@@ -33,7 +33,7 @@ import {
   Settings,
   Eye,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import ScheduleRebalanceModal from "./ScheduleRebalanceModal";

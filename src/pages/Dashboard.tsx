@@ -6,7 +6,7 @@ import RecentTrades from "@/components/RecentTrades";
 import PerformanceChart from "@/components/PerformanceChart";
 import HorizontalWorkflow from "@/components/HorizontalWorkflow";
 import StandaloneWatchlist from "@/components/StandaloneWatchlist";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 
 const Dashboard = () => {
   const navigate = useNavigate();

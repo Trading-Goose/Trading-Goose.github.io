@@ -3,7 +3,7 @@
  * Integrates AI analysis with multiple data sources and fallback mechanism
  */
 
-import { useAuth } from './auth-supabase';
+import { useAuth } from './auth';
 import { DataSourceManager, type UnifiedCandle, type UnifiedQuote } from './dataSourceManager';
 
 // Types

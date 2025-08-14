@@ -17,7 +17,7 @@ import {
   LogOut,
   Lock
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
@@ -25,7 +25,7 @@ import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, apiSettings, logout, isAuthenticated } = useAuth();
+  const { user, profile, apiSettings, logout, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [activityStats, setActivityStats] = useState({
     totalAnalyses: 0,
@@ -192,7 +192,7 @@ export default function ProfilePage() {
                     <User className="h-4 w-4" />
                     Name
                   </div>
-                  <p className="font-medium">{user.name || 'Not set'}</p>
+                  <p className="font-medium">{profile?.name || profile?.full_name || 'Not set'}</p>
                 </div>
 
                 <div className="space-y-2">
@@ -209,12 +209,22 @@ export default function ProfilePage() {
                     Member Since
                   </div>
                   <p className="font-medium">
-                    {new Date(user.created_at).toLocaleDateString('en-US', {
+                    {new Date(profile?.created_at || user.created_at).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
                     })}
                   </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Shield className="h-4 w-4" />
+                    Account Role
+                  </div>
+                  <Badge variant={primaryRole?.name === 'admin' ? 'default' : 'secondary'}>
+                    {primaryRole?.display_name || 'Default User'}
+                  </Badge>
                 </div>
 
                 <div className="space-y-2">

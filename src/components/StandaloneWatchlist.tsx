@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import StockTickerAutocomplete from "@/components/StockTickerAutocomplete";
 import { Plus, X, TrendingUp, TrendingDown, Loader2, RefreshCw, Play, Eye } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { alpacaAPI } from "@/lib/alpaca";
 import AnalysisDetailModal from "./AnalysisDetailModal";
 

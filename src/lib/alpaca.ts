@@ -2,7 +2,7 @@
  * Alpaca Trading API Integration
  */
 
-import { useAuth } from './auth-supabase';
+import { useAuth } from './auth';
 import { supabase } from './supabase';
 
 interface AlpacaConfig {

@@ -32,7 +32,7 @@ import {
     Info,
     RefreshCw
 } from "lucide-react";
-import { useAuth, validateOpenAIKey, validateAnthropicKey, validateOpenRouterKey, validateAlphaVantageKey, validateDeepSeekKey, validateGoogleKey } from "@/lib/auth-supabase";
+import { useAuth, validateOpenAIKey, validateAnthropicKey, validateOpenRouterKey, validateAlphaVantageKey, validateDeepSeekKey, validateGoogleKey } from "@/lib/auth";
 import { supabaseHelpers } from "@/lib/supabase";
 import Header from "@/components/Header";
 import type { ApiSettings } from "@/lib/supabase";

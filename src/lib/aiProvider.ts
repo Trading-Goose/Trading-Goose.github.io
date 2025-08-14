@@ -2,7 +2,7 @@
  * AI Provider wrapper for OpenRouter and other AI services
  */
 
-import { useAuth } from './auth-supabase';
+import { useAuth } from './auth';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';

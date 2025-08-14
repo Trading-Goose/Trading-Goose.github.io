@@ -19,7 +19,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-supabase";
+import { useAuth } from "@/lib/auth";
 import { formatDistanceToNow } from "date-fns";
 import AnalysisDetailModal from "./AnalysisDetailModal";
 import { useToast } from "@/hooks/use-toast";

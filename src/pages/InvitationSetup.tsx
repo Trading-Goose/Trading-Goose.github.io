@@ -7,11 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Lock, CheckCircle, AlertCircle, Eye, EyeOff, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth";
 
 export default function InvitationSetup() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,63 +18,87 @@ export default function InvitationSetup() {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Wait for auth to finish loading
-    if (authLoading) {
-      console.log('Waiting for auth to load...');
-      return;
-    }
-
-    // Check if we have a valid invitation session
-    const checkInvitation = async () => {
-      console.log('Checking invitation status...');
+    const handleInvitation = async () => {
+      console.log('InvitationSetup: Starting...');
       
-      // Check URL for invitation type
+      // Get tokens from URL hash
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const type = hashParams.get('type');
       
+      // Verify this is an invitation
       if (type !== 'invite') {
-        console.log('Not an invitation link');
+        console.error('Not an invitation link');
         setError('Invalid invitation link');
         setTimeout(() => navigate('/login'), 3000);
         return;
       }
 
-      if (!isAuthenticated || !user) {
-        console.log('No authenticated user found');
-        setError('Invalid or expired invitation');
-        setTimeout(() => navigate('/login'), 3000);
-        return;
-      }
-
-      console.log('Valid invitation session for:', user.email);
-
-      // Check if user has already completed setup
-      if (user.user_metadata?.name || user.user_metadata?.full_name) {
-        console.log('User already completed setup, redirecting to dashboard');
-        navigate('/dashboard');
-        return;
-      }
-
-      // Check if this user already has a profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('name, full_name')
-        .eq('id', user.id)
-        .single();
+      // Wait for Supabase to process the tokens (it does this automatically)
+      console.log('Waiting for session to be established...');
+      
+      // Give Supabase time to process the tokens
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      const checkSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log(`Attempt ${attempts + 1}: Session check:`, !!session);
         
-      if (profile?.name || profile?.full_name) {
-        console.log('User already has profile, redirecting to dashboard');
-        navigate('/dashboard');
-        return;
+        if (session && session.user) {
+          console.log('Session established for:', session.user.email);
+          setUserEmail(session.user.email || '');
+          
+          // Check if user already has a name set
+          if (session.user.user_metadata?.name || session.user.user_metadata?.full_name) {
+            console.log('User already completed setup');
+            navigate('/dashboard');
+            return true;
+          }
+          
+          // Check profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name, full_name')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profile?.name || profile?.full_name) {
+            console.log('User already has profile');
+            navigate('/dashboard');
+            return true;
+          }
+          
+          setIsReady(true);
+          return true;
+        }
+        
+        return false;
+      };
+      
+      // Try to get session with retries
+      while (attempts < maxAttempts) {
+        const sessionFound = await checkSession();
+        if (sessionFound) break;
+        
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
-
-      console.log('Ready to show setup form');
+      
+      if (attempts === maxAttempts) {
+        console.error('Failed to establish session after', maxAttempts, 'attempts');
+        setError('Unable to process invitation. Please try again or request a new invitation.');
+        setTimeout(() => navigate('/login'), 3000);
+      }
     };
 
-    checkInvitation();
-  }, [authLoading, isAuthenticated, user, navigate]);
+    handleInvitation();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,8 +138,11 @@ export default function InvitationSetup() {
         return;
       }
 
-      // Update or create profile
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
       if (user) {
+        // Update or create profile
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert({
@@ -132,7 +157,7 @@ export default function InvitationSetup() {
           console.error('Profile update error:', profileError);
         }
 
-        // Update invitation status
+        // Update invitation status if invitation_id is in metadata
         const invitationId = user.user_metadata?.invitation_id;
         if (invitationId) {
           await supabase
@@ -156,13 +181,12 @@ export default function InvitationSetup() {
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Setup error:", err);
-    } finally {
       setIsLoading(false);
     }
   };
 
-  // Show loading while auth is loading
-  if (authLoading) {
+  // Show loading while checking session
+  if (!isReady && !error) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -170,6 +194,7 @@ export default function InvitationSetup() {
             <div className="flex flex-col items-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-muted-foreground">Processing invitation...</p>
+              <p className="text-xs text-muted-foreground">Please wait while we set up your account</p>
             </div>
           </CardContent>
         </Card>
@@ -177,8 +202,8 @@ export default function InvitationSetup() {
     );
   }
 
-  // Show error if not authenticated
-  if (!isAuthenticated || !user) {
+  // Show error state
+  if (error && !isReady) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -187,10 +212,8 @@ export default function InvitationSetup() {
               <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-2">
                 <AlertCircle className="h-6 w-6 text-red-600" />
               </div>
-              <h3 className="text-lg font-semibold">Invalid Invitation</h3>
-              <p className="text-muted-foreground text-center">
-                {error || "This invitation link is invalid or has expired."}
-              </p>
+              <h3 className="text-lg font-semibold">Invitation Error</h3>
+              <p className="text-muted-foreground text-center">{error}</p>
               <p className="text-sm text-muted-foreground">Redirecting to login...</p>
             </div>
           </CardContent>
@@ -236,12 +259,12 @@ export default function InvitationSetup() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            {user?.email && (
+            {userEmail && (
               <div className="space-y-2">
                 <Label>Email</Label>
                 <Input
                   type="email"
-                  value={user.email}
+                  value={userEmail}
                   disabled
                   className="bg-muted"
                 />

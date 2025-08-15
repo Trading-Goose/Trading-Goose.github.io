@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Lock, CheckCircle, AlertCircle, Eye, EyeOff, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 export default function InvitationSetup() {
   const navigate = useNavigate();
@@ -71,10 +72,16 @@ export default function InvitationSetup() {
         }
 
         console.log('Setting session with provided tokens...');
+        
+        // First, clear any existing URL hash to prevent Supabase from re-processing it
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        
         const { data: sessionData, error: setSessionError } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken
         });
+        
+        console.log('setSession result:', { sessionData, setSessionError });
         
         if (setSessionError) {
           console.error('Error setting session:', setSessionError);
@@ -87,28 +94,42 @@ export default function InvitationSetup() {
 
         console.log('Session established successfully');
         console.log('Authenticated as:', sessionData.session.user.email);
-        setUserEmail(sessionData.session.user.email || '');
-
-        // Check if user already completed setup
-        if (sessionData.session.user.user_metadata?.name || sessionData.session.user.user_metadata?.full_name) {
-          console.log('User already has name, redirecting to dashboard');
+        
+        const currentUser = sessionData.session.user;
+        setUserEmail(currentUser.email || '');
+        
+        // Check if user already completed setup directly from the session
+        if (currentUser.user_metadata?.name || currentUser.user_metadata?.full_name) {
+          console.log('User already has name in metadata, redirecting to dashboard');
           navigate('/dashboard');
           return;
         }
 
-        // Check profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('name, full_name')
-          .eq('id', sessionData.session.user.id)
-          .single();
+        // Check profile table to see if user already has a profile
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('name, full_name')
+            .eq('id', currentUser.id)
+            .single();
 
-        if (profile?.name || profile?.full_name) {
-          console.log('User already has profile, redirecting to dashboard');
-          navigate('/dashboard');
-          return;
+          if (!profileError && profile && (profile.name || profile.full_name)) {
+            console.log('User already has profile, redirecting to dashboard');
+            navigate('/dashboard');
+            return;
+          }
+        } catch (err) {
+          console.log('No existing profile found, continuing with setup');
         }
 
+        // Update auth store with the session
+        useAuth.setState({ 
+          session: sessionData.session,
+          user: currentUser,
+          isAuthenticated: true,
+          isLoading: false
+        });
+        
         // Ready to show setup form
         console.log('Ready for account setup');
         setIsProcessing(false);
@@ -207,6 +228,9 @@ export default function InvitationSetup() {
       }
 
       setSuccess(true);
+      
+      // Initialize auth system now that setup is complete
+      await useAuth.getState().initialize();
       
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {

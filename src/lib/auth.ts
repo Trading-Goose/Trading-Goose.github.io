@@ -79,10 +79,17 @@ export const useAuth = create<AuthState>()(
 
       // Initialize authentication
       initialize: async () => {
-        // Prevent re-initialization if already loading or authenticated
+        // Prevent re-initialization if already loading
         const currentState = get();
         if (currentState.isLoading) {
           console.log('🔐 Auth: Already initializing, skipping...');
+          return;
+        }
+        
+        // Check if we're on the invitation setup page
+        const isInvitationSetup = window.location.pathname === '/invitation-setup';
+        if (isInvitationSetup) {
+          console.log('🔐 Auth: On invitation setup page, skipping initialization');
           return;
         }
         
@@ -498,7 +505,17 @@ export const initializeAuth = () => {
     
     const currentState = useAuth.getState();
     
+    // Check if we're on the invitation setup page
+    const isInvitationSetup = window.location.pathname === '/invitation-setup';
+    
     if (event === 'SIGNED_IN') {
+      // Skip initialization if we're on the invitation setup page
+      // The page will handle the session setup
+      if (isInvitationSetup) {
+        console.log('🔐 On invitation setup page, skipping auto-initialization');
+        return;
+      }
+      
       // Only initialize if we're not already authenticated
       if (!currentState.isAuthenticated && session) {
         await useAuth.getState().initialize();

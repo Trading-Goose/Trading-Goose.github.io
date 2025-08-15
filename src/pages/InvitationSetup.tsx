@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function InvitationSetup() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -19,85 +20,101 @@ export default function InvitationSetup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [userEmail, setUserEmail] = useState("");
-  const [isReady, setIsReady] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(true);
 
   useEffect(() => {
-    const handleInvitation = async () => {
-      console.log('InvitationSetup: Starting...');
+    const verifyInvitation = async () => {
+      console.log('Verifying invitation...');
       
-      // Get tokens from URL hash
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const type = hashParams.get('type');
-      
-      // Verify this is an invitation
-      if (type !== 'invite') {
-        console.error('Not an invitation link');
+      // Get the full hash from URL
+      const hash = window.location.hash;
+      if (!hash) {
+        console.error('No hash found in URL');
         setError('Invalid invitation link');
+        setIsVerifying(false);
         setTimeout(() => navigate('/login'), 3000);
         return;
       }
 
-      // Wait for Supabase to process the tokens (it does this automatically)
-      console.log('Waiting for session to be established...');
+      // Parse the hash parameters
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const type = hashParams.get('type');
       
-      // Give Supabase time to process the tokens
-      let attempts = 0;
-      const maxAttempts = 10;
-      
-      const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log(`Attempt ${attempts + 1}: Session check:`, !!session);
-        
-        if (session && session.user) {
-          console.log('Session established for:', session.user.email);
-          setUserEmail(session.user.email || '');
-          
-          // Check if user already has a name set
-          if (session.user.user_metadata?.name || session.user.user_metadata?.full_name) {
-            console.log('User already completed setup');
-            navigate('/dashboard');
-            return true;
-          }
-          
-          // Check profile
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('name, full_name')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (profile?.name || profile?.full_name) {
-            console.log('User already has profile');
-            navigate('/dashboard');
-            return true;
-          }
-          
-          setIsReady(true);
-          return true;
-        }
-        
-        return false;
-      };
-      
-      // Try to get session with retries
-      while (attempts < maxAttempts) {
-        const sessionFound = await checkSession();
-        if (sessionFound) break;
-        
-        attempts++;
-        if (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+      // Check if this is an invitation
+      if (type !== 'invite') {
+        console.error('Not an invitation link, type:', type);
+        setError('Invalid invitation link');
+        setIsVerifying(false);
+        setTimeout(() => navigate('/login'), 3000);
+        return;
       }
-      
-      if (attempts === maxAttempts) {
-        console.error('Failed to establish session after', maxAttempts, 'attempts');
-        setError('Unable to process invitation. Please try again or request a new invitation.');
+
+      try {
+        console.log('Verifying OTP with hash...');
+        
+        // Verify the invitation token using the entire hash
+        const { data, error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: hash.substring(1), // Remove the # character
+          type: 'invite'
+        });
+        
+        console.log('VerifyOtp result:', { data, error: verifyError });
+
+        if (verifyError) {
+          console.error('Failed to verify invitation:', verifyError);
+          setError(verifyError.message || 'Invalid or expired invitation');
+          setIsVerifying(false);
+          setTimeout(() => navigate('/login'), 3000);
+          return;
+        }
+
+        // Now we should have a session
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Session after verify:', session);
+
+        if (!session || !session.user) {
+          console.error('No session after verification');
+          setError('Failed to authenticate. Please try again.');
+          setIsVerifying(false);
+          setTimeout(() => navigate('/login'), 3000);
+          return;
+        }
+
+        console.log('Invitation verified for:', session.user.email);
+        setUserEmail(session.user.email || '');
+
+        // Check if user already has a name set
+        if (session.user.user_metadata?.name || session.user.user_metadata?.full_name) {
+          console.log('User already has name, redirecting to dashboard');
+          navigate('/dashboard');
+          return;
+        }
+
+        // Check profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name, full_name')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile?.name || profile?.full_name) {
+          console.log('User already has profile, redirecting to dashboard');
+          navigate('/dashboard');
+          return;
+        }
+
+        // User needs to complete setup
+        setIsVerifying(false);
+        
+      } catch (err) {
+        console.error('Error during verification:', err);
+        setError('Error processing invitation');
+        setIsVerifying(false);
         setTimeout(() => navigate('/login'), 3000);
       }
     };
 
-    handleInvitation();
+    verifyInvitation();
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -185,16 +202,16 @@ export default function InvitationSetup() {
     }
   };
 
-  // Show loading while checking session
-  if (!isReady && !error) {
+  // Show loading while verifying
+  if (isVerifying) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="py-8">
             <div className="flex flex-col items-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-muted-foreground">Processing invitation...</p>
-              <p className="text-xs text-muted-foreground">Please wait while we set up your account</p>
+              <p className="text-muted-foreground">Verifying invitation...</p>
+              <p className="text-xs text-muted-foreground">Please wait while we authenticate your account</p>
             </div>
           </CardContent>
         </Card>
@@ -203,7 +220,7 @@ export default function InvitationSetup() {
   }
 
   // Show error state
-  if (error && !isReady) {
+  if (error && !userEmail) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">

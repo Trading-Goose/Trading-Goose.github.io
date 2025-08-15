@@ -223,7 +223,7 @@ export default function ProfilePage() {
                     Account Role
                   </div>
                   <Badge variant={profile?.role?.name === 'admin' ? 'default' : 'secondary'}>
-                    {profile?.role?.display_name || 'Default User'}
+                    {profile?.role?.display_name}
                   </Badge>
                 </div>
 

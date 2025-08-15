@@ -7,18 +7,15 @@ export function useRBAC() {
   const { user, isAdmin } = useAuth();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [userRoles, setUserRoles] = useState<any[]>([]);
+  const [roleDetails, setRoleDetails] = useState<Map<string, { name: string; display_name: string; priority: number }>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     async function loadPermissions() {
       if (!user) {
         setPermissions([]);
-        return;
-      }
-
-      // Admins have all permissions
-      if (isAdmin) {
-        setPermissions(['*']);
+        setUserRoles([]);
+        setRoleDetails(new Map());
         return;
       }
 
@@ -31,7 +28,31 @@ export function useRBAC() {
         if (!rolesError && rolesData && rolesData.length > 0) {
           setUserRoles(rolesData);
           const roleIds = rolesData.map((ur: any) => ur.role_id);
-          
+          console.log('[useRBAC] User roles from RPC:', rolesData);
+          console.log('[useRBAC] Role IDs to fetch:', roleIds);
+
+          // Get role details directly from roles table (same as AdminRoleManager)
+          const { data: rolesDetail, error: roleDetailError } = await supabase
+            .from('roles')
+            .select('*')
+            .in('id', roleIds);
+
+          console.log('[useRBAC] Roles detail query result:', { rolesDetail, roleDetailError });
+
+          if (rolesDetail) {
+            const roleMap = new Map();
+            rolesDetail.forEach(role => {
+              console.log('[useRBAC] Adding role to map:', role);
+              roleMap.set(role.id, {
+                name: role.name,
+                display_name: role.display_name,
+                priority: role.priority || 0
+              });
+            });
+            setRoleDetails(roleMap);
+            console.log('[useRBAC] Final role map:', roleMap);
+          }
+
           // Get role permissions
           const { data: rolePerms } = await supabase
             .from('role_permissions')
@@ -40,7 +61,7 @@ export function useRBAC() {
 
           if (rolePerms && rolePerms.length > 0) {
             const permIds = rolePerms.map(rp => rp.permission_id);
-            
+
             // Get permission names
             const { data: perms } = await supabase
               .from('permissions')
@@ -48,17 +69,36 @@ export function useRBAC() {
               .in('id', permIds);
 
             const userPermissions = perms?.map(p => p.name) || [];
-            setPermissions(userPermissions);
+            
+            // Admins have all permissions
+            if (isAdmin) {
+              setPermissions(['*']);
+            } else {
+              setPermissions(userPermissions);
+            }
           } else {
-            setPermissions([]);
+            // No role permissions found
+            if (isAdmin) {
+              setPermissions(['*']);
+            } else {
+              setPermissions([]);
+            }
           }
         } else {
           setUserRoles([]);
-          setPermissions([]);
+          setRoleDetails(new Map());
+          // Even if no roles found, admin still gets all permissions
+          if (isAdmin) {
+            setPermissions(['*']);
+          } else {
+            setPermissions([]);
+          }
         }
       } catch (error) {
         console.error('Error loading permissions:', error);
         setPermissions([]);
+        setUserRoles([]);
+        setRoleDetails(new Map());
       } finally {
         setIsLoading(false);
       }
@@ -70,10 +110,10 @@ export function useRBAC() {
   const hasPermission = (permission: string): boolean => {
     // No user means no permissions
     if (!user) return false;
-    
+
     // Admins have all permissions
     if (isAdmin || permissions.includes('*')) return true;
-    
+
     // Check specific permission
     return permissions.includes(permission);
   };
@@ -87,26 +127,44 @@ export function useRBAC() {
   };
 
   const getPrimaryRole = () => {
-    // Simple role system - just admin and default
+    console.log('[useRBAC] getPrimaryRole called. userRoles:', userRoles, 'roleDetails size:', roleDetails.size);
+    
     if (userRoles && userRoles.length > 0) {
-      const admin = userRoles.find((r: any) => r.role_name === 'admin');
-      if (admin) {
-        return { name: 'admin', display_name: 'Administrator' };
-      }
+      // Sort roles by priority (highest first) to get the primary role
+      const sortedRoles = [...userRoles].sort((a, b) => {
+        const aDetails = roleDetails.get(a.role_id);
+        const bDetails = roleDetails.get(b.role_id);
+
+        const aPriority = aDetails?.priority || 0;
+        const bPriority = bDetails?.priority || 0;
+
+        return bPriority - aPriority; // Higher priority first
+      });
+
+      const primaryRole = sortedRoles[0];
+      console.log('[useRBAC] Primary role selected:', primaryRole);
       
-      // Return the first role (should be default)
-      return {
-        name: userRoles[0].role_name || 'default',
-        display_name: userRoles[0].role_display_name || 'Default User'
+      const roleDetail = roleDetails.get(primaryRole.role_id);
+      console.log('[useRBAC] Role detail from map:', roleDetail);
+
+      if (!roleDetail) {
+        // This should not happen if data was fetched correctly
+        console.error('[useRBAC] Role details not found for role:', primaryRole.role_name, 'Role ID:', primaryRole.role_id);
+        console.error('[useRBAC] Available role details keys:', Array.from(roleDetails.keys()));
+        return null;
+      }
+
+      const result = {
+        name: primaryRole.role_name,
+        display_name: roleDetail.display_name
       };
+      console.log('[useRBAC] Returning role result:', result);
+      return result;
     }
-    
-    // Fallback check for isAdmin flag
-    if (isAdmin) {
-      return { name: 'admin', display_name: 'Administrator' };
-    }
-    
-    return { name: 'default', display_name: 'Default User' };
+
+    console.log('[useRBAC] No user roles found, returning null');
+    // No fallbacks - only use database values
+    return null;
   };
 
   return {

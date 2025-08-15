@@ -83,7 +83,6 @@ export default function Header() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>
                         <div className="flex flex-col gap-1">
-                          <span>My Account</span>
                           <RoleBadge className="mt-1" />
                         </div>
                       </DropdownMenuLabel>

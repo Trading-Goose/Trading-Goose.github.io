@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { 
-  TrendingUp, 
+import {
+  TrendingUp,
   Settings,
   LogIn,
   LogOut,
@@ -26,10 +26,9 @@ import {
 export default function Header() {
   const navigate = useNavigate();
   const { user, profile, isAuthenticated, logout, apiSettings } = useAuth();
-  const { hasPermission } = useRBAC();
-  
+
+
   const hasApiKeys = hasRequiredApiKeys(apiSettings);
-  const canManageInvitations = hasPermission('invitations.create');
 
   return (
     <>
@@ -46,7 +45,7 @@ export default function Header() {
                   <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">AI-Powered Portfolio Management</p>
                 </div>
               </div>
-              
+
               {isAuthenticated && (
                 <div className="hidden md:flex items-center gap-1">
                   <Link to="/dashboard">
@@ -67,18 +66,10 @@ export default function Header() {
                       Rebalance Records
                     </Button>
                   </Link>
-                  <RoleGate permissions={['invitations.create']}>
-                    <Link to="/admin/invitations">
-                      <Button variant="ghost" size="sm">
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Invitations
-                      </Button>
-                    </Link>
-                  </RoleGate>
                 </div>
               )}
             </div>
-            
+
             <div className="flex items-center gap-2 sm:gap-3">
               {isAuthenticated ? (
                 <>
@@ -156,7 +147,7 @@ export default function Header() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  
+
                   <div className="text-right hidden sm:block">
                     <p className="text-sm font-medium text-foreground">System Status</p>
                     <div className="flex items-center gap-2">
@@ -177,7 +168,7 @@ export default function Header() {
                     <UserPlus className="h-4 w-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Sign Up</span>
                   </Button>
-                  
+
                   <div className="text-right hidden sm:block">
                     <p className="text-sm font-medium text-foreground">System Status</p>
                     <div className="flex items-center gap-2">

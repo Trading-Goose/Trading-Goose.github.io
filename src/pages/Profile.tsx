@@ -222,8 +222,8 @@ export default function ProfilePage() {
                     <Shield className="h-4 w-4" />
                     Account Role
                   </div>
-                  <Badge variant={primaryRole?.name === 'admin' ? 'default' : 'secondary'}>
-                    {primaryRole?.display_name || 'Default User'}
+                  <Badge variant={profile?.role?.name === 'admin' ? 'default' : 'secondary'}>
+                    {profile?.role?.display_name || 'Default User'}
                   </Badge>
                 </div>
 

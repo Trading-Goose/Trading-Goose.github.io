@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { useUserManagement } from "@/hooks/useUserManagement";
@@ -9,6 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -49,10 +59,12 @@ import {
   Calendar,
   Clock,
   Shield,
-  Hash
+  Hash,
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminUserManager() {
   const navigate = useNavigate();
@@ -77,11 +89,25 @@ export default function AdminUserManager() {
     cancelChanges,
     hasPendingChanges,
     canManageUsers,
-    refresh
+    refresh,
+    deleteUser
   } = useUserManagement();
 
   const [searchInput, setSearchInput] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Get current user ID on mount
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setCurrentUserId(data.user.id);
+      }
+    });
+  }, []);
 
   // Get unique providers from users
   const uniqueProviders = Array.from(new Set(users.map(u => u.provider).filter(Boolean)));
@@ -98,6 +124,42 @@ export default function AdminUserManager() {
         title: "Success",
         description: `Role changes saved for ${successCount} user(s) on this page`,
       });
+    }
+  };
+
+  const handleDeleteClick = (user: { id: string; email: string; name: string }) => {
+    setUserToDelete(user);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const success = await deleteUser(userToDelete.id);
+      if (success) {
+        toast({
+          title: "Success",
+          description: `User ${userToDelete.email} has been deleted successfully`,
+        });
+        setDeleteConfirmOpen(false);
+        setUserToDelete(null);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete user. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while deleting the user",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -374,12 +436,14 @@ export default function AdminUserManager() {
                         </Button>
                       </TableHead>
                       <TableHead>Role</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {users.map((user, index) => {
                       const globalIndex = (pagination.page - 1) * pagination.pageSize + index + 1;
                       const hasChanged = pendingChanges.has(user.id);
+                      const isCurrentUser = user.id === currentUserId;
                       
                       return (
                         <TableRow key={user.id} className={hasChanged ? 'bg-muted/50' : ''}>
@@ -468,6 +532,21 @@ export default function AdminUserManager() {
                                 Changed
                               </Badge>
                             )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteClick({ 
+                                id: user.id, 
+                                email: user.email, 
+                                name: user.name || 'Unnamed User' 
+                              })}
+                              disabled={isCurrentUser}
+                              title={isCurrentUser ? "Cannot delete your own account" : "Delete user"}
+                            >
+                              <Trash2 className={`h-4 w-4 ${isCurrentUser ? 'text-muted-foreground' : 'text-destructive'}`} />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );
@@ -587,6 +666,54 @@ export default function AdminUserManager() {
             </Card>
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure you want to delete this user?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the user account.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {userToDelete && (
+              <div className="space-y-3 py-4">
+                <div className="rounded-lg bg-muted p-3 space-y-1">
+                  <div><span className="font-semibold">User:</span> {userToDelete.name || 'Unnamed User'}</div>
+                  <div><span className="font-semibold">Email:</span> {userToDelete.email}</div>
+                </div>
+                <div>
+                  <p className="mb-2 text-sm">All associated data will be permanently deleted:</p>
+                  <div className="text-sm text-muted-foreground space-y-1 ml-4">
+                    <div>• Analysis history</div>
+                    <div>• Portfolios and positions</div>
+                    <div>• Rebalance requests</div>
+                    <div>• Trading actions</div>
+                    <div>• Watchlists</div>
+                    <div>• Settings and configurations</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete User'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

@@ -83,59 +83,89 @@ export function useUserManagement() {
       setIsLoading(true);
       setError(null);
 
-      // Use direct queries (RPC functions have permission issues with auth.users table)
-      // This approach works reliably without errors
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Try to use the new function that includes auth details
+      const { data: usersWithAuth, error: authError } = await supabase
+        .rpc('get_users_with_auth_details');
 
-      if (profileError) throw profileError;
+      if (!authError && usersWithAuth) {
+        // Successfully got users with auth details
+        const mappedUsers: UserDetails[] = usersWithAuth.map((user: any) => ({
+          id: user.id,
+          email: user.email || '',
+          name: user.name || '',
+          provider: user.provider || 'email',
+          provider_type: user.provider_type || 'email',
+          last_sign_in_at: user.last_sign_in_at,
+          created_at: user.created_at,
+          email_confirmed_at: user.email_confirmed_at,
+          phone: user.phone,
+          app_metadata: user.app_metadata || {},
+          user_metadata: user.user_metadata || {},
+          current_role_id: user.current_role_id,
+          current_role_name: user.current_role_name
+        }));
 
-      // Get user roles separately
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role_id, is_active')
-        .eq('is_active', true);
+        setUsers(mappedUsers);
+        setFilteredUsers(mappedUsers);
+        setPagination(prev => ({
+          ...prev,
+          totalCount: mappedUsers.length,
+          totalPages: Math.ceil(mappedUsers.length / prev.pageSize)
+        }));
+      } else {
+        // Fallback to the old approach if the new function doesn't exist yet
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (rolesError) throw rolesError;
+        if (profileError) throw profileError;
 
-      // Get all roles
-      const { data: allRoles, error: allRolesError } = await supabase
-        .from('roles')
-        .select('id, name, display_name');
+        // Get user roles separately
+        const { data: userRoles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('user_id, role_id, is_active')
+          .eq('is_active', true);
 
-      if (allRolesError) throw allRolesError;
+        if (rolesError) throw rolesError;
 
-      // Map profiles to user details format
-      const mappedUsers: UserDetails[] = profiles?.map(profile => {
-        const userRole = userRoles?.find(ur => ur.user_id === profile.id);
-        const role = userRole ? allRoles?.find(r => r.id === userRole.role_id) : null;
-        
-        return {
-          id: profile.id,
-          email: profile.email || '',
-          name: profile.name || profile.full_name || '',
-          provider: 'email',
-          provider_type: 'email',
-          last_sign_in_at: null,
-          created_at: profile.created_at,
-          email_confirmed_at: null,
-          phone: null,
-          app_metadata: {},
-          user_metadata: {},
-          current_role_id: userRole?.role_id || null,
-          current_role_name: role?.name || null
-        };
-      }) || [];
+        // Get all roles
+        const { data: allRoles, error: allRolesError } = await supabase
+          .from('roles')
+          .select('id, name, display_name');
 
-      setUsers(mappedUsers);
-      setFilteredUsers(mappedUsers);
-      setPagination(prev => ({
-        ...prev,
-        totalCount: mappedUsers.length,
-        totalPages: Math.ceil(mappedUsers.length / prev.pageSize)
-      }));
+        if (allRolesError) throw allRolesError;
+
+        // Map profiles to user details format
+        const mappedUsers: UserDetails[] = profiles?.map(profile => {
+          const userRole = userRoles?.find(ur => ur.user_id === profile.id);
+          const role = userRole ? allRoles?.find(r => r.id === userRole.role_id) : null;
+          
+          return {
+            id: profile.id,
+            email: profile.email || '',
+            name: profile.name || profile.full_name || '',
+            provider: 'email',
+            provider_type: 'email',
+            last_sign_in_at: null,
+            created_at: profile.created_at,
+            email_confirmed_at: null,
+            phone: null,
+            app_metadata: {},
+            user_metadata: {},
+            current_role_id: userRole?.role_id || null,
+            current_role_name: role?.name || null
+          };
+        }) || [];
+
+        setUsers(mappedUsers);
+        setFilteredUsers(mappedUsers);
+        setPagination(prev => ({
+          ...prev,
+          totalCount: mappedUsers.length,
+          totalPages: Math.ceil(mappedUsers.length / prev.pageSize)
+        }));
+      }
 
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -388,6 +418,46 @@ export function useUserManagement() {
     setPendingChanges(new Map());
   }, []);
 
+  // Delete user
+  const deleteUser = useCallback(async (userId: string) => {
+    // For now, skip permission check since it might not exist yet
+    // We'll rely on the database function to check admin status
+    
+    try {
+      // Call the admin_delete_user function with the new parameter name
+      const { data, error } = await supabase
+        .rpc('admin_delete_user', { p_target_user_id: userId });
+
+      console.log('Delete user response:', { data, error });
+
+      if (error) {
+        console.error('RPC error:', error);
+        throw error;
+      }
+
+      // Check the response from the function
+      if (data && typeof data === 'object') {
+        if (data.success) {
+          // Refresh the user list
+          await fetchUsers();
+          return true;
+        } else {
+          setError(data.error || 'Failed to delete user');
+          return false;
+        }
+      } else {
+        // If data is not an object, something went wrong
+        console.error('Unexpected response format:', data);
+        setError('Unexpected response from server');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete user');
+      return false;
+    }
+  }, [fetchUsers]);
+
   // Initialize
   useEffect(() => {
     if (canManageUsers) {
@@ -432,6 +502,7 @@ export function useUserManagement() {
     canManageUsers,
     
     // Actions
-    refresh: fetchUsers
+    refresh: fetchUsers,
+    deleteUser
   };
 }

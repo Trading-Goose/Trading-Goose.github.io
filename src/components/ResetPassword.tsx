@@ -59,24 +59,44 @@ export default function ResetPassword() {
           return;
         }
 
-        // Check if this is a recovery or invite link
-        if ((type === 'recovery' || type === 'invite') && accessToken) {
-          console.log(`Valid ${type} token found`);
-          // Set invitation flag if this is an invite
-          if (type === 'invite') {
-            setIsInvitation(true);
+        // Handle invitation tokens differently from recovery tokens
+        if (type === 'invite' && accessToken) {
+          console.log('Processing invitation token...');
+          setIsInvitation(true);
+          
+          try {
+            // For invitation tokens, we need to use verifyOtp to establish the session
+            const { data, error } = await supabase.auth.verifyOtp({
+              token_hash: window.location.hash.substring(1),
+              type: 'invite'
+            });
+            
+            if (error) {
+              console.error('Error verifying invitation token:', error);
+              setError('Invalid invitation link. Please request a new invitation.');
+              setCheckingSession(false);
+              return;
+            }
+            
+            console.log('Invitation token verified successfully:', data);
+            setIsValidSession(true);
+            setCheckingSession(false);
+            return;
+          } catch (error) {
+            console.error('Error processing invitation token:', error);
+            setError('Error processing invitation. Please try again.');
+            setCheckingSession(false);
+            return;
           }
-          // The recovery/invite token is valid, allow password reset
+        }
+
+        // Check if this is a recovery link
+        if (type === 'recovery' && accessToken) {
+          console.log('Valid recovery token found');
+          // For recovery tokens, the session should be automatically established
           setIsValidSession(true);
           setCheckingSession(false);
           return;
-        }
-
-        // For invitation tokens, we might need to wait a moment for the session to be established
-        if (type === 'invite') {
-          console.log('Invitation token detected, waiting for session establishment...');
-          // Wait a moment and then check for session
-          await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         // Also check for existing session (for users who are already in password reset mode)
@@ -90,14 +110,13 @@ export default function ResetPassword() {
         });
         
         // If we have a session, we can allow password reset
-        // This happens after the user has clicked the email link and Supabase has created a session
         if (session) {
           console.log('Valid session found, allowing password reset');
           setIsValidSession(true);
         } else {
           // No valid session or recovery token
           console.log('No valid session or recovery token, redirecting to forgot password');
-          setError('Auth session missing!');
+          setError('Invalid or missing reset link. Please request a new one.');
           setTimeout(() => {
             navigate("/forgot-password");
           }, 3000);

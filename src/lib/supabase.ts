@@ -490,7 +490,7 @@ export const supabaseHelpers = {
     try {
       const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
         data: userData || {},
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: `${window.location.origin}/invitation-setup`
       });
 
       if (error) {

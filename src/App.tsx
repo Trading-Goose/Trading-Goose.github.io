@@ -19,6 +19,7 @@ import AdminUserManager from "./pages/AdminUserManager";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import InvitationSetup from "./pages/InvitationSetup";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const AppRoutes = () => {
       <Route path="/admin/users" element={<AdminUserManager />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/invitation-setup" element={<InvitationSetup />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

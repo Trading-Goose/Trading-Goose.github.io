@@ -28,64 +28,89 @@ export default function ResetPassword() {
         // Get the hash from the URL (Supabase sends the token in the hash)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
         const type = hashParams.get('type');
         const errorCode = hashParams.get('error_code');
         const errorDescription = hashParams.get('error_description');
         
         console.log('ResetPassword - Hash params:', { 
           type, 
-          hasToken: !!accessToken,
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
           errorCode,
           errorDescription,
-          fullHash: window.location.hash
+          fullHash: window.location.hash,
+          allParams: Array.from(hashParams.entries())
         });
 
-        // Check for errors first (expired token, etc.)
-        if (errorCode === 'otp_expired' || errorDescription?.includes('expired')) {
-          setError('Your password reset link has expired. Please request a new one.');
-          setCheckingSession(false);
-          setTimeout(() => {
-            navigate("/forgot-password");
-          }, 3000);
-          return;
-        }
-
-        if (errorCode || errorDescription) {
-          setError(errorDescription || 'Invalid reset link. Please request a new one.');
-          setCheckingSession(false);
-          setTimeout(() => {
-            navigate("/forgot-password");
-          }, 3000);
-          return;
-        }
-
-        // Handle invitation tokens differently from recovery tokens
+        // Handle invitation tokens first - they may have different error handling
         if (type === 'invite' && accessToken) {
           console.log('Processing invitation token...');
           setIsInvitation(true);
           
           try {
-            // For invitation tokens, we need to use verifyOtp to establish the session
-            const { data, error } = await supabase.auth.verifyOtp({
-              token_hash: window.location.hash.substring(1),
-              type: 'invite'
+            // For invitation tokens, we need to set the session using the access token
+            // First try to set the session directly
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || ''
             });
             
-            if (error) {
-              console.error('Error verifying invitation token:', error);
-              setError('Invalid invitation link. Please request a new invitation.');
-              setCheckingSession(false);
-              return;
+            if (sessionError) {
+              console.error('Error setting session from invitation token:', sessionError);
+              // If setting session fails, try verifyOtp as fallback
+              const { data, error } = await supabase.auth.verifyOtp({
+                token_hash: window.location.hash.substring(1),
+                type: 'invite'
+              });
+              
+              if (error) {
+                throw error;
+              }
+              
+              console.log('Invitation verified via OTP:', data);
+            } else {
+              console.log('Session set successfully from invitation token:', sessionData);
             }
             
-            console.log('Invitation token verified successfully:', data);
+            // If we got here, session should be established
+            console.log('Invitation token processed successfully');
             setIsValidSession(true);
             setCheckingSession(false);
             return;
-          } catch (error) {
+          } catch (error: any) {
             console.error('Error processing invitation token:', error);
-            setError('Error processing invitation. Please try again.');
+            // Check if it's truly expired
+            if (error?.message?.includes('expired') || error?.message?.includes('OTP')) {
+              setError('Your invitation link has expired. Please request a new invitation.');
+            } else {
+              setError(error?.message || 'Error processing invitation. Please try again.');
+            }
             setCheckingSession(false);
+            setTimeout(() => {
+              navigate("/forgot-password");
+            }, 3000);
+            return;
+          }
+        }
+
+        // Check for errors for non-invite tokens (recovery tokens)
+        if (type !== 'invite') {
+          if (errorCode === 'otp_expired' || errorDescription?.includes('expired')) {
+            setError('Your password reset link has expired. Please request a new one.');
+            setCheckingSession(false);
+            setTimeout(() => {
+              navigate("/forgot-password");
+            }, 3000);
+            return;
+          }
+
+          if (errorCode || errorDescription) {
+            setError(errorDescription || 'Invalid reset link. Please request a new one.');
+            setCheckingSession(false);
+            setTimeout(() => {
+              navigate("/forgot-password");
+            }, 3000);
             return;
           }
         }

@@ -19,7 +19,6 @@ export default function ResetPassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
-  const [isInvitation, setIsInvitation] = useState(false);
 
   useEffect(() => {
     // Handle the password recovery token from the URL
@@ -28,7 +27,6 @@ export default function ResetPassword() {
         // Get the hash from the URL (Supabase sends the token in the hash)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
         const type = hashParams.get('type');
         const errorCode = hashParams.get('error_code');
         const errorDescription = hashParams.get('error_description');
@@ -36,89 +34,34 @@ export default function ResetPassword() {
         console.log('ResetPassword - Hash params:', { 
           type, 
           hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken,
           errorCode,
           errorDescription,
-          fullHash: window.location.hash,
-          allParams: Array.from(hashParams.entries())
+          fullHash: window.location.hash
         });
 
-        // Handle invitation tokens first - they may have different error handling
-        if (type === 'invite' && accessToken) {
-          console.log('Processing invitation token...');
-          setIsInvitation(true);
-          
-          try {
-            // For invitation tokens, we need to set the session using the access token
-            // First try to set the session directly
-            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken || ''
-            });
-            
-            if (sessionError) {
-              console.error('Error setting session from invitation token:', sessionError);
-              // If setting session fails, try verifyOtp as fallback
-              const { data, error } = await supabase.auth.verifyOtp({
-                token_hash: window.location.hash.substring(1),
-                type: 'invite'
-              });
-              
-              if (error) {
-                throw error;
-              }
-              
-              console.log('Invitation verified via OTP:', data);
-            } else {
-              console.log('Session set successfully from invitation token:', sessionData);
-            }
-            
-            // If we got here, session should be established
-            console.log('Invitation token processed successfully');
-            setIsValidSession(true);
-            setCheckingSession(false);
-            return;
-          } catch (error: any) {
-            console.error('Error processing invitation token:', error);
-            // Check if it's truly expired
-            if (error?.message?.includes('expired') || error?.message?.includes('OTP')) {
-              setError('Your invitation link has expired. Please request a new invitation.');
-            } else {
-              setError(error?.message || 'Error processing invitation. Please try again.');
-            }
-            setCheckingSession(false);
-            setTimeout(() => {
-              navigate("/forgot-password");
-            }, 3000);
-            return;
-          }
+        // Check for errors first (expired token, etc.)
+        if (errorCode === 'otp_expired' || errorDescription?.includes('expired')) {
+          setError('Your password reset link has expired. Please request a new one.');
+          setCheckingSession(false);
+          setTimeout(() => {
+            navigate("/forgot-password");
+          }, 3000);
+          return;
         }
 
-        // Check for errors for non-invite tokens (recovery tokens)
-        if (type !== 'invite') {
-          if (errorCode === 'otp_expired' || errorDescription?.includes('expired')) {
-            setError('Your password reset link has expired. Please request a new one.');
-            setCheckingSession(false);
-            setTimeout(() => {
-              navigate("/forgot-password");
-            }, 3000);
-            return;
-          }
-
-          if (errorCode || errorDescription) {
-            setError(errorDescription || 'Invalid reset link. Please request a new one.');
-            setCheckingSession(false);
-            setTimeout(() => {
-              navigate("/forgot-password");
-            }, 3000);
-            return;
-          }
+        if (errorCode || errorDescription) {
+          setError(errorDescription || 'Invalid reset link. Please request a new one.');
+          setCheckingSession(false);
+          setTimeout(() => {
+            navigate("/forgot-password");
+          }, 3000);
+          return;
         }
 
         // Check if this is a recovery link
         if (type === 'recovery' && accessToken) {
           console.log('Valid recovery token found');
-          // For recovery tokens, the session should be automatically established
+          // The recovery token is valid, allow password reset
           setIsValidSession(true);
           setCheckingSession(false);
           return;
@@ -127,16 +70,10 @@ export default function ResetPassword() {
         // Also check for existing session (for users who are already in password reset mode)
         const { data: { session } } = await supabase.auth.getSession();
         console.log('Current session:', session);
-        console.log('Session details:', {
-          hasSession: !!session,
-          accessToken: session?.access_token ? 'Present' : 'Missing',
-          userId: session?.user?.id,
-          userEmail: session?.user?.email
-        });
         
         // If we have a session, we can allow password reset
+        // This happens after the user has clicked the email link and Supabase has created a session
         if (session) {
-          console.log('Valid session found, allowing password reset');
           setIsValidSession(true);
         } else {
           // No valid session or recovery token
@@ -186,19 +123,12 @@ export default function ResetPassword() {
         setError(error.message);
       } else {
         setSuccess(true);
-        
-        if (isInvitation) {
-          // For invitations, keep user logged in and redirect to dashboard
-          setTimeout(() => {
-            navigate("/dashboard");
-          }, 3000);
-        } else {
-          // For password resets, sign out and redirect to login
-          await supabase.auth.signOut();
-          setTimeout(() => {
-            navigate("/login");
-          }, 3000);
-        }
+        // Sign out to ensure clean state
+        await supabase.auth.signOut();
+        // Redirect to login after 3 seconds
+        setTimeout(() => {
+          navigate("/login");
+        }, 3000);
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -245,16 +175,16 @@ export default function ResetPassword() {
             <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
-            <CardTitle>{isInvitation ? 'Account Setup Complete' : 'Password Reset Successful'}</CardTitle>
+            <CardTitle>Password Reset Successful</CardTitle>
             <CardDescription className="mt-2">
-              {isInvitation ? 'Your account has been set up successfully' : 'Your password has been updated successfully'}
+              Your password has been updated successfully
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Alert className="bg-green-50 border-green-200">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                {isInvitation ? 'Welcome to TradingGoose! Redirecting to dashboard...' : 'You can now log in with your new password. Redirecting to login page...'}
+                You can now log in with your new password. Redirecting to login page...
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -267,9 +197,9 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{isInvitation ? 'Set Your Password' : 'Reset Your Password'}</CardTitle>
+          <CardTitle>Reset Your Password</CardTitle>
           <CardDescription>
-            {isInvitation ? 'Welcome! Please set your password to complete your account setup.' : 'Enter your new password below'}
+            Enter your new password below
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -352,12 +282,12 @@ export default function ResetPassword() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isInvitation ? 'Setting password...' : 'Updating password...'}
+                  Updating password...
                 </>
               ) : (
                 <>
                   <Lock className="mr-2 h-4 w-4" />
-                  {isInvitation ? 'Set Password' : 'Reset Password'}
+                  Reset Password
                 </>
               )}
             </Button>

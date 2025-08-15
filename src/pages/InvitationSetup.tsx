@@ -22,8 +22,16 @@ export default function InvitationSetup() {
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+    
     const setupInvitation = async () => {
+      console.log('InvitationSetup component mounted');
+      if (!mounted) return;
+      
+      setCheckingSession(true);
+      
       try {
+        console.log('Starting invitation setup process...');
         // Get the hash from the URL
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
@@ -33,7 +41,8 @@ export default function InvitationSetup() {
         console.log('InvitationSetup - URL params:', { 
           type, 
           hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken
+          hasRefreshToken: !!refreshToken,
+          fullHash: window.location.hash
         });
 
         // Verify this is an invitation token
@@ -44,11 +53,25 @@ export default function InvitationSetup() {
           return;
         }
 
+        // Wait a moment for any ongoing auth initialization
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // Set the session using the tokens
-        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || ''
-        });
+        console.log('Setting session with tokens...');
+        let sessionData, sessionError;
+        try {
+          const result = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || ''
+          });
+          sessionData = result.data;
+          sessionError = result.error;
+        } catch (err) {
+          console.error('Exception during setSession:', err);
+          sessionError = err;
+        }
+
+        console.log('setSession result:', { sessionData, sessionError });
 
         if (sessionError) {
           console.error('Error setting session:', sessionError);
@@ -58,16 +81,66 @@ export default function InvitationSetup() {
           return;
         }
 
-        console.log('Session established:', sessionData);
+        console.log('Session established successfully');
         
         // Get the user's email from the session
-        const { data: { user } } = await supabase.auth.getUser();
+        console.log('Getting user info...');
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        console.log('getUser result:', { user, userError });
+        
+        if (userError || !user) {
+          console.error('Error getting user:', userError);
+          setError('Unable to retrieve user information');
+          setCheckingSession(false);
+          setTimeout(() => navigate('/login'), 3000);
+          return;
+        }
+        
         if (user?.email) {
           setUserEmail(user.email);
           console.log('Invitation for:', user.email);
         }
         
-        setCheckingSession(false);
+        // Check if user has already completed setup (has a name set)
+        console.log('User metadata:', user.user_metadata);
+        if (user.user_metadata?.name || user.user_metadata?.full_name) {
+          console.log('User already completed setup, redirecting to dashboard');
+          navigate('/dashboard');
+          return;
+        }
+        
+        // Check if this user already has a profile
+        console.log('Checking for existing profile...');
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('name, full_name')
+          .eq('id', user.id)
+          .single();
+        
+        console.log('Profile check result:', { profile, profileError });
+          
+        if (profile?.name || profile?.full_name) {
+          console.log('User already has profile, redirecting to dashboard');
+          navigate('/dashboard');
+          return;
+        }
+        
+        // Successfully processed invitation - show setup form
+        console.log('Invitation setup ready for user:', user.email);
+        
+        if (!mounted) {
+          console.log('Component unmounted, aborting');
+          return;
+        }
+        
+        // Add a small delay to ensure state updates properly
+        setTimeout(() => {
+          if (mounted) {
+            console.log('Setting checkingSession to false');
+            setCheckingSession(false);
+          }
+        }, 100);
       } catch (error) {
         console.error('Error processing invitation:', error);
         setError('Error processing invitation. Please request a new one.');
@@ -76,8 +149,22 @@ export default function InvitationSetup() {
       }
     };
 
+    // Add a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (checkingSession) {
+        console.error('Invitation setup timeout - checkingSession still true');
+        setError('Setup timeout. Please try again.');
+        setCheckingSession(false);
+      }
+    }, 15000); // 15 second timeout
+
     setupInvitation();
-  }, [navigate]);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,6 +259,7 @@ export default function InvitationSetup() {
             <div className="flex flex-col items-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-muted-foreground">Processing invitation...</p>
+              <p className="text-xs text-muted-foreground">Setting up your account</p>
             </div>
           </CardContent>
         </Card>

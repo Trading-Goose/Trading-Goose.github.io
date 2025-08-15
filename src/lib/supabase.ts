@@ -167,13 +167,17 @@ export interface ApiSettings {
   default_rebalance_threshold?: number;
   default_min_position_size?: number;
   default_max_position_size?: number;
+  rebalance_threshold?: number;
+  rebalance_min_position_size?: number;
+  rebalance_max_position_size?: number;
   target_stock_allocation?: number;
   target_cash_allocation?: number;
   rebalance_enabled?: boolean;
   rebalance_schedule?: string;
   opportunity_agent_ai?: string;
   opportunity_agent_model?: string;
-  opportunity_agent_max_tokens?: number;
+  opportunity_agent_provider_id?: string;
+  opportunity_max_tokens?: number;
   opportunity_market_range?: string;
   // Trade execution settings
   auto_execute_trades?: boolean;
@@ -486,7 +490,7 @@ export const supabaseHelpers = {
     try {
       const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
         data: userData || {},
-        redirectTo: `${window.location.origin}/dashboard`
+        redirectTo: `${window.location.origin}/reset-password`
       });
 
       if (error) {

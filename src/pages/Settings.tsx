@@ -35,8 +35,6 @@ import {
   EyeOff,
   TrendingUp,
   TrendingDown,
-  ChevronLeft,
-  Database,
   Bot,
   Plus,
   X,
@@ -94,7 +92,7 @@ const checkConfiguredProviders = async (): Promise<{ configured: Record<string, 
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { user, apiSettings, updateApiSettings, isAuthenticated, forceReload, checkSession, isLoading } = useAuth();
+  const { user, apiSettings, updateApiSettings, isAuthenticated, isLoading, initialize } = useAuth();
   
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -113,7 +111,6 @@ export default function SettingsPage() {
   const [aiProviders, setAiProviders] = useState<Array<{id: string, nickname: string, provider: string, apiKey: string}>>([]);
   
   // Default AI settings
-  const [defaultAiProvider, setDefaultAiProvider] = useState<string>(apiSettings?.ai_provider || 'openai');
   const [defaultAiModel, setDefaultAiModel] = useState(apiSettings?.ai_model || 'gpt-4');
   const [defaultCustomModel, setDefaultCustomModel] = useState('');
   
@@ -188,10 +185,10 @@ export default function SettingsPage() {
       isLoading
     });
     
-    // If authenticated but no user data and not loading, force reload
+    // If authenticated but no user data and not loading, initialize again
     if (isAuthenticated && !user && !isLoading) {
-      console.log('Authenticated but no user data, forcing reload...');
-      forceReload();
+      console.log('Authenticated but no user data, initializing...');
+      initialize();
     }
   }, [isAuthenticated, user?.id, isLoading]); // Only depend on auth state, not the full objects
 
@@ -209,8 +206,7 @@ export default function SettingsPage() {
     if (apiSettings && !initialLoadComplete) {
       console.log('Loading initial settings from apiSettings...');
       
-      // Default settings
-      setDefaultAiProvider(apiSettings.ai_provider || 'openai');
+      // Default settings (ai_provider is handled by provider configuration loading)
       
       // Check if the default model is a custom one (not in the preset list)
       const savedDefaultModel = apiSettings.ai_model || 'gpt-4';
@@ -380,10 +376,13 @@ export default function SettingsPage() {
                     is_default: false
                   });
                 } else {
-                  // Just update nickname/provider if API key is masked
-                  const saved = await supabaseHelpers.updateProviderConfiguration(user.id, provider.id, {
+                  // For existing providers without new API key, we need to save again with existing data
+                  // Note: The saveProviderConfiguration method handles updates internally
+                  const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
                     nickname: provider.nickname,
-                    provider: provider.provider
+                    provider: provider.provider,
+                    api_key: provider.apiKey || '', // Keep existing masked key
+                    is_default: false
                   });
                 }
                 
@@ -433,12 +432,6 @@ export default function SettingsPage() {
         const riskProvider = getProviderInfo(riskTeamProviderId);
         const portfolioManagerProvider = getProviderInfo(portfolioManagerProviderId);
         
-        // Get the actual provider objects to access nicknames
-        const analysisProviderObj = aiProviders.find(p => p.id === analysisTeamProviderId);
-        const researchProviderObj = aiProviders.find(p => p.id === researchTeamProviderId);
-        const tradingProviderObj = aiProviders.find(p => p.id === tradingTeamProviderId);
-        const riskProviderObj = aiProviders.find(p => p.id === riskTeamProviderId);
-        const portfolioManagerProviderObj = aiProviders.find(p => p.id === portfolioManagerProviderId);
         
         // Debug logging
         console.log('All AI Providers:', aiProviders);
@@ -534,8 +527,6 @@ export default function SettingsPage() {
         // Rebalance settings - use same logic as agent config tab
         const opportunityAgentProvider = getProviderInfo(opportunityAgentProviderId);
         
-        // Get the actual provider object to access nickname
-        const opportunityProviderObj = aiProviders.find(p => p.id === opportunityAgentProviderId);
         
         // Helper to get model value - same as agent config tab
         const getModelValue = (teamProviderId: string, teamModel: string, customModel: string) => {
@@ -553,7 +544,6 @@ export default function SettingsPage() {
         console.log('Opportunity Agent Saving:', {
           providerId: opportunityAgentProviderId,
           provider: opportunityAgentProvider,
-          providerObj: opportunityProviderObj,
           model: getModelValue(opportunityAgentProviderId, opportunityAgentModel, opportunityCustomModel),
           maxTokens: opportunityMaxTokens
         });
@@ -799,16 +789,17 @@ export default function SettingsPage() {
       // First, wait a bit for persisted state to be restored from localStorage
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Then check session
-      await checkSession();
+      // Then initialize auth to refresh session
+      await initialize();
       setSessionChecked(true);
       
       // Give the auth state time to update after session check
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Now we can safely check authentication
-      const currentState = useAuth.getState();
-      if (!currentState.isAuthenticated && !currentState.isLoading) {
+      // Can't use useAuth.getState() here since useAuth is destructured as a hook above
+      // Use the hook values directly instead
+      if (!isAuthenticated && !isLoading) {
         console.log('Not authenticated after session check, redirecting to home...');
         navigate('/');
       } else {
@@ -1128,7 +1119,7 @@ export default function SettingsPage() {
                   <Button 
                     size="sm" 
                     variant="outline"
-                    onClick={() => forceReload()}
+                    onClick={() => initialize()}
                   >
                     Reload User Data
                   </Button>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { supabase } from "@/lib/supabase";
 
 export default function InvitationSetup() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,80 +19,78 @@ export default function InvitationSetup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [userEmail, setUserEmail] = useState("");
-  const [isVerifying, setIsVerifying] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
-    const verifyInvitation = async () => {
-      console.log('Verifying invitation...');
+    const handleInvitation = async () => {
+      console.log('InvitationSetup: Processing invitation...');
       
-      // Get the full hash from URL
+      // Log the full URL for debugging
+      console.log('Current URL:', window.location.href);
+      console.log('URL Hash:', window.location.hash);
+      
+      // Check if we have tokens in the hash
       const hash = window.location.hash;
       if (!hash) {
         console.error('No hash found in URL');
-        setError('Invalid invitation link');
-        setIsVerifying(false);
-        setTimeout(() => navigate('/login'), 3000);
+        setError('Invalid invitation link - no authentication tokens found');
+        setIsProcessing(false);
+        setTimeout(() => navigate('/login'), 5000);
         return;
       }
 
-      // Parse the hash parameters
+      // Parse hash parameters
       const hashParams = new URLSearchParams(hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
       const type = hashParams.get('type');
       
+      console.log('Token details:', {
+        type,
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        tokenLength: accessToken?.length
+      });
+
       // Check if this is an invitation
       if (type !== 'invite') {
         console.error('Not an invitation link, type:', type);
-        setError('Invalid invitation link');
-        setIsVerifying(false);
-        setTimeout(() => navigate('/login'), 3000);
+        setError('This link is not a valid invitation');
+        setIsProcessing(false);
+        setTimeout(() => navigate('/login'), 5000);
         return;
       }
 
       try {
-        console.log('Verifying OTP with hash...');
+        // For invitation tokens that have been verified by Supabase and redirected here,
+        // we should have access_token and refresh_token in the URL hash.
+        // We just need to set the session using these tokens.
         
-        // Verify the invitation token using the entire hash
-        const { data, error: verifyError } = await supabase.auth.verifyOtp({
-          token_hash: hash.substring(1), // Remove the # character
-          type: 'invite'
+        if (!accessToken || !refreshToken) {
+          throw new Error('Missing authentication tokens. Please request a new invitation.');
+        }
+
+        console.log('Setting session with provided tokens...');
+        const { data: sessionData, error: setSessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
         });
         
-        console.log('VerifyOtp result:', { data, error: verifyError });
-
-        if (verifyError) {
-          console.error('Failed to verify invitation:', verifyError);
-          
-          // Provide more helpful error messages
-          if (verifyError.message?.includes('expired')) {
-            setError('Your invitation link has expired. Please contact your administrator for a new invitation.');
-          } else if (verifyError.message?.includes('invalid')) {
-            setError('This invitation link is invalid or has already been used. Please contact your administrator.');
-          } else {
-            setError(verifyError.message || 'Unable to verify invitation');
-          }
-          
-          setIsVerifying(false);
-          setTimeout(() => navigate('/login'), 5000);
-          return;
+        if (setSessionError) {
+          console.error('Error setting session:', setSessionError);
+          throw new Error(`Failed to authenticate: ${setSessionError.message}`);
+        }
+        
+        if (!sessionData.session || !sessionData.session.user) {
+          throw new Error('Session was not established properly');
         }
 
-        // Now we should have a session
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Session after verify:', session);
+        console.log('Session established successfully');
+        console.log('Authenticated as:', sessionData.session.user.email);
+        setUserEmail(sessionData.session.user.email || '');
 
-        if (!session || !session.user) {
-          console.error('No session after verification');
-          setError('Failed to authenticate. Please try again.');
-          setIsVerifying(false);
-          setTimeout(() => navigate('/login'), 3000);
-          return;
-        }
-
-        console.log('Invitation verified for:', session.user.email);
-        setUserEmail(session.user.email || '');
-
-        // Check if user already has a name set
-        if (session.user.user_metadata?.name || session.user.user_metadata?.full_name) {
+        // Check if user already completed setup
+        if (sessionData.session.user.user_metadata?.name || sessionData.session.user.user_metadata?.full_name) {
           console.log('User already has name, redirecting to dashboard');
           navigate('/dashboard');
           return;
@@ -103,7 +100,7 @@ export default function InvitationSetup() {
         const { data: profile } = await supabase
           .from('profiles')
           .select('name, full_name')
-          .eq('id', session.user.id)
+          .eq('id', sessionData.session.user.id)
           .single();
 
         if (profile?.name || profile?.full_name) {
@@ -112,18 +109,30 @@ export default function InvitationSetup() {
           return;
         }
 
-        // User needs to complete setup
-        setIsVerifying(false);
+        // Ready to show setup form
+        console.log('Ready for account setup');
+        setIsProcessing(false);
         
-      } catch (err) {
-        console.error('Error during verification:', err);
-        setError('Error processing invitation');
-        setIsVerifying(false);
-        setTimeout(() => navigate('/login'), 3000);
+      } catch (err: any) {
+        console.error('Invitation processing error:', err);
+        
+        // Provide user-friendly error messages
+        if (err.message?.includes('expired')) {
+          setError('Your invitation link has expired. Please contact your administrator for a new invitation.');
+        } else if (err.message?.includes('invalid')) {
+          setError('This invitation link is invalid or has already been used. Please contact your administrator.');
+        } else if (err.message?.includes('JWT')) {
+          setError('The invitation token is malformed. Please request a new invitation.');
+        } else {
+          setError(err.message || 'Unable to process invitation. Please try again or contact support.');
+        }
+        
+        setIsProcessing(false);
+        setTimeout(() => navigate('/login'), 5000);
       }
     };
 
-    verifyInvitation();
+    handleInvitation();
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -211,16 +220,16 @@ export default function InvitationSetup() {
     }
   };
 
-  // Show loading while verifying
-  if (isVerifying) {
+  // Show loading while processing
+  if (isProcessing) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="py-8">
             <div className="flex flex-col items-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-muted-foreground">Verifying invitation...</p>
-              <p className="text-xs text-muted-foreground">Please wait while we authenticate your account</p>
+              <p className="text-muted-foreground">Processing invitation...</p>
+              <p className="text-xs text-muted-foreground">Authenticating your account</p>
             </div>
           </CardContent>
         </Card>

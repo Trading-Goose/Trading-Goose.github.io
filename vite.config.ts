@@ -26,5 +26,13 @@ export default defineConfig(({ mode }) => ({
     // Ensure assets are properly referenced with base path
     assetsDir: 'assets',
     sourcemap: false, // Disable sourcemaps for production
+    rollupOptions: {
+      output: {
+        // Ensure JS files have proper extensions
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
+      }
+    }
   },
 }));

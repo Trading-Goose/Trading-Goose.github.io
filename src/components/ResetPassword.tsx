@@ -19,6 +19,7 @@ export default function ResetPassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [isInvitation, setIsInvitation] = useState(false);
 
   useEffect(() => {
     // Handle the password recovery token from the URL
@@ -58,10 +59,14 @@ export default function ResetPassword() {
           return;
         }
 
-        // Check if this is a recovery link
-        if (type === 'recovery' && accessToken) {
-          console.log('Valid recovery token found');
-          // The recovery token is valid, allow password reset
+        // Check if this is a recovery or invite link
+        if ((type === 'recovery' || type === 'invite') && accessToken) {
+          console.log(`Valid ${type} token found`);
+          // Set invitation flag if this is an invite
+          if (type === 'invite') {
+            setIsInvitation(true);
+          }
+          // The recovery/invite token is valid, allow password reset
           setIsValidSession(true);
           setCheckingSession(false);
           return;
@@ -197,9 +202,9 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Reset Your Password</CardTitle>
+          <CardTitle>{isInvitation ? 'Set Your Password' : 'Reset Your Password'}</CardTitle>
           <CardDescription>
-            Enter your new password below
+            {isInvitation ? 'Welcome! Please set your password to complete your account setup.' : 'Enter your new password below'}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -282,12 +287,12 @@ export default function ResetPassword() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating password...
+                  {isInvitation ? 'Setting password...' : 'Updating password...'}
                 </>
               ) : (
                 <>
                   <Lock className="mr-2 h-4 w-4" />
-                  Reset Password
+                  {isInvitation ? 'Set Password' : 'Reset Password'}
                 </>
               )}
             </Button>

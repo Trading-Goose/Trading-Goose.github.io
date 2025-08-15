@@ -128,12 +128,19 @@ export default function ResetPassword() {
         setError(error.message);
       } else {
         setSuccess(true);
-        // Sign out to ensure clean state
-        await supabase.auth.signOut();
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          navigate("/login");
-        }, 3000);
+        
+        if (isInvitation) {
+          // For invitations, keep user logged in and redirect to dashboard
+          setTimeout(() => {
+            navigate("/dashboard");
+          }, 3000);
+        } else {
+          // For password resets, sign out and redirect to login
+          await supabase.auth.signOut();
+          setTimeout(() => {
+            navigate("/login");
+          }, 3000);
+        }
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -180,16 +187,16 @@ export default function ResetPassword() {
             <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
-            <CardTitle>Password Reset Successful</CardTitle>
+            <CardTitle>{isInvitation ? 'Account Setup Complete' : 'Password Reset Successful'}</CardTitle>
             <CardDescription className="mt-2">
-              Your password has been updated successfully
+              {isInvitation ? 'Your account has been set up successfully' : 'Your password has been updated successfully'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Alert className="bg-green-50 border-green-200">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                You can now log in with your new password. Redirecting to login page...
+                {isInvitation ? 'Welcome to TradingGoose! Redirecting to dashboard...' : 'You can now log in with your new password. Redirecting to login page...'}
               </AlertDescription>
             </Alert>
           </CardContent>

@@ -62,9 +62,18 @@ export default function InvitationSetup() {
 
         if (verifyError) {
           console.error('Failed to verify invitation:', verifyError);
-          setError(verifyError.message || 'Invalid or expired invitation');
+          
+          // Provide more helpful error messages
+          if (verifyError.message?.includes('expired')) {
+            setError('Your invitation link has expired. Please contact your administrator for a new invitation.');
+          } else if (verifyError.message?.includes('invalid')) {
+            setError('This invitation link is invalid or has already been used. Please contact your administrator.');
+          } else {
+            setError(verifyError.message || 'Unable to verify invitation');
+          }
+          
           setIsVerifying(false);
-          setTimeout(() => navigate('/login'), 3000);
+          setTimeout(() => navigate('/login'), 5000);
           return;
         }
 

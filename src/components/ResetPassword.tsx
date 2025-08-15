@@ -72,18 +72,32 @@ export default function ResetPassword() {
           return;
         }
 
+        // For invitation tokens, we might need to wait a moment for the session to be established
+        if (type === 'invite') {
+          console.log('Invitation token detected, waiting for session establishment...');
+          // Wait a moment and then check for session
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
         // Also check for existing session (for users who are already in password reset mode)
         const { data: { session } } = await supabase.auth.getSession();
         console.log('Current session:', session);
+        console.log('Session details:', {
+          hasSession: !!session,
+          accessToken: session?.access_token ? 'Present' : 'Missing',
+          userId: session?.user?.id,
+          userEmail: session?.user?.email
+        });
         
         // If we have a session, we can allow password reset
         // This happens after the user has clicked the email link and Supabase has created a session
         if (session) {
+          console.log('Valid session found, allowing password reset');
           setIsValidSession(true);
         } else {
           // No valid session or recovery token
           console.log('No valid session or recovery token, redirecting to forgot password');
-          setError('Invalid or missing reset link. Please request a new one.');
+          setError('Auth session missing!');
           setTimeout(() => {
             navigate("/forgot-password");
           }, 3000);

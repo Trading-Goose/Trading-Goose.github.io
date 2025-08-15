@@ -26,3 +26,4 @@ dist-ssr
 /supabase_old
 *.sh
 deploy-functions.sh
+/.claude

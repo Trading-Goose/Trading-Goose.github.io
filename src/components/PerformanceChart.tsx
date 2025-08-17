@@ -364,7 +364,7 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
       </CardHeader>
       <CardContent>
         <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-9 max-w-5xl mx-auto">
+          <TabsList className="grid w-full grid-cols-8 max-w-5xl mx-auto">
             {periods.map((period) => (
               <TabsTrigger key={period.value} value={period.value} className="text-xs">
                 {period.label}

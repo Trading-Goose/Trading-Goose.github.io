@@ -62,6 +62,7 @@ interface RebalancePosition {
   executed?: boolean;
   orderStatus?: string;
   alpacaOrderId?: string;
+  tradeActionId?: string;
 }
 
 // Helper functions for analysis card rendering
@@ -459,17 +460,18 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
   );
 }
 
-function RebalancePositionCard({ position, onApprove, onReject, isExecuted }: {
+function RebalancePositionCard({ position, onApprove, onReject, isExecuted, orderStatus }: {
   position: RebalancePosition;
   onApprove: () => void;
   onReject: () => void;
   isExecuted: boolean;
+  orderStatus?: { status: string; alpacaOrderId?: string };
 }) {
   const pricePerShare = position.currentShares > 0
     ? position.currentValue / position.currentShares
     : 200; // Default price for new positions
 
-  const isPending = !isExecuted && position.shareChange !== 0;
+  const isPending = orderStatus?.status === 'pending' && position.shareChange !== 0;
   const isHold = position.shareChange === 0;
 
   return (
@@ -499,10 +501,19 @@ function RebalancePositionCard({ position, onApprove, onReject, isExecuted }: {
                 {position.shareChange > 0 ? '+' : ''}{position.shareChange} shares
               </span>
             )}
-            {isExecuted && (
-              <Badge variant="secondary" className="text-xs">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Executed
+            {orderStatus && (
+              <Badge 
+                variant={
+                  orderStatus.status === 'executed' || orderStatus.status === 'approved' ? 'default' :
+                  orderStatus.status === 'rejected' ? 'destructive' :
+                  'secondary'
+                } 
+                className="text-xs"
+              >
+                {orderStatus.status === 'executed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                {orderStatus.status === 'approved' && <CheckCircle className="w-3 h-3 mr-1" />}
+                {orderStatus.status === 'rejected' && <XCircle className="w-3 h-3 mr-1" />}
+                {orderStatus.status.charAt(0).toUpperCase() + orderStatus.status.slice(1)}
               </Badge>
             )}
           </div>
@@ -605,6 +616,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
   const [executedTickers, setExecutedTickers] = useState<Set<string>>(new Set());
   const [rejectedTickers, setRejectedTickers] = useState<Set<string>>(new Set());
+  const [orderStatuses, setOrderStatuses] = useState<Map<string, { status: string, alpacaOrderId?: string }>>(new Map());
 
   // Load rebalance data
   useEffect(() => {
@@ -748,8 +760,64 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           reasoning: position.reasoning || position.reason || position.rationale || '',
           executed: position.executed || false,
           orderStatus: position.order_status || position.orderStatus,
-          alpacaOrderId: position.alpaca_order_id || position.alpacaOrderId
+          alpacaOrderId: position.alpaca_order_id || position.alpacaOrderId,
+          tradeActionId: position.trade_action_id || position.tradeActionId
         }));
+
+        // Fetch order statuses for all positions in this rebalance
+        const { data: tradingActions } = await supabase
+          .from('trading_actions')
+          .select('id, ticker, status, metadata')
+          .eq('rebalance_request_id', rebalanceId)
+          .eq('user_id', user.id);
+        
+        if (tradingActions && tradingActions.length > 0) {
+          const newOrderStatuses = new Map();
+          const newExecutedTickers = new Set<string>();
+          const newRejectedTickers = new Set<string>();
+          
+          // Create a map of ticker to trade action for easier lookup
+          const tradeActionMap = new Map();
+          
+          tradingActions.forEach(action => {
+            const alpacaOrderId = action.metadata?.alpaca_order?.id;
+            const alpacaStatus = action.metadata?.alpaca_order?.status;
+            
+            newOrderStatuses.set(action.ticker, {
+              status: action.status,
+              alpacaOrderId,
+              alpacaStatus
+            });
+            
+            tradeActionMap.set(action.ticker, action.id);
+            
+            // Update executed/rejected sets based on actual status
+            if (action.status === 'executed') {
+              newExecutedTickers.add(action.ticker);
+            } else if (action.status === 'approved') {
+              // Check if Alpaca order is filled
+              if (alpacaStatus === 'filled') {
+                newExecutedTickers.add(action.ticker);
+              }
+            } else if (action.status === 'rejected') {
+              newRejectedTickers.add(action.ticker);
+            }
+          });
+          
+          // Update positions with trade action IDs
+          recommendedPositions.forEach(position => {
+            const tradeActionId = tradeActionMap.get(position.ticker);
+            if (tradeActionId) {
+              position.tradeActionId = tradeActionId;
+            }
+          });
+          
+          if (mounted) {
+            setOrderStatuses(newOrderStatuses);
+            setExecutedTickers(newExecutedTickers);
+            setRejectedTickers(newRejectedTickers);
+          }
+        }
 
         // Build workflow steps based on status and workflow_steps data
         // Handle both array and object formats for workflow_steps
@@ -1181,11 +1249,15 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         description: `Submitting order for ${ticker} to Alpaca...`,
       });
 
-      // Call edge function to execute the rebalance trade
-      const { data, error } = await supabase.functions.invoke('execute-rebalance-trade', {
+      // Call edge function to execute the trade
+      const position = rebalanceData.recommendedPositions.find((p: RebalancePosition) => p.ticker === ticker);
+      if (!position?.tradeActionId) {
+        throw new Error('Trade action ID not found for this position');
+      }
+
+      const { data, error } = await supabase.functions.invoke('execute-trade', {
         body: {
-          rebalanceId: rebalanceData.id,
-          ticker,
+          tradeActionId: position.tradeActionId,
           action: 'approve'
         }
       });
@@ -1195,11 +1267,16 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
       if (data?.success) {
         setExecutedTickers(new Set([...executedTickers, ticker]));
 
+        setOrderStatuses(prev => new Map(prev.set(ticker, {
+          status: 'executed',
+          alpacaOrderId: data.alpacaOrderId
+        })));
+
         // Update the local position data
         const position = rebalanceData.recommendedPositions.find((p: RebalancePosition) => p.ticker === ticker);
         if (position) {
           position.executed = true;
-          position.orderStatus = 'approved';
+          position.orderStatus = 'executed';
           position.alpacaOrderId = data.alpacaOrderId;
         }
 
@@ -1235,11 +1312,15 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
     }
 
     try {
-      // Call edge function to reject the rebalance trade
-      const { data, error } = await supabase.functions.invoke('execute-rebalance-trade', {
+      // Call edge function to reject the trade
+      const position = rebalanceData.recommendedPositions.find((p: RebalancePosition) => p.ticker === ticker);
+      if (!position?.tradeActionId) {
+        throw new Error('Trade action ID not found for this position');
+      }
+
+      const { data, error } = await supabase.functions.invoke('execute-trade', {
         body: {
-          rebalanceId: rebalanceData.id,
-          ticker,
+          tradeActionId: position.tradeActionId,
           action: 'reject'
         }
       });
@@ -1248,6 +1329,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
       if (data?.success) {
         setRejectedTickers(new Set([...rejectedTickers, ticker]));
+        setOrderStatuses(prev => new Map(prev.set(ticker, {
+          status: 'rejected'
+        })));
 
         // Update the local position data
         const position = rebalanceData.recommendedPositions.find((p: RebalancePosition) => p.ticker === ticker);
@@ -1292,15 +1376,17 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
       // Execute all pending orders
       const results = await Promise.allSettled(
-        pendingPositions.map((position: RebalancePosition) =>
-          supabase.functions.invoke('execute-rebalance-trade', {
+        pendingPositions.map((position: RebalancePosition) => {
+          if (!position.tradeActionId) {
+            return Promise.reject(new Error(`Trade action ID not found for ${position.ticker}`));
+          }
+          return supabase.functions.invoke('execute-trade', {
             body: {
-              rebalanceId: rebalanceData.id,
-              ticker: position.ticker,
+              tradeActionId: position.tradeActionId,
               action: 'approve'
             }
-          })
-        )
+          });
+        })
       );
 
       // Process results
@@ -1314,7 +1400,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           successCount++;
           newExecutedTickers.add(position.ticker);
           position.executed = true;
-          position.orderStatus = 'approved';
+          position.orderStatus = 'executed';
           position.alpacaOrderId = result.value.data.alpacaOrderId;
         } else {
           failedCount++;
@@ -1348,7 +1434,10 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
   // Calculate values only if rebalanceData is available
   const pendingPositions = rebalanceData?.recommendedPositions
-    ?.filter((p: RebalancePosition) => p.shareChange !== 0 && !executedTickers.has(p.ticker) && !rejectedTickers.has(p.ticker)) || [];
+    ?.filter((p: RebalancePosition) => {
+      const orderStatus = orderStatuses.get(p.ticker);
+      return p.shareChange !== 0 && orderStatus?.status === 'pending';
+    }) || [];
 
   const totalBuyValue = pendingPositions
     .filter((p: RebalancePosition) => p.action === 'BUY')
@@ -1763,16 +1852,23 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                             {/* Rebalancing Positions */}
                             <div className="space-y-3 mb-6">
                               {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
-                                const isExecuted = executedTickers.has(position.ticker);
-                                const isRejected = rejectedTickers.has(position.ticker);
+                                const orderStatus = orderStatuses.get(position.ticker);
+                                const isExecuted = orderStatus?.status === 'executed' || (orderStatus?.status === 'approved' && (orderStatus as any)?.alpacaStatus === 'filled');
+                                const isRejected = orderStatus?.status === 'rejected';
+                                const isPending = orderStatus?.status === 'pending';
 
+                                // Don't show rejected orders
                                 if (isRejected) return null;
+                                
+                                // Don't show HOLD positions (no change needed)
+                                if (position.shareChange === 0) return null;
 
                                 return (
                                   <RebalancePositionCard
                                     key={position.ticker}
                                     position={position}
                                     isExecuted={isExecuted}
+                                    orderStatus={orderStatus}
                                     onApprove={() => handleApproveOrder(position.ticker)}
                                     onReject={() => handleRejectOrder(position.ticker)}
                                   />

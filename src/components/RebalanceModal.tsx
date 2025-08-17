@@ -210,10 +210,14 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
       }));
 
       // Load Alpaca account and positions
+      console.log('Fetching Alpaca account and positions...');
       const [accountData, positionsData] = await Promise.all([
         alpacaAPI.getAccount(),
         alpacaAPI.getPositions()
       ]);
+
+      console.log('Account data:', accountData);
+      console.log('Positions data:', positionsData);
 
       if (!accountData) {
         throw new Error('Failed to fetch account data from Alpaca');
@@ -222,6 +226,15 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
       // Calculate total portfolio value
       const totalEquity = parseFloat(accountData.equity || '0');
       const cashBalance = parseFloat(accountData.cash || '0');
+
+      console.log(`Account summary: Equity=$${totalEquity}, Cash=$${cashBalance}`);
+      
+      // Check for account/position mismatch
+      if (cashBalance < 0 && (!positionsData || positionsData.length === 0)) {
+        console.warn('⚠️ Account has negative cash (margin) but no positions!');
+        console.warn('This likely means positions are in the other account type (PAPER vs LIVE)');
+        console.warn('Please check your Alpaca settings in the Settings page');
+      }
 
       if (totalEquity === 0) {
         throw new Error('Account has no equity');
@@ -233,6 +246,7 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
 
       // Process positions if any exist
       if (positionsData && Array.isArray(positionsData) && positionsData.length > 0) {
+        console.log(`Processing ${positionsData.length} positions`);
         const processedPositions: RebalancePosition[] = positionsData.map((pos: any) => ({
           ticker: pos.symbol,
           currentShares: parseFloat(pos.qty || '0'),
@@ -292,10 +306,22 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
       positionsToRebalance = [...positionsToRebalance, ...watchlistPositions];
     }
     
-    // Pass portfolio data if available
+    // Pass portfolio data if available, including positions for threshold calculation
     const portfolioData = portfolioTotalValue > 0 ? {
       totalValue: portfolioTotalValue,
-      cashBalance: portfolioCashBalance
+      cashBalance: portfolioCashBalance,
+      // Include actual portfolio positions for threshold calculation
+      positions: positions.map(pos => ({
+        ticker: pos.ticker,
+        value: pos.currentValue,
+        costBasis: pos.currentShares * pos.avgPrice, // Calculate cost basis
+        shares: pos.currentShares,
+        avgPrice: pos.avgPrice,
+        currentPrice: pos.currentValue / pos.currentShares, // Calculate current price
+        // Calculate price change from average
+        priceChangeFromAvg: pos.avgPrice > 0 ? 
+          ((pos.currentValue / pos.currentShares - pos.avgPrice) / pos.avgPrice) * 100 : 0
+      }))
     } : undefined;
     
     onApprove(positionsToRebalance, config, portfolioData);

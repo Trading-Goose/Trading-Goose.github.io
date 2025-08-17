@@ -517,28 +517,19 @@ class AlpacaAPI {
       const todayReturn = currentEquity - lastEquity;
       const todayReturnPct = (todayReturn / lastEquity) * 100;
 
-      // Total return - calculate from positions' unrealized P&L
-      let totalReturn = 0;
-      let totalCost = 0;
+      // Total return - calculate from current equity vs initial investment
+      // The initial investment for paper trading is typically $100,000
+      const initialInvestment = 100000;
       
-      if (positions && positions.length > 0) {
-        for (const position of positions) {
-          totalReturn += parseFloat(position.unrealized_pl);
-          totalCost += parseFloat(position.qty) * parseFloat(position.avg_entry_price);
-        }
-      }
-      
-      // If no positions, use the difference between current equity and starting equity (100000 for paper)
-      if (totalCost === 0) {
-        totalReturn = currentEquity - 100000; // Assuming starting with 100k
-        totalCost = 100000;
-      }
-      
-      const totalReturnPct = totalCost > 0 ? (totalReturn / totalCost) * 100 : 0;
+      // Total return is the difference between current equity and initial investment
+      // This accounts for all gains/losses including closed positions and cash
+      const totalReturn = currentEquity - initialInvestment;
+      const totalReturnPct = (totalReturn / initialInvestment) * 100;
       
       console.log('Return calculations:', {
+        currentEquity,
+        initialInvestment,
         totalReturn,
-        totalCost,
         totalReturnPct,
         todayReturn,
         todayReturnPct,

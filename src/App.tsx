@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import AnalysisRecords from "./pages/AnalysisRecords";
 import RebalanceRecords from "./pages/RebalanceRecords";
+import TradeHistory from "./pages/TradeHistory";
 import AdminInvitations from "./pages/AdminInvitationsNew";
 import AdminRoleManager from "./pages/AdminRoleManager";
 import AdminUserManager from "./pages/AdminUserManager";
@@ -34,6 +35,7 @@ const AppRoutes = () => {
       <Route path="/profile" element={<Profile />} />
       <Route path="/analysis-records" element={<AnalysisRecords />} />
       <Route path="/rebalance-records" element={<RebalanceRecords />} />
+      <Route path="/trade-history" element={<TradeHistory />} />
       <Route path="/admin/invitations" element={<AdminInvitations />} />
       <Route path="/admin/roles" element={<AdminRoleManager />} />
       <Route path="/admin/users" element={<AdminUserManager />} />

@@ -66,6 +66,12 @@ export default function Header() {
                       Rebalance Records
                     </Button>
                   </Link>
+                  <Link to="/trade-history">
+                    <Button variant="ghost" size="sm">
+                      <TrendingUp className="h-4 w-4 mr-2" />
+                      Trade History
+                    </Button>
+                  </Link>
                 </div>
               )}
             </div>
@@ -115,6 +121,12 @@ export default function Header() {
                         <Link to="/rebalance-records" className="flex items-center">
                           <RefreshCw className="h-4 w-4 mr-2" />
                           Rebalance Records
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild className="md:hidden">
+                        <Link to="/trade-history" className="flex items-center">
+                          <TrendingUp className="h-4 w-4 mr-2" />
+                          Trade History
                         </Link>
                       </DropdownMenuItem>
                       <RoleGate permissions={['admin.access']}>

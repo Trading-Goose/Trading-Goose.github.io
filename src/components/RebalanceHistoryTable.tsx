@@ -921,7 +921,11 @@ export default function RebalanceHistoryTable() {
             <AlertDialogCancel onClick={() => setSelectedRebalanceId(null)}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               {deleting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

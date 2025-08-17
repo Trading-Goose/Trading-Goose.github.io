@@ -105,7 +105,6 @@ export default function SettingsPage() {
   const [sessionChecked, setSessionChecked] = useState(false);
 
   // Form state
-  const [alphaVantageApiKey, setAlphaVantageApiKey] = useState(apiSettings?.alpha_vantage_api_key || '');
   
   // AI Provider configurations - Default AI is always first, additional providers follow
   const [aiProviders, setAiProviders] = useState<Array<{id: string, nickname: string, provider: string, apiKey: string}>>([]);
@@ -129,8 +128,8 @@ export default function SettingsPage() {
   const [riskTeamModel, setRiskTeamModel] = useState(apiSettings?.risk_team_model || 'gpt-4');
   const [riskCustomModel, setRiskCustomModel] = useState('');
   
-  // Analysis depth settings (only analysis_depth is in the database)
-  const [analysisDepth, setAnalysisDepth] = useState(apiSettings?.analysis_depth || 3);
+  // News & Social analysis optimization settings
+  const [newsSocialOptimization, setNewsSocialOptimization] = useState(apiSettings?.news_social_optimization || 'normal');
   
   // Historical data time ranges (separate from opportunity agent)
   const [analysisHistoryDays, setAnalysisHistoryDays] = useState(apiSettings?.analysis_history_days || '1M');
@@ -228,7 +227,6 @@ export default function SettingsPage() {
       }
       
       // Provider settings
-      setAlphaVantageApiKey(apiSettings.alpha_vantage_api_key || '');
       
       // Load provider configurations (will be done in separate useEffect)
       
@@ -248,8 +246,8 @@ export default function SettingsPage() {
       
       // NOTE: Team provider IDs will be set after providers are loaded (see separate useEffect below)
       
-      // Analysis depth settings
-      setAnalysisDepth(apiSettings.analysis_depth || 3);
+      // News & Social analysis optimization settings
+      setNewsSocialOptimization(apiSettings.news_social_optimization || 'normal');
       
       // Historical data time ranges (separate from opportunity agent)
       setAnalysisHistoryDays(apiSettings.analysis_history_days || '1M');
@@ -323,24 +321,14 @@ export default function SettingsPage() {
         // Save provider settings
         const newErrors: Record<string, string> = {};
         
-        // Validate Alpha Vantage key via edge function
-        if (alphaVantageApiKey) {
-          const validation = await validateCredential('alpha_vantage', alphaVantageApiKey);
-          if (!validation.valid) {
-            newErrors.alphaVantageApiKey = validation.message;
-          }
-        }
 
         if (Object.keys(newErrors).length > 0) {
           setErrors(newErrors);
           return;
         }
 
-        // Build settings object with Alpha Vantage key
+        // Build settings object
         settingsToSave = {};
-        if (alphaVantageApiKey) {
-          settingsToSave.alpha_vantage_api_key = alphaVantageApiKey;
-        }
         
         // Save each provider
         for (let index = 0; index < aiProviders.length; index++) {
@@ -483,7 +471,7 @@ export default function SettingsPage() {
           portfolio_manager_model: getModelValue(portfolioManagerProviderId, portfolioManagerModel, portfolioManagerCustomModel),
           portfolio_manager_max_tokens: portfolioManagerMaxTokens,
           // Analysis customization
-          analysis_depth: analysisDepth,
+          news_social_optimization: newsSocialOptimization,
           analysis_history_days: analysisHistoryDays, // Separate time range for analysis agents
           // Max tokens for each workflow step
           analysis_max_tokens: analysisMaxTokens,
@@ -1161,56 +1149,6 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Alpha Vantage API Configuration */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Market Data Provider</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="flex items-center gap-2">
-                        Alpha Vantage API Key
-                        {configuredProviders.alpha_vantage && (
-                          <Badge variant="success" className="text-xs">
-                            <Check className="h-3 w-3 mr-1" />
-                            Configured
-                          </Badge>
-                        )}
-                      </Label>
-                      <a 
-                        href="https://www.alphavantage.co/support/#api-key" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline"
-                      >
-                        Get free API key
-                      </a>
-                    </div>
-                    <div className="relative">
-                      <Input
-                        type={showKeys.alphaVantageApiKey ? "text" : "password"}
-                        placeholder="Enter your Alpha Vantage API key"
-                        value={alphaVantageApiKey}
-                        onChange={(e) => setAlphaVantageApiKey(e.target.value)}
-                        className={errors.alphaVantageApiKey ? "border-red-500" : "font-mono text-sm"}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-                        onClick={() => toggleShowKey('alphaVantageApiKey')}
-                      >
-                        {showKeys.alphaVantageApiKey ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                    {errors.alphaVantageApiKey && (
-                      <p className="text-sm text-red-500">{errors.alphaVantageApiKey}</p>
-                    )}
-                  </div>
-                </div>
 
                 {/* Default AI Provider Configuration */}
                 <div className="space-y-4 p-4 border rounded-lg bg-card">
@@ -1536,20 +1474,21 @@ export default function SettingsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Analysis Depth</Label>
-                      <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                        <Slider
-                          value={[analysisDepth]}
-                          onValueChange={(value) => setAnalysisDepth(value[0])}
-                          min={1}
-                          max={5}
-                          step={1}
-                          className="flex-1"
-                        />
-                        <span className="w-12 text-center font-medium">{analysisDepth}</span>
-                      </div>
+                      <Label>News & Social Analysis Optimization</Label>
+                      <Select 
+                        value={newsSocialOptimization} 
+                        onValueChange={setNewsSocialOptimization}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select optimization level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="balanced">Balanced</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <p className="text-xs text-muted-foreground">
-                        1=Basic, 3=Standard, 5=Comprehensive
+                        Normal=Standard news/social analysis, Balanced=More thorough coverage
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -1562,10 +1501,9 @@ export default function SettingsPage() {
                           <SelectValue placeholder="Select time range" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1D">1 Day</SelectItem>
-                          <SelectItem value="1W">1 Week</SelectItem>
                           <SelectItem value="1M">1 Month</SelectItem>
                           <SelectItem value="3M">3 Months</SelectItem>
+                          <SelectItem value="6M">6 Months</SelectItem>
                           <SelectItem value="1Y">1 Year</SelectItem>
                         </SelectContent>
                       </Select>

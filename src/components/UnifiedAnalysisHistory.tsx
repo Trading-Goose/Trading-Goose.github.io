@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Loader2, RefreshCw, Eye, Trash2, MoreVertical, StopCircle, Users, MessageSquare, AlertCircle } from "lucide-react";
+import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Loader2, RefreshCw, Eye, Trash2, MoreVertical, StopCircle, Users, MessageSquare, AlertCircle, Package, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -57,6 +57,13 @@ interface RunningAnalysisItem {
   id: string;
   ticker: string;
   created_at: string;
+}
+
+interface RebalanceAnalysisGroup {
+  id: string;
+  createdAt: string;
+  status: string;
+  analyses: AnalysisHistoryItem[];
 }
 
 export default function UnifiedAnalysisHistory() {
@@ -284,6 +291,7 @@ export default function UnifiedAnalysisHistory() {
 
       setHistory(prev => prev.filter(item => item.id !== analysisId));
       setRunningAnalyses(prev => prev.filter(item => item.id !== analysisId));
+      setCanceledAnalyses(prev => prev.filter(item => item.id !== analysisId));
       
       toast({
         title: "Analysis Deleted",
@@ -365,6 +373,139 @@ export default function UnifiedAnalysisHistory() {
         return MessageSquare;
     }
   };
+
+  const formatFullDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Group analyses by rebalance
+  const groupAnalysesByRebalance = (analyses: AnalysisHistoryItem[]): (AnalysisHistoryItem | RebalanceAnalysisGroup)[] => {
+    const rebalanceGroups = new Map<string, RebalanceAnalysisGroup>();
+    const standaloneAnalyses: AnalysisHistoryItem[] = [];
+
+    analyses.forEach(analysis => {
+      if (analysis.full_analysis?.rebalance_request_id || (analysis as any).rebalance_request_id) {
+        const rebalanceId = analysis.full_analysis?.rebalance_request_id || (analysis as any).rebalance_request_id;
+        if (!rebalanceGroups.has(rebalanceId)) {
+          rebalanceGroups.set(rebalanceId, {
+            id: rebalanceId,
+            createdAt: analysis.created_at,
+            status: 'completed', // Default status
+            analyses: []
+          });
+        }
+        rebalanceGroups.get(rebalanceId)!.analyses.push(analysis);
+      } else {
+        standaloneAnalyses.push(analysis);
+      }
+    });
+
+    // Combine all items with their creation timestamps for unified sorting
+    const allItems: (AnalysisHistoryItem | RebalanceAnalysisGroup)[] = [];
+    
+    // Add rebalance groups
+    Array.from(rebalanceGroups.values()).forEach(group => {
+      // Sort analyses within group by creation time
+      group.analyses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      allItems.push(group);
+    });
+
+    // Add standalone analyses
+    standaloneAnalyses.forEach(analysis => allItems.push(analysis));
+
+    // Sort all items by creation time - use createdAt for groups, created_at for individual analyses
+    return allItems.sort((a, b) => {
+      const dateA = 'createdAt' in a ? new Date(a.createdAt) : new Date(a.created_at);
+      const dateB = 'createdAt' in b ? new Date(b.createdAt) : new Date(b.created_at);
+      return dateB.getTime() - dateA.getTime();
+    });
+  };
+
+  // Render individual analysis card
+  const renderAnalysisCard = (item: AnalysisHistoryItem, isInRebalanceGroup: boolean = false) => (
+    <div
+      key={item.id}
+      className={`border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors ${
+        isInRebalanceGroup ? 'bg-muted/10' : ''
+      }`}
+      onClick={() => viewDetails(item)}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="font-semibold">{item.ticker}</span>
+          <Badge variant={getDecisionVariant(item.decision)}>
+            <span className="flex items-center gap-1">
+              {getDecisionIcon(item.decision)}
+              {item.decision}
+            </span>
+          </Badge>
+          {item.confidence > 0 && (
+            <span className={`text-sm font-medium ${getConfidenceColor(item.confidence)}`}>
+              {item.confidence}% confidence
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+        </span>
+      </div>
+      
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          {item.analysis_date ? 
+            `Analysis date: ${new Date(item.analysis_date).toLocaleDateString()}` :
+            `Started: ${new Date(item.created_at).toLocaleDateString()}`
+          }
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="border border-slate-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              viewDetails(item);
+            }}
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            View Details
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 border border-slate-700"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedAnalysisId(item.id);
+                  setSelectedAnalysisTicker(item.ticker);
+                  setShowDeleteDialog(true);
+                }}
+                className="text-red-500 hover:text-white hover:bg-red-600"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -489,77 +630,40 @@ export default function UnifiedAnalysisHistory() {
                   {runningAnalyses.length > 0 && (
                     <h3 className="text-sm font-medium text-muted-foreground mb-3">Completed Analyses</h3>
                   )}
-                  {history.map((item) => (
-                <div
-                  key={item.id}
-                  className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => viewDetails(item)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold">{item.ticker}</span>
-                      <Badge variant={getDecisionVariant(item.decision)}>
-                        <span className="flex items-center gap-1">
-                          {getDecisionIcon(item.decision)}
-                          {item.decision}
-                        </span>
-                      </Badge>
-                      <span className={`text-sm font-medium ${getConfidenceColor(item.confidence)}`}>
-                        {item.confidence}% confidence
-                      </span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">
-                      Analysis date: {new Date(item.analysis_date).toLocaleDateString()}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="border border-slate-700"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          viewDetails(item);
-                        }}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 border border-slate-700"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedAnalysisId(item.id);
-                              setSelectedAnalysisTicker(item.ticker);
-                              setShowDeleteDialog(true);
-                            }}
-                            className="text-red-500 hover:text-white hover:bg-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                </div>
-                  ))}
+                  {groupAnalysesByRebalance(history).map((item, index) => {
+                    // Check if it's a rebalance group
+                    if ('analyses' in item) {
+                      const group = item as RebalanceAnalysisGroup;
+                      return (
+                        <div key={`rebalance-${group.id}`} className="space-y-3">
+                          {/* Rebalance Group Header */}
+                          <div className="p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-5 w-5 text-primary" />
+                                <span className="font-semibold">Rebalance Analysis Session</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {group.analyses.length} analysis{group.analyses.length !== 1 ? 'es' : ''}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                                {formatFullDate(group.createdAt)}
+                              </div>
+                            </div>
+                            
+                            {/* Rebalance Analyses */}
+                            <div className="space-y-3">
+                              {group.analyses.map(analysis => renderAnalysisCard(analysis, true))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      // Standalone analysis
+                      return renderAnalysisCard(item as AnalysisHistoryItem);
+                    }
+                  })}
                 </div>
               )}
 
@@ -728,76 +832,40 @@ export default function UnifiedAnalysisHistory() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {history.map((item) => (
-                    <div
-                      key={item.id}
-                      className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => viewDetails(item)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold">{item.ticker}</span>
-                          <Badge variant={getDecisionVariant(item.decision)}>
-                            <span className="flex items-center gap-1">
-                              {getDecisionIcon(item.decision)}
-                              {item.decision}
-                            </span>
-                          </Badge>
-                          <span className={`text-sm font-medium ${getConfidenceColor(item.confidence)}`}>
-                            {item.confidence}% confidence
-                          </span>
+                  {groupAnalysesByRebalance(history).map((item, index) => {
+                    // Check if it's a rebalance group
+                    if ('analyses' in item) {
+                      const group = item as RebalanceAnalysisGroup;
+                      return (
+                        <div key={`rebalance-${group.id}`} className="space-y-3">
+                          {/* Rebalance Group Header */}
+                          <div className="p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-5 w-5 text-primary" />
+                                <span className="font-semibold">Rebalance Analysis Session</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {group.analyses.length} analysis{group.analyses.length !== 1 ? 'es' : ''}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                                {formatFullDate(group.createdAt)}
+                              </div>
+                            </div>
+                            
+                            {/* Rebalance Analyses */}
+                            <div className="space-y-3">
+                              {group.analyses.map(analysis => renderAnalysisCard(analysis, true))}
+                            </div>
+                          </div>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          Analysis date: {new Date(item.analysis_date).toLocaleDateString()}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              viewDetails(item);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View Details
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 border border-slate-700"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedAnalysisId(item.id);
-                                  setSelectedAnalysisTicker(item.ticker);
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    } else {
+                      // Standalone analysis
+                      return renderAnalysisCard(item as AnalysisHistoryItem);
+                    }
+                  })}
                 </div>
               )}
             </TabsContent>

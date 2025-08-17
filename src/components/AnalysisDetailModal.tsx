@@ -31,7 +31,8 @@ import {
   DollarSign,
   ArrowRight,
   CheckSquare,
-  X
+  X,
+  PieChart
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -45,6 +46,7 @@ import MarkdownRenderer from "./MarkdownRenderer";
 import MessageRenderer from "./MessageRenderer";
 import { formatDistanceToNow } from "date-fns";
 import { getCompleteMessages } from "@/lib/getCompleteMessages";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface AnalysisDetailModalProps {
   ticker?: string;
@@ -73,9 +75,12 @@ function TradeOrderCard({
   // Use the actual trade order data if available (from trading_actions table)
   const tradeOrder = analysisData.tradeOrder;
   
-  // Fallback to portfolio manager's final decision if no trade order exists yet
+  // For individual analysis, only use Portfolio Manager's finalDecision (not Risk Manager's decision)
   const portfolioManagerInsight = analysisData.agent_insights?.portfolioManager;
-  const finalDecision = tradeOrder || portfolioManagerInsight?.finalDecision || portfolioManagerInsight;
+  
+  // Only use trade order data if Portfolio Manager actually created one (not HOLD)
+  // Otherwise use Portfolio Manager's final decision data
+  const finalDecision = portfolioManagerInsight?.finalDecision;
   
   // Extract allocation values from various possible locations
   // First check if we have the data from the trade order (fetched from database)
@@ -142,32 +147,50 @@ function TradeOrderCard({
     afterValue
   });
   
-  // Don't show if HOLD decision
-  if (decision === 'HOLD') {
+  // Check Portfolio Manager's final decision action (not Risk Manager's decision)
+  const portfolioManagerAction = portfolioManagerInsight?.finalDecision?.action || 
+                                  portfolioManagerInsight?.action ||
+                                  tradeOrder?.action;
+  
+  // Don't show trade order if Portfolio Manager decided HOLD
+  if (portfolioManagerAction === 'HOLD') {
     return (
       <div className="rounded-lg border bg-muted/20 p-4 opacity-60">
         <div className="flex items-center gap-3">
           <Badge variant="outline">HOLD</Badge>
-          <span className="text-sm text-muted-foreground">No action required - maintaining current position</span>
+          <span className="text-sm text-muted-foreground">Portfolio Manager decided to hold - no action required</span>
         </div>
       </div>
     );
   }
   
-  if (!finalDecision && confidence < 60) {
-    return (
-      <div className="rounded-lg border bg-orange-500/5 border-orange-500/20 p-4">
-        <div className="flex items-center gap-3">
-          <AlertCircle className="w-4 h-4 text-orange-500" />
-          <span className="text-sm">No trade order generated (confidence below 60% threshold)</span>
+  // Show different states based on Portfolio Manager's decision status
+  if (!finalDecision) {
+    if (confidence < 60) {
+      return (
+        <div className="rounded-lg border bg-orange-500/5 border-orange-500/20 p-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-4 h-4 text-orange-500" />
+            <span className="text-sm">No trade order generated (confidence below 60% threshold)</span>
+          </div>
         </div>
-      </div>
-    );
+      );
+    } else {
+      // High confidence but Portfolio Manager hasn't made final decision yet
+      return (
+        <div className="rounded-lg border bg-blue-500/5 border-blue-500/20 p-4">
+          <div className="flex items-center gap-3">
+            <Clock className="w-4 h-4 text-blue-500" />
+            <span className="text-sm">Waiting for Portfolio Manager to finalize position sizing and create trade order</span>
+          </div>
+        </div>
+      );
+    }
   }
   
   // Check the actual order status from database
   const orderStatus = tradeOrder?.status;
-  const isPending = orderStatus === 'pending' || (!orderStatus && !isExecuted && decision !== 'HOLD');
+  const isPending = orderStatus === 'pending';
   const isApproved = orderStatus === 'approved';
   const isRejected = orderStatus === 'rejected';
   const isOrderExecuted = orderStatus === 'executed' || isExecuted;
@@ -194,7 +217,7 @@ function TradeOrderCard({
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="font-semibold text-lg">{ticker}</h4>
-                <Badge variant={decision === 'BUY' ? 'secondary' : 'destructive'}>
+                <Badge variant={decision === 'BUY' ? 'default' : 'destructive'}>
                   {decision === 'BUY' ? (
                     <TrendingUp className="w-3 h-3 mr-1" />
                   ) : (
@@ -469,8 +492,15 @@ function WorkflowStepsLayout({ analysisData, onApproveOrder, onRejectOrder, isOr
     }
     
     // Default behavior for other agents
-    if (analysisData.agent_insights && analysisData.agent_insights[agentKey]) {
-      return 'completed';
+    if (analysisData.agent_insights) {
+      // Check for error conditions first
+      if (analysisData.agent_insights[agentKey + '_error']) {
+        return 'failed';
+      }
+      // Then check for normal completion
+      if (analysisData.agent_insights[agentKey]) {
+        return 'completed';
+      }
     }
     // Check in workflow steps if available
     if (analysisData.workflowSteps) {
@@ -496,51 +526,62 @@ function WorkflowStepsLayout({ analysisData, onApproveOrder, onRejectOrder, isOr
   return (
     <div className="space-y-6">
       {/* Trade Decision Summary Card - Show at top if decision is made */}
-      {analysisData.decision && analysisData.decision !== 'CANCELED' && analysisData.status === 'completed' && (
-        <div className="rounded-lg border bg-gradient-to-r from-blue-500/5 to-primary/5 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-primary/10 rounded-lg">
-                <Activity className="w-6 h-6 text-primary" />
+      {(() => {
+        // For individual analysis, show Portfolio Manager's decision; for rebalance, show Risk Manager's decision
+        const isRebalanceAnalysis = !!analysisData.rebalance_request_id;
+        const displayDecision = isRebalanceAnalysis 
+          ? analysisData.decision 
+          : (analysisData.agent_insights?.portfolioManager?.finalDecision?.action || analysisData.decision);
+        
+        const shouldShow = displayDecision && displayDecision !== 'CANCELED' && analysisData.status === 'completed';
+        
+        return shouldShow && (
+          <div className="rounded-lg border bg-gradient-to-r from-blue-500/5 to-primary/5 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <Activity className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {isRebalanceAnalysis ? 'Analysis Complete - Decision Ready' : 'Portfolio Manager Decision Ready'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {displayDecision === 'HOLD' 
+                      ? 'Recommendation: Maintain current position' 
+                      : `Recommendation: ${displayDecision} ${analysisData.ticker}`}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold">Analysis Complete - Decision Ready</h3>
-                <p className="text-sm text-muted-foreground">
-                  {analysisData.decision === 'HOLD' 
-                    ? 'Recommendation: Maintain current position' 
-                    : `Recommendation: ${analysisData.decision} ${analysisData.ticker}`}
-                </p>
+              <div className="flex items-center gap-3">
+                <Badge 
+                  variant={
+                    displayDecision === 'BUY' ? 'default' : 
+                    displayDecision === 'SELL' ? 'destructive' : 
+                    'secondary'
+                  } 
+                  className="text-sm px-3 py-1"
+                >
+                  {displayDecision === 'BUY' && <TrendingUp className="w-4 h-4 mr-1" />}
+                  {displayDecision === 'SELL' && <TrendingDown className="w-4 h-4 mr-1" />}
+                  {displayDecision === 'HOLD' && <Activity className="w-4 h-4 mr-1" />}
+                  {displayDecision}
+                </Badge>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Confidence</p>
+                  <p className={`text-lg font-bold ${
+                    analysisData.confidence >= 80 ? 'text-green-600 dark:text-green-400' :
+                    analysisData.confidence >= 60 ? 'text-yellow-600 dark:text-yellow-400' :
+                    'text-red-600 dark:text-red-400'
+                  }`}>
+                    {analysisData.confidence}%
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge 
-                variant={
-                  analysisData.decision === 'BUY' ? 'default' : 
-                  analysisData.decision === 'SELL' ? 'destructive' : 
-                  'secondary'
-                } 
-                className="text-sm px-3 py-1"
-              >
-                {analysisData.decision === 'BUY' && <TrendingUp className="w-4 h-4 mr-1" />}
-                {analysisData.decision === 'SELL' && <TrendingDown className="w-4 h-4 mr-1" />}
-                {analysisData.decision === 'HOLD' && <Activity className="w-4 h-4 mr-1" />}
-                {analysisData.decision}
-              </Badge>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground">Confidence</p>
-                <p className={`text-lg font-bold ${
-                  analysisData.confidence >= 80 ? 'text-green-600 dark:text-green-400' :
-                  analysisData.confidence >= 60 ? 'text-yellow-600 dark:text-yellow-400' :
-                  'text-red-600 dark:text-red-400'
-                }`}>
-                  {analysisData.confidence}%
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Quick Stats if available */}
-          {analysisData.agent_insights?.portfolioManager?.finalDecision && analysisData.decision !== 'HOLD' && (
+            
+            {/* Quick Stats if available */}
+            {analysisData.agent_insights?.portfolioManager?.finalDecision && displayDecision !== 'HOLD' && (
             <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border/50">
               <div>
                 <p className="text-xs text-muted-foreground">Order Size</p>
@@ -586,7 +627,8 @@ function WorkflowStepsLayout({ analysisData, onApproveOrder, onRejectOrder, isOr
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
       
       {workflowSteps.map((step, stepIndex) => {
         const Icon = step.icon;
@@ -1310,45 +1352,55 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
           ) : analysisData ? (
             <>
               {/* Analysis Summary Bar */}
-              {(analysisData.decision || analysisData.confidence !== undefined || analysisData.startedAt) && (
-                <div className="px-6 py-4 bg-muted/50 border-b">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      {analysisData.confidence !== undefined && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">Confidence:</span>
-                          <span className={`font-semibold ${getConfidenceColor(analysisData.confidence)}`}>
-                            {analysisData.confidence}%
-                          </span>
-                        </div>
+              {(() => {
+                // Determine which decision to display based on analysis type
+                const isRebalanceAnalysis = !!analysisData.rebalance_request_id;
+                const displayDecision = isRebalanceAnalysis 
+                  ? analysisData.decision 
+                  : (analysisData.agent_insights?.portfolioManager?.finalDecision?.action || analysisData.decision);
+                
+                const shouldShow = displayDecision || analysisData.confidence !== undefined || analysisData.startedAt;
+                
+                return shouldShow && (
+                  <div className="px-6 py-4 bg-muted/50 border-b">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-6">
+                        {analysisData.confidence !== undefined && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Confidence:</span>
+                            <span className={`font-semibold ${getConfidenceColor(analysisData.confidence)}`}>
+                              {analysisData.confidence}%
+                            </span>
+                          </div>
+                        )}
+                        {analysisData.startedAt && (
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              Started {formatDistanceToNow(new Date(analysisData.startedAt))} ago
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {analysisData.completedAt && (
+                        <span className="text-sm text-muted-foreground">
+                          Completed in {Math.round((new Date(analysisData.completedAt).getTime() - new Date(analysisData.startedAt).getTime()) / 1000)}s
+                        </span>
                       )}
-                      {analysisData.startedAt && (
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">
-                            Started {formatDistanceToNow(new Date(analysisData.startedAt))} ago
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {analysisData.completedAt && (
-                      <span className="text-sm text-muted-foreground">
-                        Completed in {Math.round((new Date(analysisData.completedAt).getTime() - new Date(analysisData.startedAt).getTime()) / 1000)}s
-                      </span>
-                    )}
-                    
-                      {(analysisData?.decision || analysisData?.status === 'canceled') && (
-                        <Badge 
-                          variant={getDecisionVariant(analysisData.status === 'canceled' ? 'CANCELED' : analysisData.decision)} 
-                          className="text-sm px-3 py-1 flex items-center gap-1"
-                        >
-                          {getDecisionIcon(analysisData.status === 'canceled' ? 'CANCELED' : analysisData.decision)}
-                          {analysisData.status === 'canceled' ? 'CANCELED' : analysisData.decision}
-                        </Badge>
+                      
+                        {(displayDecision || analysisData?.status === 'canceled') && (
+                          <Badge 
+                            variant={getDecisionVariant(analysisData.status === 'canceled' ? 'CANCELED' : displayDecision)} 
+                            className="text-sm px-3 py-1 flex items-center gap-1"
+                          >
+                            {getDecisionIcon(analysisData.status === 'canceled' ? 'CANCELED' : displayDecision)}
+                            {analysisData.status === 'canceled' ? 'CANCELED' : displayDecision}
+                          </Badge>
                       )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               <Tabs defaultValue={isLiveAnalysis ? "actions" : "insights"} className="flex-1">
                 <div className="px-6 pt-4 pb-4">
@@ -1755,27 +1807,60 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                               );
                             }
                             
-                            // Special rendering for Market Analyst with data
-                            if (agent === 'marketAnalyst' && additionalData) {
+                            // Special rendering for Market Analyst with data, historical chart, and indicators
+                            if (agent === 'marketAnalyst') {
+                              // Get historical data and indicators from the insight
+                              const marketHistorical = insight?.market_historical || [];
+                              const technicalIndicators = insight?.technical_indicators || {};
+                              const analysisRange = insight?.data?.analysisRange || additionalData?.analysisRange;
+                              const dataPoints = insight?.data?.dataPoints || additionalData?.dataPoints;
+                              
+                              // Format data for candlestick chart
+                              const chartData = marketHistorical.map((price: any, index: number) => ({
+                                date: price.date,
+                                dateShort: new Date(price.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                open: price.open,
+                                high: price.high,
+                                low: price.low,
+                                close: price.close,
+                                volume: price.volume,
+                                // Add indicators at same index
+                                sma_20: technicalIndicators.sma_20?.[index],
+                                sma_50: technicalIndicators.sma_50?.[index],
+                                sma_200: technicalIndicators.sma_200?.[index],
+                                ema_12: technicalIndicators.ema_12?.[index],
+                                ema_26: technicalIndicators.ema_26?.[index],
+                                rsi: technicalIndicators.rsi?.[index],
+                                macd: technicalIndicators.macd?.[index],
+                                macd_signal: technicalIndicators.macd_signal?.[index],
+                                bollinger_upper: technicalIndicators.bollinger_upper?.[index],
+                                bollinger_lower: technicalIndicators.bollinger_lower?.[index]
+                              })).filter(d => d.close); // Filter out any invalid data points
+                              
                               return (
                                 <Card key={agent} className="overflow-hidden">
                                   <CardHeader className="bg-muted/30">
                                     <CardTitle className="text-base flex items-center gap-2">
                                       <BarChart3 className="w-4 h-4" />
                                       Market Analyst
+                                      {analysisRange && (
+                                        <Badge variant="outline" className="ml-2 text-xs">
+                                          {analysisRange} • {dataPoints} points
+                                        </Badge>
+                                      )}
                                     </CardTitle>
                                   </CardHeader>
-                                  <CardContent className="pt-4 space-y-4">
-                                    {/* Display market data if available */}
+                                  <CardContent className="pt-4 space-y-6">
+                                    {/* Display market data summary if available */}
                                     {additionalData && (
-                                      <div className="grid grid-cols-2 gap-3 p-3 bg-muted/50 rounded-lg text-sm">
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/50 rounded-lg text-sm">
                                         {additionalData.currentPrice && (
                                           <div>
                                             <span className="text-muted-foreground">Price:</span>
                                             <span className="ml-2 font-medium">${additionalData.currentPrice?.toFixed(2)}</span>
                                           </div>
                                         )}
-                                        {additionalData.dayChangePercent && (
+                                        {additionalData.dayChangePercent !== undefined && additionalData.dayChangePercent !== null && (
                                           <div>
                                             <span className="text-muted-foreground">Change:</span>
                                             <span className={`ml-2 font-medium ${
@@ -1791,15 +1876,318 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                                             <span className="ml-2 font-medium">{(additionalData.volume / 1000000).toFixed(2)}M</span>
                                           </div>
                                         )}
-                                        {additionalData.marketCap && (
+                                        {dataPoints && (
                                           <div>
-                                            <span className="text-muted-foreground">Market Cap:</span>
-                                            <span className="ml-2 font-medium">${(additionalData.marketCap / 1000000000).toFixed(2)}B</span>
+                                            <span className="text-muted-foreground">Data Range:</span>
+                                            <span className="ml-2 font-medium">{analysisRange || 'Custom'}</span>
                                           </div>
                                         )}
                                       </div>
                                     )}
-                                    <MarkdownRenderer content={insightContent} />
+                                    
+                                    {/* Historical Price Chart */}
+                                    {chartData.length > 0 && (
+                                      <div className="space-y-4">
+                                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                                          <BarChart3 className="w-4 h-4" />
+                                          Historical Price & Moving Averages
+                                        </h4>
+                                        <div className="h-64 w-full">
+                                          <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={chartData}>
+                                              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                                              <XAxis 
+                                                dataKey="dateShort" 
+                                                fontSize={10}
+                                                tick={{ fontSize: 10 }}
+                                                interval={Math.floor(chartData.length / 6)}
+                                              />
+                                              <YAxis 
+                                                domain={(() => {
+                                                  const values = chartData.map(d => d.close).filter(v => v != null);
+                                                  if (values.length === 0) return ['dataMin', 'dataMax'];
+                                                  const min = Math.min(...values);
+                                                  const max = Math.max(...values);
+                                                  const margin = (max - min) * 0.10;
+                                                  return [min - margin, max + margin];
+                                                })()}
+                                                fontSize={10}
+                                                tick={{ fontSize: 10 }}
+                                              />
+                                              <Tooltip 
+                                                contentStyle={{
+                                                  backgroundColor: '#1f2937',
+                                                  border: '1px solid #374151',
+                                                  borderRadius: '8px',
+                                                  color: '#f9fafb',
+                                                  fontSize: '12px',
+                                                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+                                                }}
+                                                labelStyle={{ color: '#d1d5db', fontWeight: 'bold' }}
+                                                formatter={(value: any, name: string) => [
+                                                  typeof value === 'number' ? `$${value.toFixed(2)}` : value,
+                                                  name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                                ]}
+                                                labelFormatter={(label: string) => `Date: ${label}`}
+                                              />
+                                              {/* Price Line */}
+                                              <Line 
+                                                type="monotone" 
+                                                dataKey="close" 
+                                                stroke="#2563eb" 
+                                                strokeWidth={2} 
+                                                dot={false}
+                                                name="Close Price"
+                                              />
+                                              {/* Moving Averages */}
+                                              {technicalIndicators.sma_20 && (
+                                                <Line 
+                                                  type="monotone" 
+                                                  dataKey="sma_20" 
+                                                  stroke="#f59e0b" 
+                                                  strokeWidth={1} 
+                                                  dot={false}
+                                                  name="SMA 20"
+                                                  strokeDasharray="5 5"
+                                                />
+                                              )}
+                                              {technicalIndicators.sma_50 && (
+                                                <Line 
+                                                  type="monotone" 
+                                                  dataKey="sma_50" 
+                                                  stroke="#10b981" 
+                                                  strokeWidth={1} 
+                                                  dot={false}
+                                                  name="SMA 50"
+                                                  strokeDasharray="10 5"
+                                                />
+                                              )}
+                                              {technicalIndicators.sma_200 && (
+                                                <Line 
+                                                  type="monotone" 
+                                                  dataKey="sma_200" 
+                                                  stroke="#ef4444" 
+                                                  strokeWidth={1} 
+                                                  dot={false}
+                                                  name="SMA 200"
+                                                  strokeDasharray="15 5"
+                                                />
+                                              )}
+                                              {/* Bollinger Bands */}
+                                              {technicalIndicators.bollinger_upper && (
+                                                <>
+                                                  <Line 
+                                                    type="monotone" 
+                                                    dataKey="bollinger_upper" 
+                                                    stroke="#8b5cf6" 
+                                                    strokeWidth={1} 
+                                                    dot={false}
+                                                    name="BB Upper"
+                                                    opacity={0.6}
+                                                  />
+                                                  <Line 
+                                                    type="monotone" 
+                                                    dataKey="bollinger_lower" 
+                                                    stroke="#8b5cf6" 
+                                                    strokeWidth={1} 
+                                                    dot={false}
+                                                    name="BB Lower"
+                                                    opacity={0.6}
+                                                  />
+                                                </>
+                                              )}
+                                            </LineChart>
+                                          </ResponsiveContainer>
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Technical Indicators */}
+                                    {Object.keys(technicalIndicators).length > 0 && (
+                                      <div className="space-y-4">
+                                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                                          <Activity className="w-4 h-4" />
+                                          Technical Indicators
+                                        </h4>
+                                        
+                                        {/* RSI Chart */}
+                                        {technicalIndicators.rsi && (
+                                          <div className="space-y-2">
+                                            <h5 className="text-xs font-medium text-muted-foreground">RSI (Relative Strength Index)</h5>
+                                            <div className="h-32 w-full">
+                                              <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={chartData}>
+                                                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                                                  <XAxis 
+                                                    dataKey="dateShort" 
+                                                    fontSize={8}
+                                                    interval={Math.floor(chartData.length / 6)}
+                                                  />
+                                                  <YAxis 
+                                                    domain={(() => {
+                                                      const rsiValues = chartData.map(d => d.rsi).filter(v => v != null);
+                                                      if (rsiValues.length === 0) return [0, 100];
+                                                      const min = Math.min(...rsiValues);
+                                                      const max = Math.max(...rsiValues);
+                                                      const margin = (max - min) * 0.10;
+                                                      // Keep within RSI bounds but add margins
+                                                      return [Math.max(0, min - margin), Math.min(100, max + margin)];
+                                                    })()} 
+                                                    fontSize={8}
+                                                  />
+                                                  <Tooltip 
+                                                    contentStyle={{
+                                                      backgroundColor: '#1f2937',
+                                                      border: '1px solid #374151',
+                                                      borderRadius: '8px',
+                                                      color: '#f9fafb',
+                                                      fontSize: '12px',
+                                                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+                                                    }}
+                                                    labelStyle={{ color: '#d1d5db', fontWeight: 'bold' }}
+                                                    formatter={(value: any) => [`${value?.toFixed(2)}`, 'RSI']}
+                                                    labelFormatter={(label: string) => `Date: ${label}`}
+                                                  />
+                                                  <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" opacity={0.5} />
+                                                  <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" opacity={0.5} />
+                                                  <Line 
+                                                    type="monotone" 
+                                                    dataKey="rsi" 
+                                                    stroke="#3b82f6" 
+                                                    strokeWidth={2} 
+                                                    dot={false}
+                                                    name="RSI"
+                                                  />
+                                                </LineChart>
+                                              </ResponsiveContainer>
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* MACD Chart */}
+                                        {technicalIndicators.macd && (
+                                          <div className="space-y-2">
+                                            <h5 className="text-xs font-medium text-muted-foreground">MACD</h5>
+                                            <div className="h-32 w-full">
+                                              <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={chartData}>
+                                                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                                                  <XAxis 
+                                                    dataKey="dateShort" 
+                                                    fontSize={8}
+                                                    interval={Math.floor(chartData.length / 6)}
+                                                  />
+                                                  <YAxis 
+                                                    domain={(() => {
+                                                      const macdValues = chartData.map(d => [d.macd, d.macd_signal]).flat().filter(v => v != null);
+                                                      if (macdValues.length === 0) return ['dataMin', 'dataMax'];
+                                                      const min = Math.min(...macdValues);
+                                                      const max = Math.max(...macdValues);
+                                                      const margin = (max - min) * 0.10;
+                                                      return [min - margin, max + margin];
+                                                    })()}
+                                                    fontSize={8} 
+                                                  />
+                                                  <Tooltip 
+                                                    contentStyle={{
+                                                      backgroundColor: '#1f2937',
+                                                      border: '1px solid #374151',
+                                                      borderRadius: '8px',
+                                                      color: '#f9fafb',
+                                                      fontSize: '12px',
+                                                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+                                                    }}
+                                                    labelStyle={{ color: '#d1d5db', fontWeight: 'bold' }}
+                                                    formatter={(value: any, name: string) => [
+                                                      value?.toFixed(4), 
+                                                      name === 'macd' ? 'MACD' : 'Signal'
+                                                    ]}
+                                                    labelFormatter={(label: string) => `Date: ${label}`}
+                                                  />
+                                                  <ReferenceLine y={0} stroke="#6b7280" strokeDasharray="3 3" opacity={0.5} />
+                                                  <Line 
+                                                    type="monotone" 
+                                                    dataKey="macd" 
+                                                    stroke="#3b82f6" 
+                                                    strokeWidth={1} 
+                                                    dot={false}
+                                                    name="MACD"
+                                                  />
+                                                  {technicalIndicators.macd_signal && (
+                                                    <Line 
+                                                      type="monotone" 
+                                                      dataKey="macd_signal" 
+                                                      stroke="#ef4444" 
+                                                      strokeWidth={1} 
+                                                      dot={false}
+                                                      name="Signal"
+                                                    />
+                                                  )}
+                                                </LineChart>
+                                              </ResponsiveContainer>
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Indicators Summary */}
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-3 bg-muted/30 rounded-lg text-xs">
+                                          {technicalIndicators.sma_20 && (
+                                            <div>
+                                              <span className="text-muted-foreground">SMA 20:</span>
+                                              <span className="ml-1 font-medium">
+                                                ${technicalIndicators.sma_20[technicalIndicators.sma_20.length - 1]?.toFixed(2) || 'N/A'}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {technicalIndicators.rsi && (
+                                            <div>
+                                              <span className="text-muted-foreground">RSI:</span>
+                                              <span className={`ml-1 font-medium ${
+                                                technicalIndicators.rsi[technicalIndicators.rsi.length - 1] > 70 ? 'text-red-600' :
+                                                technicalIndicators.rsi[technicalIndicators.rsi.length - 1] < 30 ? 'text-green-600' :
+                                                'text-blue-600'
+                                              }`}>
+                                                {technicalIndicators.rsi[technicalIndicators.rsi.length - 1]?.toFixed(1) || 'N/A'}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {technicalIndicators.macd && (
+                                            <div>
+                                              <span className="text-muted-foreground">MACD:</span>
+                                              <span className="ml-1 font-medium">
+                                                {technicalIndicators.macd[technicalIndicators.macd.length - 1]?.toFixed(4) || 'N/A'}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {insight?.metadata && (
+                                            <div>
+                                              <span className="text-muted-foreground">Indicators:</span>
+                                              <span className="ml-1 font-medium">
+                                                {insight.metadata.indicatorsCalculated?.length || 0}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                        
+                                        {/* Timeframe Note */}
+                                        {insight?.metadata?.timeframeNote && (
+                                          <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded text-xs text-blue-700 dark:text-blue-300">
+                                            <strong>Note:</strong> {insight.metadata.timeframeNote}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    
+                                    {/* Analysis Text */}
+                                    {insightContent && (
+                                      <div className="space-y-2">
+                                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                                          <FileText className="w-4 h-4" />
+                                          Analysis
+                                        </h4>
+                                        <MarkdownRenderer content={insightContent} />
+                                      </div>
+                                    )}
                                   </CardContent>
                                 </Card>
                               );
@@ -1863,112 +2251,18 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                               );
                             }
                             
-                            // Special rendering for Portfolio Manager
+                            // Special rendering for Portfolio Manager - simple format like RebalanceDetailModal
                             if (agent === 'portfolioManager') {
-                              const pmInsight = insight as any;
-                              
-                              // Extract the analysis text and final decision
-                              const analysisText = pmInsight?.analysis || '';
-                              const finalDecision = pmInsight?.finalDecision;
-                              
                               return (
                                 <Card key={agent} className="overflow-hidden">
                                   <CardHeader className="bg-muted/30">
                                     <CardTitle className="text-base flex items-center gap-2">
-                                      <Briefcase className="w-4 h-4" />
-                                      Portfolio Manager
+                                      <PieChart className="w-4 h-4" />
+                                      Portfolio Manager Analysis
                                     </CardTitle>
                                   </CardHeader>
-                                  <CardContent className="pt-4 space-y-4">
-                                    {/* Display analysis text if available */}
-                                    {analysisText && (
-                                      <div>
-                                        <MarkdownRenderer content={analysisText} />
-                                      </div>
-                                    )}
-                                    
-                                    {/* Display final decision details if available */}
-                                    {finalDecision && (
-                                      <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-3">
-                                        <h4 className="font-semibold text-sm">Position Sizing Decision</h4>
-                                        
-                                        <div className="grid grid-cols-2 gap-3 text-sm">
-                                          <div>
-                                            <span className="text-muted-foreground">Action:</span>
-                                            <span className="ml-2 font-medium">{finalDecision.action}</span>
-                                          </div>
-                                          
-                                          {finalDecision.dollarAmount > 0 && (
-                                            <div>
-                                              <span className="text-muted-foreground">Amount:</span>
-                                              <span className="ml-2 font-medium">${finalDecision.dollarAmount?.toLocaleString()}</span>
-                                            </div>
-                                          )}
-                                          
-                                          {finalDecision.shares > 0 && (
-                                            <div>
-                                              <span className="text-muted-foreground">Shares:</span>
-                                              <span className="ml-2 font-medium">{finalDecision.shares}</span>
-                                            </div>
-                                          )}
-                                          
-                                          {finalDecision.percentOfPortfolio && (
-                                            <div>
-                                              <span className="text-muted-foreground">% of Portfolio:</span>
-                                              <span className="ml-2 font-medium">{finalDecision.percentOfPortfolio?.toFixed(2)}%</span>
-                                            </div>
-                                          )}
-                                          
-                                          {finalDecision.entryPrice && (
-                                            <div>
-                                              <span className="text-muted-foreground">Entry Price:</span>
-                                              <span className="ml-2 font-medium">${finalDecision.entryPrice?.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                          
-                                          {finalDecision.stopLoss && (
-                                            <div>
-                                              <span className="text-muted-foreground">Stop Loss:</span>
-                                              <span className="ml-2 font-medium">${finalDecision.stopLoss?.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                          
-                                          {finalDecision.takeProfit && (
-                                            <div>
-                                              <span className="text-muted-foreground">Take Profit:</span>
-                                              <span className="ml-2 font-medium">${finalDecision.takeProfit?.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                          
-                                          {finalDecision.riskRewardRatio && (
-                                            <div>
-                                              <span className="text-muted-foreground">Risk/Reward:</span>
-                                              <span className="ml-2 font-medium">1:{finalDecision.riskRewardRatio?.toFixed(1)}</span>
-                                            </div>
-                                          )}
-                                        </div>
-                                        
-                                        {/* Position changes if available */}
-                                        {finalDecision.beforePosition && finalDecision.afterPosition && (
-                                          <div className="pt-3 border-t space-y-2">
-                                            <div className="flex items-center gap-4 text-sm">
-                                              <span className="text-muted-foreground">Before:</span>
-                                              <span>{finalDecision.beforePosition.shares} shares (${finalDecision.beforePosition.value?.toLocaleString()} - {finalDecision.beforePosition.allocation?.toFixed(2)}%)</span>
-                                            </div>
-                                            <div className="flex items-center gap-4 text-sm">
-                                              <span className="text-muted-foreground">After:</span>
-                                              <span>{finalDecision.afterPosition.shares} shares (${finalDecision.afterPosition.value?.toLocaleString()} - {finalDecision.afterPosition.allocation?.toFixed(2)}%)</span>
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {finalDecision.reasoning && (
-                                          <div className="pt-3 border-t">
-                                            <p className="text-sm text-muted-foreground">{finalDecision.reasoning}</p>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
+                                  <CardContent className="pt-4">
+                                    <MarkdownRenderer content={insightContent} />
                                   </CardContent>
                                 </Card>
                               );

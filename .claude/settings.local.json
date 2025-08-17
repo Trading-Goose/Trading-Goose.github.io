@@ -20,8 +20,12 @@
       "Bash(find:*)",
       "WebSearch",
       "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions logs send-invitation --project-ref lnvjsqyvhczgxvygbqer --tail 5)",
-      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy opportunity-agent --project-ref lnvjsqyvhczgxvygbqer)"
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy opportunity-agent --project-ref lnvjsqyvhczgxvygbqer)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-market-analyst --project-ref lnvjsqyvhczgxvygbqer)"
     ],
-    "deny": []
+    "deny": [],
+    "additionalDirectories": [
+      "/home/TradingAgent/TradingAgents/tradingagents/agents"
+    ]
   }
 }

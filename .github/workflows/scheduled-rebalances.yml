@@ -4,7 +4,7 @@ on:
   schedule:
     # Run at :25 and :55 past every hour
     # This gives us a 5-minute buffer before :00 and :30 schedules
-    - cron: "25,55 * * * *"
+    - cron: "25,55 * * *  1-5"
 
   # Allow manual trigger for testing
   workflow_dispatch:

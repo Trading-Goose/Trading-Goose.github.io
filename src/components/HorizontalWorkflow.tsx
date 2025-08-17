@@ -244,6 +244,8 @@ const getStatusColor = (status: string) => {
       return 'text-blue-500 bg-blue-500/10 animate-pulse';
     case 'running':
       return 'text-yellow-500 bg-yellow-500/10';
+    case 'failed':
+      return 'text-orange-500 bg-orange-500/10';
     case 'pending':
       return 'text-gray-500 bg-gray-500/10';
     default:
@@ -259,6 +261,8 @@ const getStatusIcon = (status: string) => {
       return <Loader2 className="w-3 h-3 animate-spin" />;
     case 'running':
       return <Loader2 className="w-3 h-3 animate-spin text-yellow-500" />;
+    case 'failed':
+      return <AlertCircle className="w-3 h-3 text-orange-500" />;
     case 'pending':
       return <Clock className="w-3 h-3" />;
     default:
@@ -588,8 +592,15 @@ export default function HorizontalWorkflow() {
     }
 
     // Default behavior for other agents
-    if (insights && insights[agentKey]) {
-      return 'completed';
+    if (insights) {
+      // Check for error conditions first
+      if (insights[agentKey + '_error']) {
+        return 'failed';
+      }
+      // Then check for normal completion
+      if (insights[agentKey]) {
+        return 'completed';
+      }
     }
     // Check in workflow steps if available
     if (analysis.full_analysis?.workflowSteps) {
@@ -648,12 +659,58 @@ export default function HorizontalWorkflow() {
         console.log('Rebalance analysis - risk assessment complete, marking as done');
         isCompleted = true;
       }
+      
+      // Also check if all required agents have either completed or failed (allowing workflow to continue)
+      const analysisAgents = ['marketAnalyst', 'socialMediaAnalyst', 'newsAnalyst', 'fundamentalsAnalyst'];
+      const analysisAgentsFinished = analysisAgents.filter(agent => 
+        insights[agent] || insights[agent + '_error']
+      ).length;
+      
+      const researchAgents = ['bullResearcher', 'bearResearcher', 'researchManager'];
+      const researchAgentsFinished = researchAgents.filter(agent => insights[agent]).length;
+      
+      const traderFinished = insights.trader || analysis.decision;
+      
+      const riskAgents = ['riskyAnalyst', 'safeAnalyst', 'neutralAnalyst', 'riskManager'];
+      const riskAgentsFinished = riskAgents.filter(agent => insights[agent]).length;
+      
+      // For rebalance analyses, all phases through risk should be complete
+      if (analysisAgentsFinished === analysisAgents.length && 
+          researchAgentsFinished === researchAgents.length && 
+          traderFinished && 
+          riskAgentsFinished === riskAgents.length) {
+        console.log('Rebalance analysis - all required agents finished (including any failures), marking as done');
+        isCompleted = true;
+      }
     } else if (!isRebalanceAnalysis && analysis.analysis_status === 0) {
       // For individual analyses, check if portfolio manager has completed
       const hasPortfolioManagerInsights = insights.portfolioManager;
       
       if (hasPortfolioManagerInsights) {
         console.log('Individual analysis - portfolio management complete, marking as done');
+        isCompleted = true;
+      }
+      
+      // Also check if all required agents have either completed or failed (allowing workflow to continue)
+      const analysisAgents = ['marketAnalyst', 'socialMediaAnalyst', 'newsAnalyst', 'fundamentalsAnalyst'];
+      const analysisAgentsFinished = analysisAgents.filter(agent => 
+        insights[agent] || insights[agent + '_error']
+      ).length;
+      
+      const researchAgents = ['bullResearcher', 'bearResearcher', 'researchManager'];
+      const researchAgentsFinished = researchAgents.filter(agent => insights[agent]).length;
+      
+      const traderFinished = insights.trader || analysis.decision;
+      
+      const riskAgents = ['riskyAnalyst', 'safeAnalyst', 'neutralAnalyst', 'riskManager'];
+      const riskAgentsFinished = riskAgents.filter(agent => insights[agent]).length;
+      
+      // If all phases are complete (even with some failures), mark as complete
+      if (analysisAgentsFinished === analysisAgents.length && 
+          researchAgentsFinished === researchAgents.length && 
+          traderFinished && 
+          riskAgentsFinished === riskAgents.length) {
+        console.log('Individual analysis - all required agents finished (including any failures), marking as done');
         isCompleted = true;
       }
     }
@@ -670,10 +727,13 @@ export default function HorizontalWorkflow() {
           id: agent.name.toLowerCase().replace(/\s+/g, '-'),
           name: agent.name,
           icon: getAgentIcon(agent.name),
-          status: agent.status === 'completed' ? 'idle' : agent.status === 'processing' ? 'processing' : 'idle',
+          status: agent.status === 'completed' ? 'idle' : 
+                  agent.status === 'processing' ? 'processing' : 
+                  agent.status === 'failed' ? 'failed' : 'idle',
           lastAction: agent.status === 'completed' ? 'Analysis complete' :
-            agent.status === 'processing' ? 'Analyzing...' : 'Waiting...',
-          progress: agent.progress || (agent.status === 'completed' ? 100 : 0)
+            agent.status === 'processing' ? 'Analyzing...' : 
+            agent.status === 'failed' ? 'Failed' : 'Waiting...',
+          progress: agent.status === 'completed' ? 100 : agent.status === 'failed' ? 0 : (agent.progress || 0)
         }));
 
         // SIMPLIFIED: Calculate step status based on agent completion
@@ -779,9 +839,11 @@ export default function HorizontalWorkflow() {
       });
     }
 
-    // SIMPLIFIED: Analysis Phase - just count completed agents
+    // SIMPLIFIED: Analysis Phase - count completed or failed agents
     const analysisAgents = ['marketAnalyst', 'socialMediaAnalyst', 'newsAnalyst', 'fundamentalsAnalyst'];
-    const analysisCompleted = analysisAgents.filter(agent => insights[agent]).length;
+    const analysisCompleted = analysisAgents.filter(agent => 
+      insights[agent] || insights[agent + '_error']
+    ).length;
     const analysisTotal = analysisAgents.length;
 
     // Simple rule: 0 = pending, some = running, all = completed
@@ -806,27 +868,35 @@ export default function HorizontalWorkflow() {
       agents: [
         {
           ...updatedSteps[0].agents[0],
-          status: 'idle',
-          lastAction: insights['marketAnalyst'] ? 'Analysis complete' : 'Waiting...',
-          progress: insights['marketAnalyst'] ? 100 : 0
+          status: insights['marketAnalyst_error'] ? 'failed' : 'idle',
+          lastAction: insights['marketAnalyst'] ? 'Analysis complete' : 
+                     insights['marketAnalyst_error'] ? 'Analysis failed (continued with fallback)' : 
+                     'Waiting...',
+          progress: insights['marketAnalyst'] ? 100 : insights['marketAnalyst_error'] ? 0 : 0
         },
         {
           ...updatedSteps[0].agents[1],
-          status: 'idle',
-          lastAction: insights['socialMediaAnalyst'] ? 'Social sentiment analyzed' : 'Waiting...',
-          progress: insights['socialMediaAnalyst'] ? 100 : 0
+          status: insights['socialMediaAnalyst_error'] ? 'failed' : 'idle',
+          lastAction: insights['socialMediaAnalyst'] ? 'Social sentiment analyzed' : 
+                     insights['socialMediaAnalyst_error'] ? 'Analysis failed (continued with fallback)' : 
+                     'Waiting...',
+          progress: insights['socialMediaAnalyst'] ? 100 : insights['socialMediaAnalyst_error'] ? 0 : 0
         },
         {
           ...updatedSteps[0].agents[2],
-          status: 'idle',
-          lastAction: insights['newsAnalyst'] ? 'News analysis complete' : 'Waiting...',
-          progress: insights['newsAnalyst'] ? 100 : 0
+          status: insights['newsAnalyst_error'] ? 'failed' : 'idle',
+          lastAction: insights['newsAnalyst'] ? 'News analysis complete' : 
+                     insights['newsAnalyst_error'] ? 'Analysis failed (continued with fallback)' : 
+                     'Waiting...',
+          progress: insights['newsAnalyst'] ? 100 : insights['newsAnalyst_error'] ? 0 : 0
         },
         {
           ...updatedSteps[0].agents[3],
-          status: 'idle',
-          lastAction: insights['fundamentalsAnalyst'] ? 'Fundamentals analyzed' : 'Waiting...',
-          progress: insights['fundamentalsAnalyst'] ? 100 : 0
+          status: insights['fundamentalsAnalyst_error'] ? 'failed' : 'idle',
+          lastAction: insights['fundamentalsAnalyst'] ? 'Fundamentals analyzed' : 
+                     insights['fundamentalsAnalyst_error'] ? 'Analysis failed (continued with fallback)' : 
+                     'Waiting...',
+          progress: insights['fundamentalsAnalyst'] ? 100 : insights['fundamentalsAnalyst_error'] ? 0 : 0
         }
       ]
     };
@@ -1191,6 +1261,8 @@ export default function HorizontalWorkflow() {
                               <div className="flex items-center gap-2">
                                 {agent.status === 'processing' ? (
                                   <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                                ) : agent.status === 'failed' ? (
+                                  <AlertCircle className="h-3 w-3 text-orange-500" />
                                 ) : agent.progress === 100 ? (
                                   <CheckCircle className="h-3 w-3 text-green-500" />
                                 ) : (
@@ -1199,8 +1271,10 @@ export default function HorizontalWorkflow() {
                                 {agent.progress !== undefined && agent.progress > 0 && (
                                   <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                                     <div
-                                      className={`h-full transition-all duration-500 ${agent.status === 'processing' ? 'bg-blue-500 animate-pulse' : 'bg-green-500'
-                                        }`}
+                                      className={`h-full transition-all duration-500 ${
+                                        agent.status === 'processing' ? 'bg-blue-500 animate-pulse' : 
+                                        agent.status === 'failed' ? 'bg-orange-500' : 'bg-green-500'
+                                      }`}
                                       style={{ width: `${agent.progress}%` }}
                                     />
                                   </div>
@@ -1272,8 +1346,10 @@ export default function HorizontalWorkflow() {
                           <div className="flex items-center gap-2">
                             <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
                               <div
-                                className={`h-full transition-all ${agent.status === 'processing' ? 'bg-blue-500' : 'bg-green-500'
-                                  }`}
+                                className={`h-full transition-all ${
+                                  agent.status === 'processing' ? 'bg-blue-500' : 
+                                  agent.status === 'failed' ? 'bg-orange-500' : 'bg-green-500'
+                                }`}
                                 style={{ width: `${agent.progress}%` }}
                               />
                             </div>

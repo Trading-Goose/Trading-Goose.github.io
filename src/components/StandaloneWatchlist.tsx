@@ -495,7 +495,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       setSelectedTicker(ticker);
     } else {
       // Start new analysis
-      if (!apiSettings?.ai_api_key || !apiSettings?.alpha_vantage_api_key) {
+      if (!apiSettings?.ai_api_key) {
         toast({
           title: "Configuration Required",
           description: "Please configure your API settings in the Settings page",
@@ -665,7 +665,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                         e.stopPropagation();
                         openAnalysis(item.ticker);
                       }}
-                      disabled={!apiSettings?.ai_api_key || !apiSettings?.alpha_vantage_api_key}
+                      disabled={!apiSettings?.ai_api_key}
                     >
                       {runningAnalyses.has(item.ticker) ? (
                         <>

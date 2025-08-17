@@ -92,7 +92,7 @@ export class DataSourceManager {
    * Get news (no data source available)
    */
   async getNews(ticker: string, from: string, to: string): Promise<any[]> {
-    console.warn('⚠️ News not available - Use Alpha Vantage instead');
+    console.warn('⚠️ News not available - Use Perplefina for news analysis');
     return [];
   }
 
@@ -100,7 +100,7 @@ export class DataSourceManager {
    * Get fundamental metrics (no data source available)
    */
   async getMetrics(ticker: string): Promise<any> {
-    console.warn('⚠️ Metrics not available - Use Alpha Vantage instead');
+    console.warn('⚠️ Metrics not available - Use Perplefina for fundamental analysis');
     return {};
   }
 
@@ -108,7 +108,7 @@ export class DataSourceManager {
    * Get sentiment data (no data source available)
    */
   async getSentiment(ticker: string): Promise<any> {
-    console.warn('⚠️ Sentiment analysis not available - Use Alpha Vantage instead');
+    console.warn('⚠️ Sentiment analysis not available - Use Perplefina for social media analysis');
     return {
       buzz: { buzz: 0 },
       sentiment: { bullishPercent: 0.5, bearishPercent: 0.5 },

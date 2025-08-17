@@ -36,7 +36,6 @@ export const analysisConfig = {
    * Make sure you have valid API keys configured in Settings!
    */
   apiReminder: {
-    alpha_vantage: 'Get free API key at https://www.alphavantage.co/support/#api-key',
     ai: 'Configure your AI provider (OpenAI, Anthropic, etc.)'
   }
 };

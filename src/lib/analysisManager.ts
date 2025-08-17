@@ -193,7 +193,7 @@ class AnalysisManager {
   // Start new analysis
   async startAnalysis(
     ticker: string,
-    apiSettings: { ai_provider: string; ai_api_key: string; ai_model?: string; alpha_vantage_api_key: string },
+    apiSettings: { ai_provider: string; ai_api_key: string; ai_model?: string },
     userId?: string
   ): Promise<string | undefined> {
     // Check if already running
@@ -317,7 +317,6 @@ class AnalysisManager {
     try {
       // Create trading engine with callbacks
       const engine = await createTradingEngine({
-        alphaVantageApiKey: apiSettings.alpha_vantage_api_key,
         aiProvider: apiSettings.ai_provider,
         aiApiKey: apiSettings.ai_api_key,
         aiModel: apiSettings.ai_model,

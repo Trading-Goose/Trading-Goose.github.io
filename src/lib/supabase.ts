@@ -124,7 +124,6 @@ export interface ApiSettings {
   ai_provider: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'deepseek';
   ai_api_key: string;
   ai_model?: string;
-  alpha_vantage_api_key: string;
   polygon_api_key?: string;
   alpaca_paper_api_key?: string;
   alpaca_paper_secret_key?: string;
@@ -283,7 +282,6 @@ export const supabaseHelpers = {
           ai_provider: 'openai' as const,
           ai_api_key: '',
           ai_model: 'gpt-4',
-          alpha_vantage_api_key: '',
           alpaca_paper_api_key: '',
           alpaca_paper_secret_key: '',
           alpaca_live_api_key: '',

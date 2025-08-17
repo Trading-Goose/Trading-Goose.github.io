@@ -620,14 +620,17 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
   // Load rebalance data
   useEffect(() => {
-    if (!isOpen || !rebalanceId || !user) return;
+    if (!isOpen || !rebalanceId || !user?.id) return;
 
     let mounted = true;
 
     const loadRebalance = async () => {
-      if (!mounted) return;
+      if (!mounted || !user?.id) return;
 
       try {
+        // Add a small delay to ensure auth state is stable
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Fetch rebalance request data
         const { data: rebalanceRequest, error: requestError } = await supabase
           .from('rebalance_requests')
@@ -638,7 +641,18 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         if (requestError) {
           if (requestError.code === 'PGRST116') {
-            throw new Error('Rebalance not found. It may have been deleted.');
+            // Try once more without user_id filter to check if rebalance exists at all
+            const { data: anyRebalance } = await supabase
+              .from('rebalance_requests')
+              .select('id, user_id')
+              .eq('id', rebalanceId)
+              .single();
+              
+            if (anyRebalance) {
+              throw new Error('Access denied. This rebalance belongs to another user.');
+            } else {
+              throw new Error('Rebalance not found. It may have been deleted.');
+            }
           }
           throw requestError;
         }
@@ -1683,8 +1697,11 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                         );
                       }
 
-                      // State 5: No actions needed
-                      if (hasPositions && rebalanceData.recommendedPositions.every((p: RebalancePosition) => p.shareChange === 0)) {
+                      // State 5: No actions needed (only if no executed/pending/rejected orders exist)
+                      if (hasPositions && 
+                          rebalanceData.recommendedPositions.every((p: RebalancePosition) => p.shareChange === 0) &&
+                          executedTickers.size === 0 && rejectedTickers.size === 0 && 
+                          !Array.from(orderStatuses.values()).some(status => ['pending', 'executed', 'approved'].includes(status.status))) {
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1834,6 +1851,43 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                               </Card>
                             </div>
 
+                            {/* Executed Orders Section */}
+                            {executedTickers.size > 0 && (
+                              <div className="mb-6">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div>
+                                    <h3 className="font-medium">Executed Orders</h3>
+                                    <p className="text-xs text-muted-foreground">
+                                      Orders that have been successfully submitted to your broker
+                                    </p>
+                                  </div>
+                                  <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">
+                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                    {executedTickers.size} executed
+                                  </Badge>
+                                </div>
+                                <div className="space-y-3">
+                                  {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
+                                    const orderStatus = orderStatuses.get(position.ticker);
+                                    const isExecuted = orderStatus?.status === 'executed' || (orderStatus?.status === 'approved' && (orderStatus as any)?.alpacaStatus === 'filled');
+                                    
+                                    if (!isExecuted) return null;
+                                    
+                                    return (
+                                      <RebalancePositionCard
+                                        key={`executed-${position.ticker}`}
+                                        position={position}
+                                        isExecuted={isExecuted}
+                                        orderStatus={orderStatus}
+                                        onApprove={() => {}} // No action needed for executed orders
+                                        onReject={() => {}} // No action needed for executed orders
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
                             {/* Section Header */}
                             {pendingPositions.length > 0 && (
                               <div className="flex items-center justify-between mb-4">
@@ -1849,32 +1903,34 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                               </div>
                             )}
 
-                            {/* Rebalancing Positions */}
-                            <div className="space-y-3 mb-6">
-                              {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
-                                const orderStatus = orderStatuses.get(position.ticker);
-                                const isExecuted = orderStatus?.status === 'executed' || (orderStatus?.status === 'approved' && (orderStatus as any)?.alpacaStatus === 'filled');
-                                const isRejected = orderStatus?.status === 'rejected';
-                                const isPending = orderStatus?.status === 'pending';
+                            {/* Pending Orders (only show pending, not executed) */}
+                            {pendingPositions.length > 0 && (
+                              <div className="space-y-3 mb-6">
+                                {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
+                                  const orderStatus = orderStatuses.get(position.ticker);
+                                  const isExecuted = orderStatus?.status === 'executed' || (orderStatus?.status === 'approved' && (orderStatus as any)?.alpacaStatus === 'filled');
+                                  const isRejected = orderStatus?.status === 'rejected';
+                                  const isPending = orderStatus?.status === 'pending';
 
-                                // Don't show rejected orders
-                                if (isRejected) return null;
-                                
-                                // Don't show HOLD positions (no change needed)
-                                if (position.shareChange === 0) return null;
+                                  // Only show pending orders in this section
+                                  if (!isPending || isExecuted || isRejected) return null;
+                                  
+                                  // Don't show HOLD positions (no change needed)
+                                  if (position.shareChange === 0) return null;
 
-                                return (
-                                  <RebalancePositionCard
-                                    key={position.ticker}
-                                    position={position}
-                                    isExecuted={isExecuted}
-                                    orderStatus={orderStatus}
-                                    onApprove={() => handleApproveOrder(position.ticker)}
-                                    onReject={() => handleRejectOrder(position.ticker)}
-                                  />
-                                );
-                              })}
-                            </div>
+                                  return (
+                                    <RebalancePositionCard
+                                      key={position.ticker}
+                                      position={position}
+                                      isExecuted={isExecuted}
+                                      orderStatus={orderStatus}
+                                      onApprove={() => handleApproveOrder(position.ticker)}
+                                      onReject={() => handleRejectOrder(position.ticker)}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            )}
                           </>
                         );
                       }

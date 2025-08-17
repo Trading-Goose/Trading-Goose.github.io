@@ -153,7 +153,6 @@ export default function ProfilePage() {
 
   const tradingMode = apiSettings?.alpaca_paper_trading ? 'Paper Trading' : 'Live Trading';
   const hasAIConfig = !!apiSettings?.ai_api_key;
-  const hasMarketDataConfig = !!apiSettings?.alpha_vantage_api_key;
   const hasAlpacaConfig = apiSettings?.alpaca_paper_trading
     ? !!apiSettings?.alpaca_paper_api_key
     : !!apiSettings?.alpaca_live_api_key;
@@ -297,12 +296,6 @@ export default function ProfilePage() {
                   </Badge>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Market Data</span>
-                  <Badge variant={hasMarketDataConfig ? "success" : "secondary"}>
-                    {hasMarketDataConfig ? "Configured" : "Not Set"}
-                  </Badge>
-                </div>
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Trading Account</span>

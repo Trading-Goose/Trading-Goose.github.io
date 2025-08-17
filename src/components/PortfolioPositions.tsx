@@ -273,9 +273,9 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
           )}
         </CardHeader>
         <CardContent className="p-0">
-          <div className="max-h-[250px] overflow-y-auto">
+          <div className="relative">
             <Table>
-              <TableHeader className="sticky top-0 bg-background">
+              <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                 <TableRow>
                   <TableHead className="w-[60px] text-xs">Symbol</TableHead>
                   <TableHead className="text-right text-xs px-2">Shares</TableHead>
@@ -284,7 +284,10 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                   <TableHead className="text-right text-xs px-2">Total</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+            </Table>
+            <div className="max-h-[210px] overflow-y-auto">
+              <Table>
+                <TableBody>
                 {positions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-4">
@@ -302,16 +305,16 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                         }`}
                       onClick={() => onSelectStock?.(position.symbol)}
                     >
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium w-[60px]">
                         <Badge variant={selectedStock === position.symbol ? 'default' : 'outline'}>
                           {position.symbol}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right text-sm">{position.shares}</TableCell>
-                      <TableCell className="text-right font-medium text-sm">
+                      <TableCell className="text-right text-sm px-2">{position.shares}</TableCell>
+                      <TableCell className="text-right font-medium text-sm px-2">
                         ${(position.marketValue / 1000).toFixed(1)}k
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right px-2">
                         <div className={`flex items-center justify-end gap-1 ${position.dayChange >= 0 ? 'text-success' : 'text-danger'
                           }`}>
                           {position.dayChange >= 0 ? (
@@ -324,7 +327,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right px-2">
                         <div className={`flex items-center justify-end gap-1 ${position.unrealizedPL >= 0 ? 'text-success' : 'text-danger'
                           }`}>
                           {position.unrealizedPL >= 0 ? (
@@ -340,8 +343,9 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                     </TableRow>
                   ))
                 )}
-              </TableBody>
-            </Table>
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
       </Card>

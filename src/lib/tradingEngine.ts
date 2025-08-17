@@ -81,7 +81,6 @@ export interface RiskDebateRound {
   round: number;
 }
 
-// Alpha Vantage API client is now used instead of Finnhub
 
 // AI Analysis client
 class AIAnalysisClient {
@@ -189,7 +188,6 @@ export class TradingEngine {
   private onWorkflowUpdate?: (steps: WorkflowStep[]) => void;
 
   constructor(config: {
-    alphaVantageApiKey: string;
     aiProvider: string;
     aiApiKey: string;
     aiModel?: string;
@@ -198,12 +196,9 @@ export class TradingEngine {
   }) {
     // Initialize new data source manager with multiple sources
     this.dataSource = new DataSourceManager({
-      alphaVantageApiKey: config.alphaVantageApiKey,
       preferredSource: 'auto', // Auto-select best source
     });
-    
-    // Keep legacy client for news/sentiment data
-    // Alpha Vantage is now used for market data
+
     this.ai = new AIAnalysisClient(config.aiProvider, config.aiApiKey, config.aiModel);
     this.onMessage = config.onMessage;
     this.onWorkflowUpdate = config.onWorkflowUpdate;
@@ -293,9 +288,9 @@ export class TradingEngine {
       workflowSteps[0].agents[0].status = 'processing';
       this.updateWorkflow(workflowSteps);
       this.sendMessage('Market Analyst', 'Fetching market data and calculating indicators...');
-      
+
       const marketAnalysis = await this.analyzeMarketData(ticker, date);
-      
+
       workflowSteps[0].agents[0].status = 'completed';
       workflowSteps[0].agents[0].progress = 100;
       this.updateWorkflow(workflowSteps);
@@ -305,9 +300,9 @@ export class TradingEngine {
       workflowSteps[0].agents[1].status = 'processing';
       this.updateWorkflow(workflowSteps);
       this.sendMessage('Social Media Analyst', 'Analyzing social media sentiment and buzz...');
-      
+
       const socialMediaAnalysis = await this.analyzeSocialMedia(ticker);
-      
+
       workflowSteps[0].agents[1].status = 'completed';
       workflowSteps[0].agents[1].progress = 100;
       this.updateWorkflow(workflowSteps);
@@ -317,9 +312,9 @@ export class TradingEngine {
       workflowSteps[0].agents[2].status = 'processing';
       this.updateWorkflow(workflowSteps);
       this.sendMessage('News Analyst', 'Analyzing recent news and market events...');
-      
+
       const newsAnalysis = await this.analyzeNews(ticker, date);
-      
+
       workflowSteps[0].agents[2].status = 'completed';
       workflowSteps[0].agents[2].progress = 100;
       this.updateWorkflow(workflowSteps);
@@ -329,9 +324,9 @@ export class TradingEngine {
       workflowSteps[0].agents[3].status = 'processing';
       this.updateWorkflow(workflowSteps);
       this.sendMessage('Fundamentals Analyst', 'Analyzing company fundamentals...');
-      
+
       const fundamentalsAnalysis = await this.analyzeFundamentals(ticker);
-      
+
       workflowSteps[0].agents[3].status = 'completed';
       workflowSteps[0].agents[3].progress = 100;
       workflowSteps[0].status = 'completed';
@@ -438,7 +433,7 @@ export class TradingEngine {
 
       const fromTimestamp = Math.floor(startDate.getTime() / 1000);
       const toTimestamp = Math.floor(endDate.getTime() / 1000);
-      
+
       console.log('📅 Date range for candles:', {
         inputDate: date,
         startDate: startDate.toISOString(),
@@ -516,7 +511,7 @@ export class TradingEngine {
       startDate.setDate(startDate.getDate() - 7);
 
       let news: NewsItem[] = [];
-      
+
       try {
         news = await this.dataSource.getNews(
           ticker,
@@ -529,9 +524,9 @@ export class TradingEngine {
 
       const newsText = news.length > 0
         ? news
-            .slice(0, 5)
-            .map((item) => `- ${item.headline}: ${item.summary}`)
-            .join('\n')
+          .slice(0, 5)
+          .map((item) => `- ${item.headline}: ${item.summary}`)
+          .join('\n')
         : 'No recent news available for analysis.';
 
       const prompt = `
@@ -554,7 +549,7 @@ export class TradingEngine {
   private async analyzeSocialMedia(ticker: string): Promise<string> {
     try {
       let sentiment: any = {};
-      
+
       try {
         sentiment = await this.dataSource.getSentiment(ticker);
       } catch (error) {
@@ -586,7 +581,7 @@ export class TradingEngine {
   private async analyzeSentiment(ticker: string): Promise<string> {
     try {
       let sentiment: any = {};
-      
+
       try {
         sentiment = await this.dataSource.getSentiment(ticker);
       } catch (error) {
@@ -617,7 +612,7 @@ export class TradingEngine {
   private async analyzeFundamentals(ticker: string): Promise<string> {
     try {
       let metrics: any = {};
-      
+
       try {
         metrics = await this.dataSource.getMetrics(ticker);
       } catch (error) {
@@ -792,7 +787,7 @@ export class TradingEngine {
       const decision = response.includes('BUY') ? 'BUY' : response.includes('SELL') ? 'SELL' : 'HOLD';
       const confidenceMatch = response.match(/(\d+)%/);
       const confidence = confidenceMatch ? parseInt(confidenceMatch[1]) : 70;
-      
+
       return {
         decision,
         confidence,
@@ -955,39 +950,15 @@ export async function createTradingEngine(config?: {
   const authState = useAuth.getState();
   const apiSettings = authState.apiSettings;
 
-  if (!apiSettings?.alpha_vantage_api_key) {
-    throw new Error('Alpha Vantage API key not configured. Please configure in Settings.');
-  }
 
-  // Get the appropriate API key based on the provider
-  let aiApiKey = '';
-  switch (apiSettings.ai_provider) {
-    case 'openai':
-      aiApiKey = apiSettings.openai_api_key || '';
-      break;
-    case 'anthropic':
-      aiApiKey = apiSettings.anthropic_api_key || '';
-      break;
-    case 'google':
-      aiApiKey = apiSettings.google_api_key || '';
-      break;
-    case 'deepseek':
-      aiApiKey = apiSettings.deepseek_api_key || '';
-      break;
-    case 'openrouter':
-      aiApiKey = apiSettings.openrouter_api_key || '';
-      break;
-    default:
-      // Fallback to ai_api_key field if it exists
-      aiApiKey = apiSettings.ai_api_key || '';
-  }
+  // Get the AI API key
+  const aiApiKey = apiSettings.ai_api_key || '';
 
   if (!aiApiKey) {
     throw new Error(`${apiSettings.ai_provider} API key not configured. Please configure in Settings.`);
   }
 
   return new TradingEngine({
-    alphaVantageApiKey: apiSettings.alpha_vantage_api_key,
     aiProvider: apiSettings.ai_provider,
     aiApiKey: aiApiKey,
     aiModel: apiSettings.ai_model,

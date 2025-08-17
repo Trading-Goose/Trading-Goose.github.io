@@ -44,31 +44,12 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
   
   // Fetch data on component mount and when selectedStock changes
   useEffect(() => {
-    // Only fetch if we have API credentials
-    if (apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key) {
-      fetchData();
-    }
+    fetchData();
   }, [apiSettings, selectedStock]);
   
   const fetchData = async () => {
-    const isPaperTrading = apiSettings?.alpaca_paper_trading ?? true;
-    const hasCredentials = isPaperTrading
-      ? (apiSettings?.alpaca_paper_api_key && apiSettings?.alpaca_paper_secret_key)
-      : (apiSettings?.alpaca_live_api_key && apiSettings?.alpaca_live_secret_key);
-    
-    // Debug logging
-    console.log('PerformanceChart - Checking Alpaca credentials:', {
-      apiSettings,
-      isPaperTrading,
-      alpaca_paper_api_key: apiSettings?.alpaca_paper_api_key,
-      alpaca_paper_secret_key: apiSettings?.alpaca_paper_secret_key,
-      alpaca_live_api_key: apiSettings?.alpaca_live_api_key,
-      alpaca_live_secret_key: apiSettings?.alpaca_live_secret_key,
-      hasCredentials
-    });
-    
-    if (!hasCredentials) {
-      console.log("Alpaca API credentials not configured - using mock data");
+    if (!apiSettings) {
+      console.log("API settings not loaded");
       return;
     }
     
@@ -253,7 +234,8 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
   const latestValue = currentData[currentData.length - 1] || { value: 0, pnl: 0 };
   const firstValue = currentData[0] || { value: 0, pnl: 0 };
   const totalReturn = latestValue.pnl || (latestValue.value - firstValue.value);
-  const totalReturnPercent = latestValue.pnlPercent || 
+  const totalReturnPercent = latestValue.pnlPercent ? 
+    parseFloat(latestValue.pnlPercent).toFixed(2) : 
     (firstValue.value > 0 ? ((totalReturn / firstValue.value) * 100).toFixed(2) : '0.00');
   const isPositive = totalReturn >= 0;
   

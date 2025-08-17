@@ -21,7 +21,6 @@ export interface ApiSettings {
   ai_provider: string;
   ai_api_key: string;
   ai_model: string;
-  alpha_vantage_api_key?: string;
   finnhub_api_key?: string;
   polygon_api_key?: string;
   alpaca_api_key?: string;
@@ -580,9 +579,6 @@ export const validateOpenRouterKey = (key: string): boolean => {
   return key.startsWith('sk-or-') && key.length > 20;
 };
 
-export const validateAlphaVantageKey = (key: string): boolean => {
-  return key.length > 10;
-};
 
 export const validateDeepSeekKey = (key: string): boolean => {
   return key.startsWith('sk-') && key.length > 20;

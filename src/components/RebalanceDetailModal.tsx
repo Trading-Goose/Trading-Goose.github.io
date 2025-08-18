@@ -896,7 +896,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           console.log('🔍 Type of opportunity_evaluation:', typeof rebalanceRequest.opportunity_evaluation);
           
           // If not found in workflow_steps, check opportunity_evaluation field directly
-          if (!opportunityStep.data && rebalanceRequest.opportunity_evaluation) {
+          // BUT only if we're past the opportunity_evaluation phase
+          if (!opportunityStep.data && rebalanceRequest.opportunity_evaluation && 
+              ['analyzing', 'planning', 'pending_approval', 'executing', 'completed'].includes(status)) {
             console.log('📊 Using opportunity_evaluation field from rebalance_requests');
             opportunityStep = {
               status: 'completed',
@@ -926,22 +928,27 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           let insights = opportunityStep.data;
           
           // Determine opportunity step status
-          // Priority: 1) Check explicit status field, 2) Check if data exists, 3) Check overall workflow status
+          // Priority: 1) Check explicit status field, 2) Check overall workflow status
           let opportunityStatus = 'pending';
           if (opportunityStep.status === 'error' || (opportunityStep.data && opportunityStep.data.error)) {
             opportunityStatus = 'error';
             // If the opportunity agent failed, the whole rebalance should show as failed
             insights = opportunityStep.data; // Keep the error data
-          } else if (opportunityStep.status === 'completed' || (opportunityStep.data && !opportunityStep.data.error)) {
+          } else if (opportunityStep.status === 'completed') {
+            // Only mark as completed if the workflow step explicitly says so
             opportunityStatus = 'completed';
-          } else if (status === 'initializing' || status === 'analyzing') {
+          } else if (opportunityStep.status === 'running' || status === 'opportunity_evaluation') {
+            // Opportunity agent is currently running
             opportunityStatus = 'running';
-          } else if (['planning', 'pending_approval', 'executing', 'completed'].includes(status)) {
-            // If we've moved past analyzing, opportunity must be complete
+          } else if (['analyzing', 'planning', 'pending_approval', 'executing', 'completed'].includes(status) && opportunityStep.status === 'completed') {
+            // If we've moved past opportunity_evaluation AND the step is marked complete
             opportunityStatus = 'completed';
           } else if (status === 'failed' && opportunityStep.data?.error) {
             // If rebalance failed and opportunity has error, mark it as error
             opportunityStatus = 'error';
+          } else {
+            // Default to pending if we can't determine status
+            opportunityStatus = 'pending';
           }
 
           // Parse insights if it's a string

@@ -1,10 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -16,43 +12,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Progress } from "@/components/ui/progress";
 import { 
   Settings, 
   Key, 
-  Save, 
   AlertCircle,
-  Check,
-  Eye,
-  EyeOff,
   TrendingUp,
-  TrendingDown,
   Bot,
-  Plus,
-  X,
-  Info,
   RefreshCw,
-  DollarSign
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabaseHelpers, supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import type { ApiSettings } from "@/lib/supabase";
 
-interface AiProvider {
-  id: string;
-  nickname: string;
-  provider: string;
-  apiKey: string;
-}
+// Import tab components
+import ProvidersTab from "./settings/ProvidersTab";
+import AgentsTab from "./settings/AgentsTab";
+import RebalanceTab from "./settings/RebalanceTab";
+import TradingTab from "./settings/TradingTab";
+import type { AiProvider } from "./settings/types";
 
 // Helper function to validate credentials via edge function
 const validateCredential = async (provider: string, apiKey: string): Promise<{ valid: boolean; message: string }> => {
@@ -1138,1418 +1116,147 @@ export default function SettingsPage() {
           </TabsList>
 
           <TabsContent value="providers" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5" />
-                  API Provider Configuration
-                </CardTitle>
-                <CardDescription>
-                  Configure your data and AI provider API keys
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-
-                {/* Default AI Provider Configuration */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Default AI Provider</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Configure your primary AI provider. This will be used by default for all analysis.
-                  </p>
-                  
-                  {aiProviders.length > 0 && aiProviders[0] && (() => {
-                    const provider = aiProviders[0];
-                    return (
-                      <div className="space-y-3">
-                        <div className="flex gap-4 items-start">
-                          <div className="flex-1">
-                            <Label className="text-xs mb-1">Nickname</Label>
-                            <Input
-                              placeholder="e.g., Production API"
-                              value={provider.nickname}
-                              onChange={(e) => updateAiProvider(provider.id, 'nickname', e.target.value)}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <Label className="text-xs mb-1">Provider</Label>
-                            <Select
-                              value={provider.provider}
-                              onValueChange={(value) => updateAiProvider(provider.id, 'provider', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select provider" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="openai">OpenAI</SelectItem>
-                                <SelectItem value="anthropic">Anthropic</SelectItem>
-                                <SelectItem value="google">Google AI</SelectItem>
-                                <SelectItem value="deepseek">DeepSeek</SelectItem>
-                                <SelectItem value="openrouter">OpenRouter</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="flex gap-4 items-start">
-                          <div className="flex-1">
-                            <Label className="text-xs mb-1">API Key</Label>
-                            <div className="relative">
-                              <Input
-                                type={showKeys[`provider_${provider.id}`] ? "text" : "password"}
-                                placeholder="Enter your default AI provider API key"
-                                value={provider.apiKey}
-                                onChange={(e) => updateAiProvider(provider.id, 'apiKey', e.target.value)}
-                                className={errors[`provider_${provider.id}`] ? "border-red-500 font-mono text-sm" : "font-mono text-sm"}
-                              />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-                                onClick={() => toggleShowKey(`provider_${provider.id}`)}
-                              >
-                                {showKeys[`provider_${provider.id}`] ? (
-                                  <EyeOff className="h-4 w-4" />
-                                ) : (
-                                  <Eye className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
-                            {errors[`provider_${provider.id}`] && (
-                              <p className="text-sm text-red-500 mt-1">{errors[`provider_${provider.id}`]}</p>
-                            )}
-                          </div>
-                        </div>
-                        {provider.provider && (
-                          <div className="flex-1">
-                            <Label className="text-xs mb-1">Default Model</Label>
-                            <Select value={defaultAiModel} onValueChange={setDefaultAiModel}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select default model" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {getModelOptions(provider.provider).map(model => (
-                                  <SelectItem key={model} value={model}>
-                                    {model === 'custom' ? 'Custom (enter manually)' : model}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {defaultAiModel === 'custom' && (
-                              <Input
-                                className="mt-2"
-                                placeholder="Enter custom model name"
-                                value={defaultCustomModel}
-                                onChange={(e) => setDefaultCustomModel(e.target.value)}
-                              />
-                            )}
-                          </div>
-                        )}
-                        <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground ml-1">
-                            This provider will be used by default for all teams unless overridden
-                          </p>
-                          {provider.provider && provider.apiKey && (
-                            <p className="text-xs text-muted-foreground ml-1">
-                              When agents use "Default AI", they will use this provider with the {defaultAiModel === 'custom' ? defaultCustomModel : (defaultAiModel || getModelOptions(provider.provider)[0])} model
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Additional AI Providers */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Additional AI Providers</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Configure additional AI providers for team-specific assignments.
-                  </p>
-                  
-                  <div className="space-y-4">
-                    {aiProviders.slice(1).map((provider, index) => (
-                        <div key={provider.id} className="space-y-3 p-4 border rounded-lg">
-                          <div className="flex gap-4 items-start">
-                            <div className="flex-1">
-                              <Label className="text-xs mb-1">Nickname</Label>
-                              <Input
-                                placeholder="e.g., Fast Model"
-                                value={provider.nickname}
-                                onChange={(e) => updateAiProvider(provider.id, 'nickname', e.target.value)}
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <Label className="text-xs mb-1">Provider</Label>
-                              <Select
-                                value={provider.provider}
-                                onValueChange={(value) => updateAiProvider(provider.id, 'provider', value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select provider" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="openai">OpenAI</SelectItem>
-                                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                                  <SelectItem value="google">Google AI</SelectItem>
-                                  <SelectItem value="deepseek">DeepSeek</SelectItem>
-                                  <SelectItem value="openrouter">OpenRouter</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          <div className="flex gap-4 items-start">
-                            <div className="flex-1">
-                              <Label className="text-xs mb-1">API Key</Label>
-                              <div className="relative">
-                                <Input
-                                  type={showKeys[`provider_${provider.id}`] ? "text" : "password"}
-                                  placeholder="Enter API key"
-                                  value={provider.apiKey}
-                                  onChange={(e) => updateAiProvider(provider.id, 'apiKey', e.target.value)}
-                                  className={errors[`provider_${provider.id}`] ? "border-red-500 font-mono text-sm" : "font-mono text-sm"}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-                                  onClick={() => toggleShowKey(`provider_${provider.id}`)}
-                                >
-                                  {showKeys[`provider_${provider.id}`] ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                              {errors[`provider_${provider.id}`] && (
-                                <p className="text-sm text-red-500 mt-1">{errors[`provider_${provider.id}`]}</p>
-                              )}
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeAiProvider(provider.id)}
-                              className="mt-5"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                    ))}
-                    
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={addAiProvider}
-                      className="w-full"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Additional Provider
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Save Button for Providers Tab */}
-                <div className="flex justify-end pt-4">
-                  {saved && activeTab === 'providers' && (
-                    <Alert className="mr-4 w-auto bg-green-50 border-green-200">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <AlertDescription className="text-green-800">
-                        Provider settings saved successfully!
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {errors.save && activeTab === 'providers' && !errors.save.includes('Cannot delete provider') && !errors.save.includes('Cannot remove') && (
-                    <Alert className="mr-4 w-auto bg-red-50 border-red-200">
-                      <AlertCircle className="h-4 w-4 text-red-600" />
-                      <AlertDescription className="text-red-800">
-                        {errors.save}
-                        {errors.save.includes('column') && (
-                          <div className="mt-2 text-sm">
-                            <p className="font-semibold">Database migration may be needed:</p>
-                            <p>Run: <code className="bg-red-100 px-1 rounded">npx supabase db push</code></p>
-                          </div>
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  <Button 
-                    onClick={() => handleSaveTab('providers')} 
-                    size="lg"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Provider Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ProvidersTab
+              aiProviders={aiProviders}
+              defaultAiModel={defaultAiModel}
+              defaultCustomModel={defaultCustomModel}
+              showKeys={showKeys}
+              errors={errors}
+              saved={saved}
+              activeTab={activeTab}
+              updateAiProvider={updateAiProvider}
+              setDefaultAiModel={setDefaultAiModel}
+              setDefaultCustomModel={setDefaultCustomModel}
+              toggleShowKey={toggleShowKey}
+              addAiProvider={addAiProvider}
+              removeAiProvider={removeAiProvider}
+              handleSaveTab={handleSaveTab}
+              getModelOptions={getModelOptions}
+            />
           </TabsContent>
 
           <TabsContent value="agents" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5" />
-                  Agent Configuration
-                </CardTitle>
-                <CardDescription>
-                  Configure AI models for each agent team
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Agent Team Configuration Info */}
-                <Alert className="mb-6">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Each agent team will use your default AI provider unless you assign a specific provider below.
-                    Configure additional providers in the Providers tab first.
-                  </AlertDescription>
-                </Alert>
-
-                {/* Analysis Agent */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Analysis Agent</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>AI Provider</Label>
-                      <Select value={analysisTeamProviderId} onValueChange={setAnalysisTeamProviderId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select provider" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getConfiguredProviders().map(provider => (
-                            <SelectItem key={provider.id} value={provider.id}>
-                              {provider.nickname}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Model</Label>
-                      {analysisTeamProviderId === defaultProviderId ? (
-                        <div>
-                          <Select 
-                            disabled 
-                            value={getDefaultModelValue()}
-                          >
-                            <SelectTrigger>
-                              <SelectValue>{getDefaultModelValue()}</SelectValue>
-                            </SelectTrigger>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Using Default AI provider's model
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <Select 
-                            value={analysisTeamModel} 
-                            onValueChange={setAnalysisTeamModel}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select model" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getModelOptions(aiProviders.find(p => p.id === analysisTeamProviderId)?.provider || 'openai').map(model => (
-                                <SelectItem key={model} value={model}>
-                                  {model === 'custom' ? 'Custom (enter manually)' : model}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {analysisTeamModel === 'custom' && (
-                            <Input
-                              className="mt-2"
-                              placeholder="Enter custom model name"
-                              value={analysisCustomModel}
-                              onChange={(e) => setAnalysisCustomModel(e.target.value)}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>News & Social Analysis Optimization</Label>
-                      <Select 
-                        value={newsSocialOptimization} 
-                        onValueChange={setNewsSocialOptimization}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select optimization level" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="normal">Normal</SelectItem>
-                          <SelectItem value="balanced">Balanced</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Normal=Standard news/social analysis, Balanced=More thorough coverage
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Historical Data Range</Label>
-                      <Select 
-                        value={analysisHistoryDays} 
-                        onValueChange={setAnalysisHistoryDays}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select time range" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1M">1 Month</SelectItem>
-                          <SelectItem value="3M">3 Months</SelectItem>
-                          <SelectItem value="6M">6 Months</SelectItem>
-                          <SelectItem value="1Y">1 Year</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        How far back to analyze data
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      Max Tokens
-                      <Info className="h-3 w-3 text-muted-foreground" />
-                    </Label>
-                    <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                      <Slider
-                        value={[analysisMaxTokens]}
-                        onValueChange={(value) => setAnalysisMaxTokens(value[0])}
-                        min={500}
-                        max={8000}
-                        step={500}
-                        className="flex-1"
-                      />
-                      <span className="w-16 text-center font-medium">{analysisMaxTokens}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Maximum response tokens for analysis agents (500-8000)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Research Agent */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Research Agent</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>AI Provider</Label>
-                      <Select value={researchTeamProviderId} onValueChange={setResearchTeamProviderId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select provider" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getConfiguredProviders().map(provider => (
-                            <SelectItem key={provider.id} value={provider.id}>
-                              {provider.nickname}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Model</Label>
-                      {researchTeamProviderId === defaultProviderId ? (
-                        <div>
-                          <Select 
-                            disabled 
-                            value={getDefaultModelValue()}
-                          >
-                            <SelectTrigger>
-                              <SelectValue>{getDefaultModelValue()}</SelectValue>
-                            </SelectTrigger>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Using Default AI provider's model
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <Select 
-                            value={researchTeamModel} 
-                            onValueChange={setResearchTeamModel}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select model" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getModelOptions(aiProviders.find(p => p.id === researchTeamProviderId)?.provider || 'openai').map(model => (
-                                <SelectItem key={model} value={model}>
-                                  {model === 'custom' ? 'Custom (enter manually)' : model}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {researchTeamModel === 'custom' && (
-                            <Input
-                              className="mt-2"
-                              placeholder="Enter custom model name"
-                              value={researchCustomModel}
-                              onChange={(e) => setResearchCustomModel(e.target.value)}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Number of Debate Rounds</Label>
-                    <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                      <Slider
-                        value={[researchDebateRounds]}
-                        onValueChange={(value) => setResearchDebateRounds(value[0])}
-                        min={1}
-                        max={5}
-                        step={1}
-                        className="flex-1"
-                      />
-                      <span className="w-12 text-center font-medium">{researchDebateRounds}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      How many rounds of bull vs bear debate
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      Max Tokens
-                      <Info className="h-3 w-3 text-muted-foreground" />
-                    </Label>
-                    <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                      <Slider
-                        value={[researchMaxTokens]}
-                        onValueChange={(value) => setResearchMaxTokens(value[0])}
-                        min={500}
-                        max={8000}
-                        step={500}
-                        className="flex-1"
-                      />
-                      <span className="w-16 text-center font-medium">{researchMaxTokens}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Maximum response tokens for research agents (500-8000)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Trading Decision Agent */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Trading Decision Agent</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>AI Provider</Label>
-                      <Select value={tradingTeamProviderId} onValueChange={setTradingTeamProviderId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select provider" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getConfiguredProviders().map(provider => (
-                            <SelectItem key={provider.id} value={provider.id}>
-                              {provider.nickname}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Model</Label>
-                      {tradingTeamProviderId === defaultProviderId ? (
-                        <div>
-                          <Select 
-                            disabled 
-                            value={getDefaultModelValue()}
-                          >
-                            <SelectTrigger>
-                              <SelectValue>{getDefaultModelValue()}</SelectValue>
-                            </SelectTrigger>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Using Default AI provider's model
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <Select 
-                            value={tradingTeamModel} 
-                            onValueChange={setTradingTeamModel}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select model" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getModelOptions(aiProviders.find(p => p.id === tradingTeamProviderId)?.provider || 'openai').map(model => (
-                                <SelectItem key={model} value={model}>
-                                  {model === 'custom' ? 'Custom (enter manually)' : model}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {tradingTeamModel === 'custom' && (
-                            <Input
-                              className="mt-2"
-                              placeholder="Enter custom model name"
-                              value={tradingCustomModel}
-                              onChange={(e) => setTradingCustomModel(e.target.value)}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      Max Tokens
-                      <Info className="h-3 w-3 text-muted-foreground" />
-                    </Label>
-                    <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                      <Slider
-                        value={[tradingMaxTokens]}
-                        onValueChange={(value) => setTradingMaxTokens(value[0])}
-                        min={500}
-                        max={8000}
-                        step={500}
-                        className="flex-1"
-                      />
-                      <span className="w-16 text-center font-medium">{tradingMaxTokens}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Maximum response tokens for trading agent (500-8000)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Risk Management Agent */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Risk Management Agent</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>AI Provider</Label>
-                      <Select value={riskTeamProviderId} onValueChange={setRiskTeamProviderId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select provider" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getConfiguredProviders().map(provider => (
-                            <SelectItem key={provider.id} value={provider.id}>
-                              {provider.nickname}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Model</Label>
-                      {riskTeamProviderId === defaultProviderId ? (
-                        <div>
-                          <Select 
-                            disabled 
-                            value={getDefaultModelValue()}
-                          >
-                            <SelectTrigger>
-                              <SelectValue>{getDefaultModelValue()}</SelectValue>
-                            </SelectTrigger>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Using Default AI provider's model
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <Select 
-                            value={riskTeamModel} 
-                            onValueChange={setRiskTeamModel}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select model" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getModelOptions(aiProviders.find(p => p.id === riskTeamProviderId)?.provider || 'openai').map(model => (
-                                <SelectItem key={model} value={model}>
-                                  {model === 'custom' ? 'Custom (enter manually)' : model}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {riskTeamModel === 'custom' && (
-                            <Input
-                              className="mt-2"
-                              placeholder="Enter custom model name"
-                              value={riskCustomModel}
-                              onChange={(e) => setRiskCustomModel(e.target.value)}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      Max Tokens
-                      <Info className="h-3 w-3 text-muted-foreground" />
-                    </Label>
-                    <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                      <Slider
-                        value={[riskMaxTokens]}
-                        onValueChange={(value) => setRiskMaxTokens(value[0])}
-                        min={500}
-                        max={8000}
-                        step={500}
-                        className="flex-1"
-                      />
-                      <span className="w-16 text-center font-medium">{riskMaxTokens}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Maximum response tokens for risk agents (500-8000)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Portfolio Manager Configuration */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Portfolio Manager</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Analyzes portfolio positions and generates optimal allocation strategy with trade orders
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>AI Provider</Label>
-                      <Select value={portfolioManagerProviderId} onValueChange={setPortfolioManagerProviderId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select provider" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getConfiguredProviders().map(provider => (
-                            <SelectItem key={provider.id} value={provider.id}>
-                              {provider.nickname}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Model</Label>
-                      {portfolioManagerProviderId === defaultProviderId ? (
-                        <div>
-                          <Select 
-                            disabled 
-                            value={getDefaultModelValue()}
-                          >
-                            <SelectTrigger>
-                              <SelectValue>{getDefaultModelValue()}</SelectValue>
-                            </SelectTrigger>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Using Default AI provider's model
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <Select 
-                            value={portfolioManagerModel} 
-                            onValueChange={setPortfolioManagerModel}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select model" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getModelOptions(aiProviders.find(p => p.id === portfolioManagerProviderId)?.provider || 'openai').map(model => (
-                                <SelectItem key={model} value={model}>
-                                  {model === 'custom' ? 'Custom (enter manually)' : model}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {portfolioManagerModel === 'custom' && (
-                            <Input
-                              className="mt-2"
-                              placeholder="Enter custom model name"
-                              value={portfolioManagerCustomModel}
-                              onChange={(e) => setPortfolioManagerCustomModel(e.target.value)}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      Max Tokens
-                      <Info className="h-3 w-3 text-muted-foreground" />
-                    </Label>
-                    <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                      <Slider
-                        value={[portfolioManagerMaxTokens]}
-                        onValueChange={(value) => setPortfolioManagerMaxTokens(value[0])}
-                        min={500}
-                        max={8000}
-                        step={500}
-                        className="flex-1"
-                      />
-                      <span className="w-16 text-center font-medium">{portfolioManagerMaxTokens}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Maximum response tokens for portfolio manager (500-8000)
-                    </p>
-                  </div>
-                </div>
-
-
-                {/* Save Button for Agents Tab */}
-                <div className="flex justify-end pt-4">
-                  {saved && activeTab === 'agents' && (
-                    <Alert className="mr-4 w-auto bg-green-50 border-green-200">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <AlertDescription className="text-green-800">
-                        Agent configuration saved successfully!
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  <Button 
-                    onClick={() => handleSaveTab('agents')} 
-                    size="lg"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Agent Configuration
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <AgentsTab
+              aiProviders={aiProviders}
+              researchDebateRounds={researchDebateRounds}
+              analysisTeamProviderId={analysisTeamProviderId}
+              analysisTeamModel={analysisTeamModel}
+              analysisCustomModel={analysisCustomModel}
+              researchTeamProviderId={researchTeamProviderId}
+              researchTeamModel={researchTeamModel}
+              researchCustomModel={researchCustomModel}
+              tradingTeamProviderId={tradingTeamProviderId}
+              tradingTeamModel={tradingTeamModel}
+              tradingCustomModel={tradingCustomModel}
+              riskTeamProviderId={riskTeamProviderId}
+              riskTeamModel={riskTeamModel}
+              riskCustomModel={riskCustomModel}
+              portfolioManagerProviderId={portfolioManagerProviderId}
+              portfolioManagerModel={portfolioManagerModel}
+              portfolioManagerCustomModel={portfolioManagerCustomModel}
+              newsSocialOptimization={newsSocialOptimization}
+              analysisHistoryDays={analysisHistoryDays}
+              analysisMaxTokens={analysisMaxTokens}
+              researchMaxTokens={researchMaxTokens}
+              tradingMaxTokens={tradingMaxTokens}
+              riskMaxTokens={riskMaxTokens}
+              portfolioManagerMaxTokens={portfolioManagerMaxTokens}
+              defaultAiModel={defaultAiModel}
+              defaultCustomModel={defaultCustomModel}
+              saved={saved}
+              activeTab={activeTab}
+              setResearchDebateRounds={setResearchDebateRounds}
+              setAnalysisTeamProviderId={setAnalysisTeamProviderId}
+              setAnalysisTeamModel={setAnalysisTeamModel}
+              setAnalysisCustomModel={setAnalysisCustomModel}
+              setResearchTeamProviderId={setResearchTeamProviderId}
+              setResearchTeamModel={setResearchTeamModel}
+              setResearchCustomModel={setResearchCustomModel}
+              setTradingTeamProviderId={setTradingTeamProviderId}
+              setTradingTeamModel={setTradingTeamModel}
+              setTradingCustomModel={setTradingCustomModel}
+              setRiskTeamProviderId={setRiskTeamProviderId}
+              setRiskTeamModel={setRiskTeamModel}
+              setRiskCustomModel={setRiskCustomModel}
+              setPortfolioManagerProviderId={setPortfolioManagerProviderId}
+              setPortfolioManagerModel={setPortfolioManagerModel}
+              setPortfolioManagerCustomModel={setPortfolioManagerCustomModel}
+              setNewsSocialOptimization={setNewsSocialOptimization}
+              setAnalysisHistoryDays={setAnalysisHistoryDays}
+              setAnalysisMaxTokens={setAnalysisMaxTokens}
+              setResearchMaxTokens={setResearchMaxTokens}
+              setTradingMaxTokens={setTradingMaxTokens}
+              setRiskMaxTokens={setRiskMaxTokens}
+              setPortfolioManagerMaxTokens={setPortfolioManagerMaxTokens}
+              handleSaveTab={handleSaveTab}
+              getModelOptions={getModelOptions}
+              getConfiguredProviders={getConfiguredProviders}
+              getDefaultModelValue={getDefaultModelValue}
+            />
           </TabsContent>
 
           <TabsContent value="rebalance" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <RefreshCw className="h-5 w-5" />
-                  Rebalance Configuration
-                </CardTitle>
-                <CardDescription>
-                  Configure portfolio rebalancing settings and agents
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Rebalance Settings */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Rebalance Settings</h3>
-                  
-                  {/* Rebalance Threshold */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      Rebalance Threshold (%)
-                      <Info className="h-3 w-3 text-muted-foreground" />
-                    </Label>
-                    <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                      <Slider
-                        value={[rebalanceThreshold]}
-                        onValueChange={(value) => setRebalanceThreshold(value[0])}
-                        min={1}
-                        max={20}
-                        step={1}
-                        className="flex-1"
-                      />
-                      <span className="w-12 text-center font-medium">{rebalanceThreshold}%</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Trigger rebalance when portfolio drift exceeds this percentage
-                    </p>
-                  </div>
-                  
-                  {/* Position Size Limits */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Min Position Size ($)</Label>
-                      <Input
-                        type="number"
-                        value={rebalanceMinPositionSize}
-                        onChange={(e) => setRebalanceMinPositionSize(Number(e.target.value))}
-                        min={0}
-                        step={100}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Minimum dollar amount per position
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Max Position Size ($)</Label>
-                      <Input
-                        type="number"
-                        value={rebalanceMaxPositionSize}
-                        onChange={(e) => setRebalanceMaxPositionSize(Number(e.target.value))}
-                        min={0}
-                        step={1000}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Maximum dollar amount per position
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Portfolio Allocation */}
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Portfolio Allocation</Label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-sm">Stock Allocation: {targetStockAllocation}%</Label>
-                          <Slider
-                            value={[targetStockAllocation]}
-                            onValueChange={(value) => {
-                              setTargetStockAllocation(value[0]);
-                              setTargetCashAllocation(100 - value[0]);
-                            }}
-                            min={0}
-                            max={100}
-                            step={5}
-                            className="w-full"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-sm">Cash Allocation: {targetCashAllocation}%</Label>
-                          <div className="h-10 flex items-center">
-                            <Progress value={targetCashAllocation} className="h-2 w-full" />
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Target allocation between stocks and cash in your portfolio. These values must total 100%.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-
-                {/* Opportunity Agent Configuration */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold">Opportunity Agent</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Identifies market opportunities when portfolio is within threshold
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>AI Provider</Label>
-                      <Select value={opportunityAgentProviderId} onValueChange={setOpportunityAgentProviderId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select provider" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getConfiguredProviders().map(provider => (
-                            <SelectItem key={provider.id} value={provider.id}>
-                              {provider.nickname}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Model</Label>
-                      {opportunityAgentProviderId === defaultProviderId ? (
-                        <div>
-                          <Select 
-                            disabled 
-                            value={getDefaultModelValue()}
-                          >
-                            <SelectTrigger>
-                              <SelectValue>{getDefaultModelValue()}</SelectValue>
-                            </SelectTrigger>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Using Default AI provider's model
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <Select 
-                            value={opportunityAgentModel} 
-                            onValueChange={setOpportunityAgentModel}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select model" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getModelOptions(aiProviders.find(p => p.id === opportunityAgentProviderId)?.provider || 'openai').map(model => (
-                                <SelectItem key={model} value={model}>
-                                  {model === 'custom' ? 'Custom (enter manually)' : model}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {opportunityAgentModel === 'custom' && (
-                            <Input
-                              className="mt-2"
-                              placeholder="Enter custom model name"
-                              value={opportunityCustomModel}
-                              onChange={(e) => setOpportunityCustomModel(e.target.value)}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Market Data Time Range</Label>
-                    <Select 
-                      value={opportunityMarketRange} 
-                      onValueChange={setOpportunityMarketRange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select time range" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1D">1 Day</SelectItem>
-                        <SelectItem value="1W">1 Week</SelectItem>
-                        <SelectItem value="1M">1 Month</SelectItem>
-                        <SelectItem value="3M">3 Months</SelectItem>
-                        <SelectItem value="1Y">1 Year</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Historical price data range for market opportunity analysis
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      Max Tokens
-                      <Info className="h-3 w-3 text-muted-foreground" />
-                    </Label>
-                    <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                      <Slider
-                        value={[opportunityMaxTokens]}
-                        onValueChange={(value) => setOpportunityMaxTokens(value[0])}
-                        min={500}
-                        max={8000}
-                        step={500}
-                        className="flex-1"
-                      />
-                      <span className="w-16 text-center font-medium">{opportunityMaxTokens}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Maximum response tokens for opportunity agent (500-8000)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Save Button for Rebalance Tab */}
-                <div className="flex justify-end pt-4">
-                  {saved && activeTab === 'rebalance' && (
-                    <Alert className="mr-4 w-auto bg-green-50 border-green-200">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <AlertDescription className="text-green-800">
-                        Rebalance configuration saved successfully!
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {errors.save && activeTab === 'rebalance' && (
-                    <Alert className="mr-4 w-auto bg-red-50 border-red-200">
-                      <AlertCircle className="h-4 w-4 text-red-600" />
-                      <AlertDescription className="text-red-800">
-                        {errors.save}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  <Button 
-                    onClick={() => handleSaveTab('rebalance')} 
-                    size="lg"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Rebalance Configuration
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <RebalanceTab
+              aiProviders={aiProviders}
+              rebalanceThreshold={rebalanceThreshold}
+              rebalanceMinPositionSize={rebalanceMinPositionSize}
+              rebalanceMaxPositionSize={rebalanceMaxPositionSize}
+              targetStockAllocation={targetStockAllocation}
+              targetCashAllocation={targetCashAllocation}
+              opportunityAgentProviderId={opportunityAgentProviderId}
+              opportunityAgentModel={opportunityAgentModel}
+              opportunityCustomModel={opportunityCustomModel}
+              opportunityMaxTokens={opportunityMaxTokens}
+              opportunityMarketRange={opportunityMarketRange}
+              defaultAiModel={defaultAiModel}
+              defaultCustomModel={defaultCustomModel}
+              saved={saved}
+              activeTab={activeTab}
+              errors={errors}
+              setRebalanceThreshold={setRebalanceThreshold}
+              setRebalanceMinPositionSize={setRebalanceMinPositionSize}
+              setRebalanceMaxPositionSize={setRebalanceMaxPositionSize}
+              setTargetStockAllocation={setTargetStockAllocation}
+              setTargetCashAllocation={setTargetCashAllocation}
+              setOpportunityAgentProviderId={setOpportunityAgentProviderId}
+              setOpportunityAgentModel={setOpportunityAgentModel}
+              setOpportunityCustomModel={setOpportunityCustomModel}
+              setOpportunityMaxTokens={setOpportunityMaxTokens}
+              setOpportunityMarketRange={setOpportunityMarketRange}
+              handleSaveTab={handleSaveTab}
+              getModelOptions={getModelOptions}
+              getConfiguredProviders={getConfiguredProviders}
+              getDefaultModelValue={getDefaultModelValue}
+            />
           </TabsContent>
 
           <TabsContent value="trading" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Alpaca Trading Configuration
-                </CardTitle>
-                <CardDescription>
-                  Configure your Alpaca trading credentials
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Information and Trading Mode Toggle Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Getting Started Information */}
-                  <div className="rounded-lg border bg-muted/50 p-4">
-                    <span className="block text-sm font-medium mb-2">
-                      Getting Started
-                    </span>
-                    <ol className="space-y-1 text-xs text-muted-foreground">
-                      <li className="flex items-start gap-2">
-                        <span className="font-medium">1.</span>
-                        <span>Visit <a href="https://alpaca.markets" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">alpaca.markets</a> and create an account</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="font-medium">2.</span>
-                        <span>Navigate to your dashboard and select API Keys</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="font-medium">3.</span>
-                        <span>Generate separate keys for Paper and Live trading</span>
-                      </li>
-                    </ol>
-                  </div>
-
-                  {/* Trading Mode Toggle */}
-                  <div className="rounded-lg border bg-muted/30 p-4">
-                    <div className="flex items-start space-x-3">
-                      <div className="flex items-center h-5">
-                        <input
-                          type="checkbox"
-                          id="paper-trading"
-                          checked={alpacaPaperTrading}
-                          onChange={(e) => setAlpacaPaperTrading(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-2 focus:ring-2 focus:ring-offset-background transition-all cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label htmlFor="paper-trading" className="text-base font-medium cursor-pointer leading-none">
-                          Use Paper Trading
-                        </Label>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Recommended for testing strategies with simulated money
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Trade Execution Settings */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <RefreshCw className="h-4 w-4" />
-                    Trade Execution Settings
-                  </h3>
-                  
-                  {/* Order Type Preference */}
-                  <div className="space-y-2">
-                    <Label htmlFor="order-type">Preferred Order Type</Label>
-                    <Select value={orderTypePreference} onValueChange={setOrderTypePreference}>
-                      <SelectTrigger id="order-type">
-                        <SelectValue placeholder="Select order type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">
-                          <div className="flex items-center gap-2">
-                            <Bot className="h-4 w-4" />
-                            <span>Auto (Recommended)</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="share_amount">
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4" />
-                            <span>By Share Amount</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="dollar_amount">
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="h-4 w-4" />
-                            <span>By Specific Value</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      {orderTypePreference === 'auto' && 
-                        "Automatically chooses between share and dollar orders based on affordability and fractional share support"
-                      }
-                      {orderTypePreference === 'share_amount' && 
-                        "Orders will specify exact number of shares to buy/sell"
-                      }
-                      {orderTypePreference === 'dollar_amount' && 
-                        "Orders will specify dollar amount to invest (supports fractional shares)"
-                      }
-                    </p>
-                  </div>
-                  
-                  {/* User Risk Level */}
-                  <div className="space-y-2">
-                    <Label htmlFor="risk-level">Risk Tolerance Level</Label>
-                    <Select value={userRiskLevel} onValueChange={setUserRiskLevel}>
-                      <SelectTrigger id="risk-level">
-                        <SelectValue placeholder="Select risk level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="conservative">
-                          <div className="flex items-center gap-2">
-                            <TrendingDown className="h-4 w-4 text-blue-500" />
-                            <span>Conservative</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="moderate">
-                          <div className="flex items-center gap-2">
-                            <RefreshCw className="h-4 w-4 text-yellow-500" />
-                            <span>Moderate (Recommended)</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="aggressive">
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-red-500" />
-                            <span>Aggressive</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      {userRiskLevel === 'conservative' && 
-                        "Lower position sizes, focuses on capital preservation and steady growth"
-                      }
-                      {userRiskLevel === 'moderate' && 
-                        "Balanced approach between risk and reward, suitable for most investors"
-                      }
-                      {userRiskLevel === 'aggressive' && 
-                        "Larger position sizes, maximizes growth potential with higher risk tolerance"
-                      }
-                    </p>
-                  </div>
-                  
-                  {/* Default Position Size */}
-                  <div className="space-y-2">
-                    <Label htmlFor="position-size">Default Position Size</Label>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="position-size"
-                        type="number"
-                        min="100"
-                        step="100"
-                        value={defaultPositionSizeDollars}
-                        onChange={(e) => setDefaultPositionSizeDollars(Number(e.target.value))}
-                        className="flex-1"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Base amount in dollars for each trade position. Will be adjusted based on confidence and risk level.
-                    </p>
-                  </div>
-                  
-                  {/* Auto-Execute Trade Orders */}
-                  <div className="rounded-lg border bg-muted/30 p-4">
-                    <div className="flex items-start space-x-3">
-                      <div className="flex items-center h-5">
-                        <input
-                          type="checkbox"
-                          id="auto-execute"
-                          checked={autoExecuteTrades}
-                          onChange={(e) => setAutoExecuteTrades(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-2 focus:ring-2 focus:ring-offset-background transition-all cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label htmlFor="auto-execute" className="text-base font-medium cursor-pointer leading-none">
-                          Auto-Execute Trade Orders
-                        </Label>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          When enabled, approved trade recommendations will be automatically executed without manual confirmation
-                        </p>
-                        {autoExecuteTrades && (
-                          <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
-                            <p className="text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
-                              <AlertCircle className="h-3 w-3" />
-                              <span>Auto-execution will use {alpacaPaperTrading ? 'paper' : 'live'} trading mode</span>
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Paper Trading Credentials */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    Paper Trading Credentials
-                  </h3>
-                  <div className="rounded-lg border bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10 p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      <span className="text-sm font-medium">
-                        Safe Testing Environment
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Test strategies safely with simulated money. No real funds at risk.
-                    </p>
-                    
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          Paper API Key
-                          {configuredProviders.alpaca_paper && (
-                            <Badge variant="success" className="text-xs">
-                              <Check className="h-3 w-3 mr-1" />
-                              Configured
-                            </Badge>
-                          )}
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            type={showKeys.alpacaPaperApiKey ? "text" : "password"}
-                            placeholder="Enter your paper trading API key"
-                            value={alpacaPaperApiKey}
-                            onChange={(e) => setAlpacaPaperApiKey(e.target.value)}
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-                            onClick={() => toggleShowKey('alpacaPaperApiKey')}
-                          >
-                            {showKeys.alpacaPaperApiKey ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Paper Secret Key</Label>
-                        <div className="relative">
-                          <Input
-                            type={showKeys.alpacaPaperSecretKey ? "text" : "password"}
-                            placeholder="Enter your paper trading secret key"
-                            value={alpacaPaperSecretKey}
-                            onChange={(e) => setAlpacaPaperSecretKey(e.target.value)}
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-                            onClick={() => toggleShowKey('alpacaPaperSecretKey')}
-                          >
-                            {showKeys.alpacaPaperSecretKey ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Live Trading Credentials */}
-                <div className="space-y-4 p-4 border rounded-lg bg-card">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    Live Trading Credentials
-                  </h3>
-                  <div className="rounded-lg border bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10 p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                      <span className="text-sm font-medium">
-                        Real Money Trading
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      <strong>⚠️ Warning:</strong> These credentials will execute real trades with actual money. Use extreme caution and ensure you understand the risks.
-                    </p>
-                    
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          Live API Key
-                          {configuredProviders.alpaca_live && (
-                            <Badge variant="success" className="text-xs">
-                              <Check className="h-3 w-3 mr-1" />
-                              Configured
-                            </Badge>
-                          )}
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            type={showKeys.alpacaLiveApiKey ? "text" : "password"}
-                            placeholder="Enter your live trading API key"
-                            value={alpacaLiveApiKey}
-                            onChange={(e) => setAlpacaLiveApiKey(e.target.value)}
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-                            onClick={() => toggleShowKey('alpacaLiveApiKey')}
-                          >
-                            {showKeys.alpacaLiveApiKey ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Live Secret Key</Label>
-                        <div className="relative">
-                          <Input
-                            type={showKeys.alpacaLiveSecretKey ? "text" : "password"}
-                            placeholder="Enter your live trading secret key"
-                            value={alpacaLiveSecretKey}
-                            onChange={(e) => setAlpacaLiveSecretKey(e.target.value)}
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
-                            onClick={() => toggleShowKey('alpacaLiveSecretKey')}
-                          >
-                            {showKeys.alpacaLiveSecretKey ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Save Button for Trading Tab */}
-                <div className="flex justify-end pt-4">
-                  {saved && activeTab === 'trading' && (
-                    <Alert className="mr-4 w-auto bg-green-50 border-green-200">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <AlertDescription className="text-green-800">
-                        Trading settings saved successfully!
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  <Button 
-                    onClick={() => {
-                      console.log('Button clicked - calling handleSaveTab for trading');
-                      handleSaveTab('trading').catch(err => {
-                        console.error('Error in handleSaveTab:', err);
-                      });
-                    }} 
-                    size="lg"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Trading Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <TradingTab
+              alpacaPaperApiKey={alpacaPaperApiKey}
+              alpacaPaperSecretKey={alpacaPaperSecretKey}
+              alpacaLiveApiKey={alpacaLiveApiKey}
+              alpacaLiveSecretKey={alpacaLiveSecretKey}
+              alpacaPaperTrading={alpacaPaperTrading}
+              autoExecuteTrades={autoExecuteTrades}
+              orderTypePreference={orderTypePreference}
+              userRiskLevel={userRiskLevel}
+              defaultPositionSizeDollars={defaultPositionSizeDollars}
+              configuredProviders={configuredProviders}
+              showKeys={showKeys}
+              saved={saved}
+              activeTab={activeTab}
+              setAlpacaPaperApiKey={setAlpacaPaperApiKey}
+              setAlpacaPaperSecretKey={setAlpacaPaperSecretKey}
+              setAlpacaLiveApiKey={setAlpacaLiveApiKey}
+              setAlpacaLiveSecretKey={setAlpacaLiveSecretKey}
+              setAlpacaPaperTrading={setAlpacaPaperTrading}
+              setAutoExecuteTrades={setAutoExecuteTrades}
+              setOrderTypePreference={setOrderTypePreference}
+              setUserRiskLevel={setUserRiskLevel}
+              setDefaultPositionSizeDollars={setDefaultPositionSizeDollars}
+              toggleShowKey={toggleShowKey}
+              handleSaveTab={handleSaveTab}
+            />
           </TabsContent>
         </Tabs>
 

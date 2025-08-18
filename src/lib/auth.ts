@@ -21,7 +21,6 @@ export interface ApiSettings {
   ai_provider: string;
   ai_api_key: string;
   ai_model: string;
-  finnhub_api_key?: string;
   polygon_api_key?: string;
   alpaca_api_key?: string;
   alpaca_api_secret?: string;
@@ -36,28 +35,28 @@ interface AuthState {
   user: User | null;
   profile: Profile | null;
   apiSettings: ApiSettings | null;
-  
+
   // Status flags
   isAuthenticated: boolean;
   isLoading: boolean;
   isAdmin: boolean;
-  
+
   // Error handling
   error: string | null;
-  
+
   // Core methods
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
-  
+
   // Password methods
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
-  
+
   // Settings methods
   updateApiSettings: (settings: Partial<ApiSettings>) => Promise<void>;
-  
+
   // Admin methods
   checkAdminStatus: () => Promise<boolean>;
   forceAssignAdmin: () => Promise<{ success: boolean; error?: string }>;
@@ -84,14 +83,14 @@ export const useAuth = create<AuthState>()(
           console.log('🔐 Auth: Already initializing, skipping...');
           return;
         }
-        
+
         // Check if we're on the invitation setup page
         const isInvitationSetup = window.location.pathname === '/invitation-setup';
         if (isInvitationSetup) {
           console.log('🔐 Auth: On invitation setup page, skipping initialization');
           return;
         }
-        
+
         // If already authenticated with same session, skip
         if (currentState.isAuthenticated && currentState.session) {
           const { data: { session } } = await supabase.auth.getSession();
@@ -101,17 +100,17 @@ export const useAuth = create<AuthState>()(
             return;
           }
         }
-        
+
         console.log('🔐 Auth: Initializing...');
         set({ isLoading: true, error: null });
 
         try {
           // Get current session
           const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          
+
           if (sessionError) {
             console.error('Session error:', sessionError);
-            set({ 
+            set({
               session: null,
               user: null,
               profile: null,
@@ -119,7 +118,7 @@ export const useAuth = create<AuthState>()(
               isAuthenticated: false,
               isAdmin: false,
               isLoading: false,
-              error: sessionError.message 
+              error: sessionError.message
             });
             return;
           }
@@ -140,7 +139,7 @@ export const useAuth = create<AuthState>()(
           }
 
           console.log('🔐 Session found for:', session.user.email);
-          
+
           // Load profile
           const { data: profileData } = await supabase
             .from('profiles')
@@ -163,7 +162,7 @@ export const useAuth = create<AuthState>()(
             .single();
 
           let apiSettings = settingsData;
-          
+
           // Create default settings if none exist
           if (!apiSettings) {
             const { data: newSettings } = await supabase
@@ -176,7 +175,7 @@ export const useAuth = create<AuthState>()(
               })
               .select()
               .single();
-            
+
             apiSettings = newSettings;
           }
 
@@ -186,7 +185,7 @@ export const useAuth = create<AuthState>()(
             // Use RPC function which handles the query properly
             const { data: userRoles, error } = await supabase
               .rpc('get_user_roles', { p_user_id: session.user.id });
-            
+
             if (error) {
               console.warn('Admin check via RPC failed, trying direct query:', error);
               // Fallback to direct query
@@ -195,7 +194,7 @@ export const useAuth = create<AuthState>()(
                 .select('name')
                 .eq('id', session.user.id)
                 .single();
-              
+
               isAdmin = roles?.name === 'admin' || false;
             } else if (userRoles && userRoles.length > 0) {
               isAdmin = userRoles.some((r: any) => r.role_name === 'admin' || r.role_name === 'super_admin');
@@ -216,7 +215,7 @@ export const useAuth = create<AuthState>()(
             error: null
           });
 
-          console.log('🔐 Auth initialized:', { 
+          console.log('🔐 Auth initialized:', {
             email: session.user.email,
             isAdmin
           });
@@ -255,16 +254,16 @@ export const useAuth = create<AuthState>()(
           if (data.session) {
             // The auth state change listener will handle initialization
             // Just set the basic state here
-            set({ 
-              session: data.session, 
+            set({
+              session: data.session,
               user: data.user,
               isAuthenticated: true,
-              isLoading: false 
+              isLoading: false
             });
-            
+
             // Load the rest of the data
             await get().initialize();
-            
+
             return { success: true };
           }
 
@@ -297,10 +296,10 @@ export const useAuth = create<AuthState>()(
 
           // Sign out from Supabase
           await supabase.auth.signOut();
-          
+
           // Clear local storage
           localStorage.removeItem('auth-storage');
-          
+
         } catch (error) {
           console.error('Logout error:', error);
         } finally {
@@ -344,7 +343,7 @@ export const useAuth = create<AuthState>()(
             } else {
               set({ isLoading: false });
             }
-            
+
             return { success: true };
           }
 
@@ -371,9 +370,9 @@ export const useAuth = create<AuthState>()(
 
           return { success: true };
         } catch (error) {
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Failed to send reset email' 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to send reset email'
           };
         }
       },
@@ -391,9 +390,9 @@ export const useAuth = create<AuthState>()(
 
           return { success: true };
         } catch (error) {
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Failed to update password' 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update password'
           };
         }
       },
@@ -433,13 +432,13 @@ export const useAuth = create<AuthState>()(
           // Use RPC function to check admin status
           const { data: userRoles, error } = await supabase
             .rpc('get_user_roles', { p_user_id: state.user.id });
-          
+
           let isAdmin = false;
-          
+
           if (!error && userRoles && userRoles.length > 0) {
             isAdmin = userRoles.some((r: any) => r.role_name === 'admin' || r.role_name === 'super_admin');
           }
-          
+
           set({ isAdmin });
           return isAdmin;
 
@@ -455,25 +454,25 @@ export const useAuth = create<AuthState>()(
         try {
           const { data, error } = await supabase
             .rpc('force_assign_admin_to_first_user');
-          
+
           if (error) {
             return { success: false, error: error.message };
           }
-          
+
           if (data?.success) {
             // Reload to get new admin status
             await get().initialize();
             return { success: true };
           }
-          
-          return { 
-            success: false, 
-            error: data?.error || 'Failed to assign admin role' 
+
+          return {
+            success: false,
+            error: data?.error || 'Failed to assign admin role'
           };
         } catch (error) {
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Failed to assign admin' 
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to assign admin'
           };
         }
       }
@@ -501,12 +500,12 @@ export const initializeAuth = () => {
   // Listen for auth state changes
   supabase.auth.onAuthStateChange(async (event, session) => {
     console.log('🔐 Auth state changed:', event);
-    
+
     const currentState = useAuth.getState();
-    
+
     // Check if we're on the invitation setup page
     const isInvitationSetup = window.location.pathname === '/invitation-setup';
-    
+
     if (event === 'SIGNED_IN') {
       // Skip initialization if we're on the invitation setup page
       // The page will handle the session setup
@@ -514,7 +513,7 @@ export const initializeAuth = () => {
         console.log('🔐 On invitation setup page, skipping auto-initialization');
         return;
       }
-      
+
       // Only initialize if we're not already authenticated
       if (!currentState.isAuthenticated && session) {
         await useAuth.getState().initialize();
@@ -549,10 +548,10 @@ export const isAdmin = () => useAuth.getState().isAdmin;
 // Check if required API keys are configured
 export const hasRequiredApiKeys = (settings: ApiSettings | null): boolean => {
   if (!settings) return false;
-  
+
   // At minimum, need an AI provider configured
   if (!settings.ai_provider || !settings.ai_api_key) return false;
-  
+
   // Check if the API key appears valid based on provider
   switch (settings.ai_provider) {
     case 'openai':

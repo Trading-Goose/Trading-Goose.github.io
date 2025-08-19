@@ -888,8 +888,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         // Add opportunity analysis step
         if (!rebalanceRequest.skip_opportunity_agent) {
+          // Debug the full workflow steps data structure
+          console.log('🔧 DEBUG: Full workflowStepsData:', workflowStepsData);
+          console.log('🔧 DEBUG: workflowStepsData keys:', Object.keys(workflowStepsData || {}));
+          
           // Try to get opportunity data from multiple sources
           let opportunityStep = workflowStepsData.opportunity_analysis || {};
+          console.log('🔧 DEBUG: opportunityStep from workflow_steps:', opportunityStep);
           
           // Also check the opportunity_reasoning field directly from rebalance_requests
           console.log('🔍 Checking for opportunity_reasoning in rebalance_requests:', rebalanceRequest.opportunity_reasoning);
@@ -900,12 +905,29 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           if (!opportunityStep.data && rebalanceRequest.opportunity_reasoning && 
               ['analyzing', 'planning', 'pending_approval', 'executing', 'completed'].includes(status)) {
             console.log('📊 Using opportunity_reasoning field from rebalance_requests');
+            console.log('📊 opportunity_reasoning data:', rebalanceRequest.opportunity_reasoning);
+            console.log('📊 selectedStocks in opportunity_reasoning:', rebalanceRequest.opportunity_reasoning.selectedStocks);
             opportunityStep = {
               status: 'completed',
               data: rebalanceRequest.opportunity_reasoning,
               timestamp: rebalanceRequest.opportunity_reasoning?.timestamp
             };
           }
+          
+          // If we still don't have opportunity step data but have opportunity_reasoning, use it anyway
+          if (!opportunityStep.data && rebalanceRequest.opportunity_reasoning) {
+            console.log('📊 FALLBACK: Using opportunity_reasoning as fallback');
+            opportunityStep = {
+              status: 'completed',
+              data: rebalanceRequest.opportunity_reasoning,
+              timestamp: rebalanceRequest.opportunity_reasoning?.timestamp
+            };
+          }
+          
+          console.log('🎯 DEBUG: Current status:', status);
+          console.log('🎯 DEBUG: opportunityStep after all processing:', opportunityStep);
+          console.log('🎯 DEBUG: opportunityStep.data exists:', !!opportunityStep.data);
+          console.log('🎯 DEBUG: Will add opportunity to workflowSteps:', !!opportunityStep.data);
           
           console.log('🎯 Opportunity step data:', opportunityStep);
           console.log('🎯 Opportunity step status:', opportunityStep.status);
@@ -924,8 +946,19 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             });
           }
 
-          // Parse the AI response if it's stored as a string (declare insights first)
+          // Parse the AI response if it's stored as a string (declare insights first)  
+          console.log('🔧 WORKFLOW PROCESSING - Starting workflow processing');
+          console.log('🔧 WORKFLOW PROCESSING - opportunityStep before processing:', opportunityStep);
+          
           let insights = opportunityStep.data;
+          
+          console.log('🔧 WORKFLOW PROCESSING - Raw opportunityStep.data:', opportunityStep.data);
+          if (opportunityStep.data) {
+            console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data keys:', Object.keys(opportunityStep.data));
+            console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data.reasoning:', opportunityStep.data.reasoning);
+            console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data.recommendAnalysis:', opportunityStep.data.recommendAnalysis);
+            console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data.selectedStocks:', opportunityStep.data.selectedStocks);
+          }
           
           // Determine opportunity step status
           // Priority: 1) Check explicit status field, 2) Check overall workflow status
@@ -966,7 +999,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             }
           }
 
-          workflowSteps.push({
+          const opportunityWorkflowStep = {
             id: 'opportunity',
             title: 'Opportunity Analysis',
             description: 'Scanning market for new investment opportunities',
@@ -974,7 +1007,10 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             completedAt: opportunityStep.data?.timestamp || opportunityStep.timestamp || opportunityStep.completedAt,
             insights: insights, // Use the parsed insights
             data: opportunityStatus === 'error' ? opportunityStep.data : undefined // Include error data if failed
-          });
+          };
+          
+          console.log('🚀 Adding opportunity workflow step:', opportunityWorkflowStep);
+          workflowSteps.push(opportunityWorkflowStep);
         }
 
         // Add stock analysis step
@@ -1201,6 +1237,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           skipThresholdCheck: rebalanceRequest.skip_threshold_check,
           skipOpportunityAgent: rebalanceRequest.skip_opportunity_agent,
           workflowSteps,
+
+          // Include opportunity reasoning for insights tab access
+          opportunity_reasoning: rebalanceRequest.opportunity_reasoning,
 
           relatedAnalyses: rebalanceAnalyses || []
         };
@@ -2099,26 +2138,61 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                         console.log('🎨 INSIGHTS TAB - Opportunity insights:', opportunityStep?.insights);
                         console.log('🎨 INSIGHTS TAB - Type of insights:', typeof opportunityStep?.insights);
                         console.log('🎨 INSIGHTS TAB - Raw rebalanceData:', rebalanceData);
+                        console.log('🎨 INSIGHTS TAB - rebalanceData keys:', Object.keys(rebalanceData));
+                        console.log('🎨 INSIGHTS TAB - rebalanceData.rebalance_plan:', rebalanceData.rebalance_plan);
                         
                         // Check if we have insights in the workflow step
-                        let insights = opportunityStep?.insights;
+                        let insights = opportunityStep?.insights || opportunityStep?.data;
                         
-                        // If no insights in workflow step, try to get from raw data
-                        if (!insights && opportunityStep?.data) {
-                          console.log('🎨 INSIGHTS TAB - Trying to use raw data as insights');
-                          insights = opportunityStep.data;
-                        }
+                        console.log('🎨 INSIGHTS TAB - Final insights from workflow step:', insights);
+                        console.log('🎨 INSIGHTS TAB - Insights keys:', insights ? Object.keys(insights) : 'null');
+                        console.log('🎨 INSIGHTS TAB - insights.recommendAnalysis:', insights?.recommendAnalysis);
+                        console.log('🎨 INSIGHTS TAB - insights.reasoning:', insights?.reasoning);
+                        console.log('🎨 INSIGHTS TAB - insights.selectedStocks length:', insights?.selectedStocks?.length);
                         
                         // If we have basic selectedStocks data but no complete insights structure, create one
-                        if (insights && insights.selectedStocks && !insights.recommendAnalysis) {
+                        if (insights && insights.selectedStocks && insights.recommendAnalysis !== true && insights.recommendAnalysis !== false) {
                           console.log('🎨 INSIGHTS TAB - Converting basic data to full insights structure');
+                          
+                          // Try to find the reasoning from the original opportunity step data
+                          const fullOpportunityData = opportunityStep?.data;
+                          console.log('🎨 INSIGHTS TAB - fullOpportunityData:', fullOpportunityData);
+                          console.log('🎨 INSIGHTS TAB - fullOpportunityData?.reasoning:', fullOpportunityData?.reasoning);
+                          
+                          // Check multiple sources for the reasoning text
+                          let reasoningText = fullOpportunityData?.reasoning || insights.reasoning;
+                          
+                          // If still no reasoning, try to get it from rebalanceData.opportunity_reasoning
+                          if (!reasoningText && rebalanceData.opportunity_reasoning?.reasoning) {
+                            reasoningText = rebalanceData.opportunity_reasoning.reasoning;
+                          }
+                          
+                          // Try to get from rebalance_plan
+                          if (!reasoningText && rebalanceData.rebalance_plan?.opportunity_reasoning) {
+                            reasoningText = rebalanceData.rebalance_plan.opportunity_reasoning.reasoning;
+                          }
+                          
+                          // Try to get from agentInsights
+                          if (!reasoningText && rebalanceData.agentInsights?.opportunityAgent) {
+                            reasoningText = rebalanceData.agentInsights.opportunityAgent;
+                          }
+                          
+                          // Last fallback
+                          if (!reasoningText) {
+                            reasoningText = 'Market conditions suggest analyzing the selected stocks for potential opportunities.';
+                          }
+                          
+                          console.log('🎨 INSIGHTS TAB - Selected reasoningText:', reasoningText);
+                          
                           insights = {
                             ...insights,
                             recommendAnalysis: true, // If we have selected stocks, analysis was recommended
-                            reasoning: insights.reasoning || 'Market conditions suggest analyzing the selected stocks for potential opportunities.',
+                            reasoning: reasoningText,
                             selectedStocksCount: insights.selectedStocks?.length || 0,
-                            evaluatedStocksCount: insights.evaluatedStocksCount || insights.selectedStocks?.length || 0
+                            evaluatedStocksCount: insights.evaluatedStocks?.length || 0
                           };
+                        } else {
+                          console.log('🎨 INSIGHTS TAB - Using existing insights structure, recommendAnalysis:', insights?.recommendAnalysis);
                         }
                         
                         console.log('🎨 INSIGHTS TAB - Final insights to display:', insights);
@@ -2294,6 +2368,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                 )}
 
                                 <div className="border-t pt-3">
+                                  {console.log('🔍 RENDERING reasoning:', parsedInsights.reasoning)}
                                   <MarkdownRenderer content={parsedInsights.reasoning} className="text-sm text-muted-foreground italic" />
                                 </div>
                               </CardContent>

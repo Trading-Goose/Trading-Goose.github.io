@@ -891,19 +891,19 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           // Try to get opportunity data from multiple sources
           let opportunityStep = workflowStepsData.opportunity_analysis || {};
           
-          // Also check the opportunity_evaluation field directly from rebalance_requests
-          console.log('🔍 Checking for opportunity_evaluation in rebalance_requests:', rebalanceRequest.opportunity_evaluation);
-          console.log('🔍 Type of opportunity_evaluation:', typeof rebalanceRequest.opportunity_evaluation);
+          // Also check the opportunity_reasoning field directly from rebalance_requests
+          console.log('🔍 Checking for opportunity_reasoning in rebalance_requests:', rebalanceRequest.opportunity_reasoning);
+          console.log('🔍 Type of opportunity_reasoning:', typeof rebalanceRequest.opportunity_reasoning);
           
-          // If not found in workflow_steps, check opportunity_evaluation field directly
+          // If not found in workflow_steps, check opportunity_reasoning field directly
           // BUT only if we're past the opportunity_evaluation phase
-          if (!opportunityStep.data && rebalanceRequest.opportunity_evaluation && 
+          if (!opportunityStep.data && rebalanceRequest.opportunity_reasoning && 
               ['analyzing', 'planning', 'pending_approval', 'executing', 'completed'].includes(status)) {
-            console.log('📊 Using opportunity_evaluation field from rebalance_requests');
+            console.log('📊 Using opportunity_reasoning field from rebalance_requests');
             opportunityStep = {
               status: 'completed',
-              data: rebalanceRequest.opportunity_evaluation,
-              timestamp: rebalanceRequest.opportunity_evaluation?.timestamp
+              data: rebalanceRequest.opportunity_reasoning,
+              timestamp: rebalanceRequest.opportunity_reasoning?.timestamp
             };
           }
           
@@ -2098,10 +2098,34 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                         console.log('🎨 INSIGHTS TAB - Opportunity step:', opportunityStep);
                         console.log('🎨 INSIGHTS TAB - Opportunity insights:', opportunityStep?.insights);
                         console.log('🎨 INSIGHTS TAB - Type of insights:', typeof opportunityStep?.insights);
+                        console.log('🎨 INSIGHTS TAB - Raw rebalanceData:', rebalanceData);
                         
-                        if (opportunityStep?.insights) {
+                        // Check if we have insights in the workflow step
+                        let insights = opportunityStep?.insights;
+                        
+                        // If no insights in workflow step, try to get from raw data
+                        if (!insights && opportunityStep?.data) {
+                          console.log('🎨 INSIGHTS TAB - Trying to use raw data as insights');
+                          insights = opportunityStep.data;
+                        }
+                        
+                        // If we have basic selectedStocks data but no complete insights structure, create one
+                        if (insights && insights.selectedStocks && !insights.recommendAnalysis) {
+                          console.log('🎨 INSIGHTS TAB - Converting basic data to full insights structure');
+                          insights = {
+                            ...insights,
+                            recommendAnalysis: true, // If we have selected stocks, analysis was recommended
+                            reasoning: insights.reasoning || 'Market conditions suggest analyzing the selected stocks for potential opportunities.',
+                            selectedStocksCount: insights.selectedStocks?.length || 0,
+                            evaluatedStocksCount: insights.evaluatedStocksCount || insights.selectedStocks?.length || 0
+                          };
+                        }
+                        
+                        console.log('🎨 INSIGHTS TAB - Final insights to display:', insights);
+                        
+                        if (insights) {
                           // Handle case where insights might be a string (raw AI response)
-                          let parsedInsights = opportunityStep.insights;
+                          let parsedInsights = insights;
                           if (typeof parsedInsights === 'string') {
                             console.log('📝 Opportunity insights is string, attempting to parse');
                             console.log('📝 Raw string content:', parsedInsights);
@@ -2243,17 +2267,28 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                       Selected {parsedInsights.selectedStocksCount} of {parsedInsights.evaluatedStocksCount} stocks for analysis
                                     </p>
                                     <div className="space-y-2">
-                                      {parsedInsights.selectedStocks.map((stock: any) => (
-                                        <div key={stock.ticker} className="p-2 bg-muted/30 rounded">
-                                          <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-mono font-medium">{stock.ticker}</span>
-                                            <Badge variant="outline" className="text-xs">
-                                              {stock.priority}
-                                            </Badge>
+                                      {parsedInsights.selectedStocks.map((stock: any, idx: number) => {
+                                        // Handle both string arrays and object arrays
+                                        const ticker = typeof stock === 'string' ? stock : stock.ticker;
+                                        const reason = typeof stock === 'string' ? 'Selected for analysis based on market conditions' : stock.reason;
+                                        const priority = typeof stock === 'string' ? 'High' : stock.priority;
+                                        
+                                        return (
+                                          <div key={ticker || idx} className="p-2 bg-muted/30 rounded">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <span className="font-mono font-medium">{ticker}</span>
+                                              {priority && (
+                                                <Badge variant="outline" className="text-xs">
+                                                  {priority}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            {reason && (
+                                              <MarkdownRenderer content={reason} className="text-sm text-muted-foreground" />
+                                            )}
                                           </div>
-                                          <MarkdownRenderer content={stock.reason} className="text-sm text-muted-foreground" />
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}

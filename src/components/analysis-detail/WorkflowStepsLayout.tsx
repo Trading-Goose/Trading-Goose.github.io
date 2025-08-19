@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import { 
+import {
   Activity,
   BarChart3,
   Brain,
@@ -25,15 +25,15 @@ interface WorkflowStepsLayoutProps {
 }
 
 // Enhanced Workflow Steps Layout Component
-export default function WorkflowStepsLayout({ 
-  analysisData, 
-  onApproveOrder, 
-  onRejectOrder, 
-  isOrderExecuted 
+export default function WorkflowStepsLayout({
+  analysisData,
+  onApproveOrder,
+  onRejectOrder,
+  isOrderExecuted
 }: WorkflowStepsLayoutProps) {
   // Check if this analysis is part of a rebalance request
   const isRebalanceAnalysis = !!analysisData.rebalance_request_id;
-  
+
   const workflowSteps = [
     {
       id: 'analysis',
@@ -80,7 +80,7 @@ export default function WorkflowStepsLayout({
       ]
     }
   ];
-  
+
   // Only add Portfolio Management step if this is NOT a rebalance analysis
   // For rebalance analyses, the portfolio manager runs once for all stocks together
   if (!isRebalanceAnalysis) {
@@ -123,7 +123,7 @@ export default function WorkflowStepsLayout({
         }
       }
     }
-    
+
     // Default behavior for other agents
     if (analysisData.agent_insights) {
       // Check for error conditions first
@@ -162,22 +162,21 @@ export default function WorkflowStepsLayout({
       {(() => {
         // For individual analysis, show Portfolio Manager's decision; for rebalance, show Risk Manager's decision
         const isRebalanceAnalysis = !!analysisData.rebalance_request_id;
-        const displayDecision = isRebalanceAnalysis 
-          ? analysisData.decision 
+        const displayDecision = isRebalanceAnalysis
+          ? analysisData.decision
           : (analysisData.agent_insights?.portfolioManager?.finalDecision?.action || analysisData.decision);
-        
+
         const shouldShow = displayDecision && displayDecision !== 'CANCELED' && analysisData.status === 'completed';
-        
+
         return shouldShow && (
-          <div className={`rounded-lg border p-6 ${
-            displayDecision === 'BUY' 
-              ? 'bg-gradient-to-r from-green-500/5 to-green-600/5 border-green-500/20' 
-              : displayDecision === 'SELL' 
+          <div className={`rounded-lg border p-6 ${displayDecision === 'BUY'
+            ? 'bg-gradient-to-r from-green-500/5 to-green-600/5 border-green-500/20'
+            : displayDecision === 'SELL'
               ? 'bg-gradient-to-r from-red-500/5 to-red-600/5 border-red-500/20'
               : displayDecision === 'HOLD'
-              ? 'bg-gradient-to-r from-gray-500/5 to-gray-600/5 border-gray-500/20'
-              : 'bg-gradient-to-r from-blue-500/5 to-primary/5 border-border'
-          }`}>
+                ? 'bg-gradient-to-r from-gray-500/5 to-gray-600/5 border-gray-500/20'
+                : 'bg-gradient-to-r from-blue-500/5 to-primary/5 border-border'
+            }`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-primary/10 rounded-lg">
@@ -188,19 +187,19 @@ export default function WorkflowStepsLayout({
                     {isRebalanceAnalysis ? 'Analysis Complete - Decision Ready' : 'Portfolio Manager Decision Ready'}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {displayDecision === 'HOLD' 
-                      ? 'Recommendation: Maintain current position' 
+                    {displayDecision === 'HOLD'
+                      ? 'Recommendation: Maintain current position'
                       : `Recommendation: ${displayDecision} ${analysisData.ticker}`}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Badge 
+                <Badge
                   variant={
-                    displayDecision === 'BUY' ? 'default' : 
-                    displayDecision === 'SELL' ? 'destructive' : 
-                    'secondary'
-                  } 
+                    displayDecision === 'BUY' ? 'default' :
+                      displayDecision === 'SELL' ? 'destructive' :
+                        'secondary'
+                  }
                   className="text-sm px-3 py-1"
                 >
                   {displayDecision === 'BUY' && <TrendingUp className="w-4 h-4 mr-1" />}
@@ -210,91 +209,90 @@ export default function WorkflowStepsLayout({
                 </Badge>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Confidence</p>
-                  <p className={`text-lg font-bold ${
-                    analysisData.confidence >= 80 ? 'text-green-600 dark:text-green-400' :
+                  <p className={`text-lg font-bold ${analysisData.confidence >= 80 ? 'text-green-600 dark:text-green-400' :
                     analysisData.confidence >= 60 ? 'text-yellow-600 dark:text-yellow-400' :
-                    'text-red-600 dark:text-red-400'
-                  }`}>
+                      'text-red-600 dark:text-red-400'
+                    }`}>
                     {analysisData.confidence}%
                   </p>
                 </div>
               </div>
             </div>
-            
+
             {/* Quick Stats if available */}
             {analysisData.agent_insights?.portfolioManager?.finalDecision && displayDecision !== 'HOLD' && (
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border/50">
-              <div>
-                <p className="text-xs text-muted-foreground">Order Size</p>
-                <p className="font-semibold">
-                  {(() => {
-                    const finalDecision = analysisData.agent_insights?.portfolioManager?.finalDecision;
-                    if (finalDecision?.dollarAmount) {
-                      return `$${finalDecision.dollarAmount.toLocaleString()}`;
-                    } else if (finalDecision?.shares) {
-                      return `${finalDecision.shares} shares`;
-                    } else if (finalDecision?.changes?.value) {
-                      return `$${Math.abs(finalDecision.changes.value).toLocaleString()}`;
-                    }
-                    return 'Pending';
-                  })()}
-                </p>
+              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border/50">
+                <div>
+                  <p className="text-xs text-muted-foreground">Order Size</p>
+                  <p className="font-semibold">
+                    {(() => {
+                      const finalDecision = analysisData.agent_insights?.portfolioManager?.finalDecision;
+                      if (finalDecision?.dollarAmount) {
+                        return `$${finalDecision.dollarAmount.toLocaleString()}`;
+                      } else if (finalDecision?.shares) {
+                        return `${finalDecision.shares} shares`;
+                      } else if (finalDecision?.changes?.value) {
+                        return `$${Math.abs(finalDecision.changes.value).toLocaleString()}`;
+                      }
+                      return 'Pending';
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Order Type</p>
+                  <p className="font-semibold">
+                    {(() => {
+                      const finalDecision = analysisData.agent_insights?.portfolioManager?.finalDecision;
+                      return finalDecision?.dollarAmount ? 'Dollar-based' : 'Share-based';
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className="font-semibold flex items-center gap-1">
+                    {(() => {
+                      const tradeOrder = analysisData.tradeOrder;
+                      const orderStatus = tradeOrder?.status;
+                      const isExecuted = orderStatus === 'executed' || isOrderExecuted;
+
+                      if (isExecuted) {
+                        return (
+                          <>
+                            <CheckCircle className="w-3 h-3 text-green-500" />
+                            <span className="text-green-600 dark:text-green-400">Executed</span>
+                          </>
+                        );
+                      } else if (orderStatus === 'approved') {
+                        return (
+                          <>
+                            <CheckCircle className="w-3 h-3 text-green-500" />
+                            <span className="text-green-600 dark:text-green-400">Approved</span>
+                          </>
+                        );
+                      } else if (orderStatus === 'rejected') {
+                        return (
+                          <>
+                            <XCircle className="w-3 h-3 text-red-500" />
+                            <span className="text-white-600 dark:text-red-400">Rejected</span>
+                          </>
+                        );
+                      } else {
+                        return (
+                          <>
+                            <Clock className="w-3 h-3 text-yellow-500" />
+                            <span className="text-yellow-600 dark:text-yellow-400">Pending Approval</span>
+                          </>
+                        );
+                      }
+                    })()}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Order Type</p>
-                <p className="font-semibold">
-                  {(() => {
-                    const finalDecision = analysisData.agent_insights?.portfolioManager?.finalDecision;
-                    return finalDecision?.dollarAmount ? 'Dollar-based' : 'Share-based';
-                  })()}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Status</p>
-                <p className="font-semibold flex items-center gap-1">
-                  {(() => {
-                    const tradeOrder = analysisData.tradeOrder;
-                    const orderStatus = tradeOrder?.status;
-                    const isExecuted = orderStatus === 'executed' || isOrderExecuted;
-                    
-                    if (isExecuted) {
-                      return (
-                        <>
-                          <CheckCircle className="w-3 h-3 text-green-500" />
-                          <span className="text-green-600 dark:text-green-400">Executed</span>
-                        </>
-                      );
-                    } else if (orderStatus === 'approved') {
-                      return (
-                        <>
-                          <CheckCircle className="w-3 h-3 text-green-500" />
-                          <span className="text-green-600 dark:text-green-400">Approved</span>
-                        </>
-                      );
-                    } else if (orderStatus === 'rejected') {
-                      return (
-                        <>
-                          <XCircle className="w-3 h-3 text-red-500" />
-                          <span className="text-red-600 dark:text-red-400">Rejected</span>
-                        </>
-                      );
-                    } else {
-                      return (
-                        <>
-                          <Clock className="w-3 h-3 text-yellow-500" />
-                          <span className="text-yellow-600 dark:text-yellow-400">Pending Approval</span>
-                        </>
-                      );
-                    }
-                  })()}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         );
       })()}
-      
+
       {workflowSteps.map((step, stepIndex) => {
         const Icon = step.icon;
         const completedAgents = step.agents.filter(agent => getAgentStatus(agent.key, step.id) === 'completed').length;
@@ -310,28 +308,26 @@ export default function WorkflowStepsLayout({
           <div key={step.id} className="relative">
             <div className="space-y-4">
               {/* Step Header */}
-              <div className={`rounded-lg border p-4 transition-all ${
-                isCompleted 
-                  ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
-                  : isActive 
+              <div className={`rounded-lg border p-4 transition-all ${isCompleted
+                ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
+                : isActive
                   ? 'bg-primary/5 border-primary/20'
                   : 'bg-card border-border'
-              }`}>
-                
+                }`}>
+
                 <div className="relative">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4 flex-1">
                       {/* Step Icon */}
-                      <div className={`p-3 rounded-lg ${
-                        isCompleted 
-                          ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
-                          : isActive 
+                      <div className={`p-3 rounded-lg ${isCompleted
+                        ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
+                        : isActive
                           ? 'bg-primary/10 text-primary'
                           : 'bg-muted text-muted-foreground'
-                      }`}>
+                        }`}>
                         <Icon className="w-6 h-6" />
                       </div>
-                      
+
                       {/* Step Details */}
                       <div className="flex-1 space-y-3">
                         <div className="flex items-center gap-3">
@@ -350,7 +346,7 @@ export default function WorkflowStepsLayout({
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">{step.description}</p>
-                        
+
                         {/* Special handling for Research phase - show debate rounds */}
                         {step.id === 'research' && analysisData.agent_insights?.researchDebate && (
                           <div className="flex items-center gap-2 text-sm">
@@ -364,16 +360,16 @@ export default function WorkflowStepsLayout({
                             )}
                           </div>
                         )}
-                        
+
                         {/* Progress Bar */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">
                               {step.id === 'research' && !isCompleted ? (
                                 <>
-                                  {analysisData.agent_insights?.researchManager ? '3/3 agents' : 
-                                   analysisData.agent_insights?.researchDebate ? 'Debating...' : 
-                                   `${completedAgents}/${totalAgents} agents`}
+                                  {analysisData.agent_insights?.researchManager ? '3/3 agents' :
+                                    analysisData.agent_insights?.researchDebate ? 'Debating...' :
+                                      `${completedAgents}/${totalAgents} agents`}
                                 </>
                               ) : (
                                 `${completedAgents}/${totalAgents} agents`
@@ -384,21 +380,20 @@ export default function WorkflowStepsLayout({
                             </span>
                           </div>
                           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                isCompleted 
-                                  ? 'bg-green-500' 
-                                  : isActive 
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${isCompleted
+                                ? 'bg-green-500'
+                                : isActive
                                   ? 'bg-primary'
                                   : 'bg-muted-foreground/30'
-                              }`}
+                                }`}
                               style={{ width: `${progressPercentage}%` }}
                             />
                           </div>
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Timestamp */}
                     {timestamp && (
                       <div className="text-right">
@@ -424,42 +419,40 @@ export default function WorkflowStepsLayout({
                     return (
                       <div
                         key={agent.key}
-                        className={`relative rounded-lg border p-4 transition-all ${
-                          status === 'completed'
-                            ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
-                            : status === 'running'
+                        className={`relative rounded-lg border p-4 transition-all ${status === 'completed'
+                          ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
+                          : status === 'running'
                             ? 'bg-primary/5 border-primary/30 shadow-sm'
                             : 'bg-card border-border'
-                        }`}
+                          }`}
                       >
                         <div className="flex flex-col items-center text-center space-y-2">
                           {/* Agent Icon */}
-                          <div className={`p-2 rounded-lg ${
-                            status === 'completed'
-                              ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
-                              : status === 'running'
+                          <div className={`p-2 rounded-lg ${status === 'completed'
+                            ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
+                            : status === 'running'
                               ? 'bg-primary/10 text-primary'
                               : 'bg-muted text-muted-foreground'
-                          }`}>
+                            }`}>
                             <AgentIcon className="w-5 h-5" />
                           </div>
-                          
+
                           {/* Agent Name */}
                           <h4 className="font-medium text-sm">{agent.name}</h4>
-                        
-                        {/* Status Badge */}
-                        <Badge 
-                          variant={status === 'completed' ? 'secondary' : 'outline'} 
-                          className="text-xs"
-                        >
-                          {status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
-                          {status === 'running' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                          {status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
-                        </Badge>
+
+                          {/* Status Badge */}
+                          <Badge
+                            variant={status === 'completed' ? 'secondary' : 'outline'}
+                            className="text-xs"
+                          >
+                            {status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                            {status === 'running' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                            {status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
-                  );
+                    );
                   })}
                 </div>
               ) : null}
@@ -467,7 +460,7 @@ export default function WorkflowStepsLayout({
           </div>
         );
       })}
-      
+
       {/* Overall Progress Summary */}
       <div className="rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between">
@@ -477,7 +470,7 @@ export default function WorkflowStepsLayout({
               Overall Progress
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              {isRebalanceAnalysis 
+              {isRebalanceAnalysis
                 ? "Stock analysis for rebalance workflow (Portfolio Manager runs after all stocks complete)"
                 : "Analysis workflow execution status"}
             </p>

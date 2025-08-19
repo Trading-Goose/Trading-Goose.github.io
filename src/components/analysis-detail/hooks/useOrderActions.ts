@@ -20,7 +20,7 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
 
     const pollInterval = setInterval(async () => {
       attempts++;
-      
+
       try {
         // Fetch updated trade order from database
         const { data: tradeOrder, error } = await supabase
@@ -40,15 +40,15 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
               alpacaFilledPrice: tradeOrder.alpaca_filled_price,
               status: tradeOrder.status
             };
-            updateAnalysisData({ 
-              tradeOrder: updatedTradeOrder 
+            updateAnalysisData({
+              tradeOrder: updatedTradeOrder
             });
           }
 
           // Check if order reached terminal state
           if (['filled', 'canceled', 'rejected', 'expired'].includes(tradeOrder.alpaca_order_status)) {
             clearInterval(pollInterval);
-            
+
             if (tradeOrder.alpaca_order_status === 'filled') {
               toast({
                 title: "Order Filled",
@@ -121,7 +121,7 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
 
       if (data.success) {
         setIsOrderExecuted(true);
-        
+
         // Update the local trade order data
         if (analysisData.tradeOrder) {
           const updatedTradeOrder = {
@@ -130,8 +130,8 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
             alpacaOrderId: data.alpacaOrderId,
             alpacaOrderStatus: data.alpacaStatus
           };
-          updateAnalysisData({ 
-            tradeOrder: updatedTradeOrder 
+          updateAnalysisData({
+            tradeOrder: updatedTradeOrder
           });
         }
 
@@ -209,15 +209,14 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
             ...analysisData.tradeOrder,
             status: 'rejected'
           };
-          updateAnalysisData({ 
-            tradeOrder: updatedTradeOrder 
+          updateAnalysisData({
+            tradeOrder: updatedTradeOrder
           });
         }
 
         toast({
           title: "Order Rejected",
           description: `${analysisData.decision} order for ${analysisData.ticker} has been rejected.`,
-          variant: "destructive",
         });
       }
     } catch (error: any) {

@@ -205,7 +205,7 @@ export default function TradeOrderCard({
                     }
                     className={`text-xs ${orderStatus === 'executed' ? 'text-green-600' :
                       orderStatus === 'approved' ? 'text-green-600' :
-                        orderStatus === 'rejected' ? 'text-red-600' :
+                        orderStatus === 'rejected' ? 'text-white-600' :
                           orderStatus === 'pending' ? 'tex-white-600' : ''
                       }`}
                   >

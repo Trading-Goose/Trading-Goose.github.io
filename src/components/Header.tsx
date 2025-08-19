@@ -37,8 +37,8 @@ export default function Header() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-4">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 rounded-lg bg-gradient-primary">
-                  <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+                <div className="p-2 rounded-lg">
+                  <img src="/goose.png" alt="TradingGoose Logo" className="h-5 w-5 sm:h-10 sm:w-10" />
                 </div>
                 <div>
                   <h1 className="text-xl sm:text-2xl font-bold text-foreground">TradingGoose</h1>

@@ -128,7 +128,6 @@ export interface TradingTabProps {
   alpacaLiveSecretKey: string;
   alpacaPaperTrading: boolean;
   autoExecuteTrades: boolean;
-  orderTypePreference: string;
   userRiskLevel: string;
   defaultPositionSizeDollars: number;
   configuredProviders: Record<string, boolean>;
@@ -141,7 +140,6 @@ export interface TradingTabProps {
   setAlpacaLiveSecretKey: (key: string) => void;
   setAlpacaPaperTrading: (enabled: boolean) => void;
   setAutoExecuteTrades: (enabled: boolean) => void;
-  setOrderTypePreference: (preference: string) => void;
   setUserRiskLevel: (level: string) => void;
   setDefaultPositionSizeDollars: (amount: number) => void;
   toggleShowKey: (key: string) => void;

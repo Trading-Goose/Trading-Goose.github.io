@@ -19,7 +19,6 @@ import {
   Check,
   Eye,
   EyeOff,
-  Bot,
   RefreshCw,
   DollarSign,
 } from "lucide-react";
@@ -32,7 +31,6 @@ export default function TradingTab({
   alpacaLiveSecretKey,
   alpacaPaperTrading,
   autoExecuteTrades,
-  orderTypePreference,
   userRiskLevel,
   defaultPositionSizeDollars,
   configuredProviders,
@@ -45,7 +43,6 @@ export default function TradingTab({
   setAlpacaLiveSecretKey,
   setAlpacaPaperTrading,
   setAutoExecuteTrades,
-  setOrderTypePreference,
   setUserRiskLevel,
   setDefaultPositionSizeDollars,
   toggleShowKey,
@@ -116,47 +113,6 @@ export default function TradingTab({
             <RefreshCw className="h-4 w-4" />
             Trade Execution Settings
           </h3>
-          
-          {/* Order Type Preference */}
-          <div className="space-y-2">
-            <Label htmlFor="order-type">Preferred Order Type</Label>
-            <Select value={orderTypePreference} onValueChange={setOrderTypePreference}>
-              <SelectTrigger id="order-type">
-                <SelectValue placeholder="Select order type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">
-                  <div className="flex items-center gap-2">
-                    <Bot className="h-4 w-4" />
-                    <span>Auto (Recommended)</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="share_amount">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    <span>By Share Amount</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="dollar_amount">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    <span>By Specific Value</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {orderTypePreference === 'auto' && 
-                "Automatically chooses between share and dollar orders based on affordability and fractional share support"
-              }
-              {orderTypePreference === 'share_amount' && 
-                "Orders will specify exact number of shares to buy/sell"
-              }
-              {orderTypePreference === 'dollar_amount' && 
-                "Orders will specify dollar amount to invest (supports fractional shares)"
-              }
-            </p>
-          </div>
           
           {/* User Risk Level */}
           <div className="space-y-2">

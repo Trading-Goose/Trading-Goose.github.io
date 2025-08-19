@@ -35,7 +35,8 @@ export default defineConfig(({ mode }) => ({
     },
     target: 'es2015',
     modulePreload: {
-      polyfill: true
+      polyfill: true,
+      resolveDependencies: (_, deps) => deps
     },
     rollupOptions: {
       output: {
@@ -43,7 +44,14 @@ export default defineConfig(({ mode }) => ({
         format: 'es',
         entryFileNames: 'assets/[name].[hash].js',
         chunkFileNames: 'assets/[name].[hash].js',
-        assetFileNames: 'assets/[name].[hash][extname]',
+        assetFileNames: (assetInfo) => {
+          // Ensure proper file extensions for different asset types
+          const fileName = assetInfo.names?.[0] || 'asset';
+          if (fileName.endsWith('.css')) {
+            return 'assets/[name].[hash].css';
+          }
+          return 'assets/[name].[hash][extname]';
+        },
         manualChunks: undefined
       }
     }

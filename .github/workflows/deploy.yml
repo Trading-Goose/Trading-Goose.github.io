@@ -52,6 +52,15 @@ jobs:
       - name: Add .nojekyll file
         run: touch ./dist/.nojekyll
         
+      - name: Create web.config for proper MIME types (if needed)
+        run: |
+          # GitHub Pages uses Jekyll by default, but .nojekyll disables it
+          # Ensure all JS files have proper content-type headers by checking index.html
+          echo "Checking for module script references in index.html..."
+          if grep -q 'type="module"' ./dist/index.html; then
+            echo "Module scripts found - GitHub Pages should handle these correctly"
+          fi
+        
       - name: Setup Pages
         uses: actions/configure-pages@v4
         

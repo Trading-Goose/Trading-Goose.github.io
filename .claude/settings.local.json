@@ -32,7 +32,13 @@
       "Bash(done)",
       "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase db run --project-ref lnvjsqyvhczgxvygbqer --sql \"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = ''trading_actions'' ORDER BY ordinal_position;\")",
       "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions logs execute-trade)",
-      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy execute-trade --project-ref lnvjsqyvhczgxvygbqer)"
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy execute-trade --project-ref lnvjsqyvhczgxvygbqer)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions logs analyze-stock-coordinator --project-ref lnvjsqyvhczgxvygbqer --tail 20)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase logs --project-ref lnvjsqyvhczgxvygbqer --type function --tail 20)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-social-media-analyst --project-ref lnvjsqyvhczgxvygbqer)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-risky-analyst --project-ref lnvjsqyvhczgxvygbqer)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-safe-analyst --project-ref lnvjsqyvhczgxvygbqer)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-neutral-analyst --project-ref lnvjsqyvhczgxvygbqer)"
     ],
     "deny": [],
     "additionalDirectories": [

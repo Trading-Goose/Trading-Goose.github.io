@@ -111,7 +111,6 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
     // The agents object contains the actual status for each agent
     if (stockAnalysis && stockAnalysis.agents) {
       const status = stockAnalysis.agents[agentKey];
-      console.log(`🎯 Getting status for ${agentKey} in ${stockAnalysis.ticker}: ${status}`);
       return status || 'pending';
     }
     return 'pending';
@@ -274,13 +273,6 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
               {step.id === 'analysis' && step.stockAnalyses && (
                 <div className="space-y-4 pl-14">
                   {step.stockAnalyses.map((stockAnalysis: any) => {
-                    console.log(`🔍 Rendering stock analysis for ${stockAnalysis.ticker}:`, {
-                      ticker: stockAnalysis.ticker,
-                      status: stockAnalysis.status,
-                      agents: stockAnalysis.agents
-                    });
-
-
                     // Define workflow steps and determine their status based on agent completion
                     const getWorkflowStepStatus = (agentKeys: string[]) => {
                       const agentStatuses = agentKeys.map(key => stockAnalysis.agents?.[key] || 'pending');
@@ -665,26 +657,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           throw new Error('Rebalance data not found');
         }
 
-        console.log('🔍 Full rebalance request:', rebalanceRequest);
-        console.log('🔍 Rebalance request keys:', Object.keys(rebalanceRequest));
-
-        // Deep inspection of opportunity agent data
-        console.log('🎯 OPPORTUNITY AGENT DATA INSPECTION:');
-        console.log('1. workflow_steps:', rebalanceRequest.workflow_steps);
-        console.log('2. workflow_steps.opportunity_analysis:', rebalanceRequest.workflow_steps?.opportunity_analysis);
-        console.log('3. opportunity_analysis.data:', rebalanceRequest.workflow_steps?.opportunity_analysis?.data);
-        console.log('4. rebalance_plan:', rebalanceRequest.rebalance_plan);
-        console.log('5. opportunity_agent_insight:', rebalanceRequest.rebalance_plan?.opportunity_agent_insight);
-        console.log('6. agent_insights:', rebalanceRequest.agent_insights);
-        console.log('7. opportunity_reasons:', rebalanceRequest.opportunity_reasons);
-        console.log('8. opportunity_messages:', rebalanceRequest.opportunity_messages);
-        console.log('9. opportunity_evaluation:', rebalanceRequest.opportunity_evaluation);
-        console.log('10. Type of opportunity_evaluation:', typeof rebalanceRequest.opportunity_evaluation);
-        if (rebalanceRequest.opportunity_evaluation) {
-          console.log('11. opportunity_evaluation fields:', Object.keys(rebalanceRequest.opportunity_evaluation));
-          console.log('12. opportunity_evaluation.reasoning:', rebalanceRequest.opportunity_evaluation.reasoning);
-          console.log('13. opportunity_evaluation.selectedStocks:', rebalanceRequest.opportunity_evaluation.selectedStocks);
-        }
 
         // Fetch related rebalance analyses from analysis_history table
         // Include all fields including the full_analysis JSON field that contains workflow steps
@@ -718,9 +690,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         const portfolioSnapshot = rebalanceRequest.portfolio_snapshot || {};
         const targetAllocations = rebalanceRequest.target_allocations || {};
 
-        console.log('📊 Rebalance plan:', rebalancePlan);
-        console.log('📊 Rebalance plan positions:', rebalancePlan.positions);
-        console.log('📊 Rebalance request status:', status);
 
         // Transform recommended positions from rebalance plan
         // Look for positions in multiple possible locations
@@ -751,20 +720,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           positionsArray = rebalancePlan.tradeOrders;
         }
 
-        console.log('📊 Found positions array:', positionsArray);
-        console.log('📊 Positions array length:', positionsArray.length);
 
-        // TEMPORARY: If we're in pending_approval but have no positions, create sample data
-        // This helps identify if the issue is with data extraction or UI rendering
-        if (status === 'pending_approval' && positionsArray.length === 0) {
-          console.warn('⚠️ No positions found for pending_approval status. This is likely a data extraction issue.');
-          console.log('📊 Available rebalance_plan keys:', Object.keys(rebalancePlan));
-
-          // Check if there's any text-based plan we can parse
-          if (rebalancePlan.portfolioManagerInsights || rebalancePlan.portfolio_manager_insights || rebalancePlan.plan_text) {
-            console.log('📊 Found plan text, but unable to extract structured positions');
-          }
-        }
 
         const recommendedPositions = positionsArray.map((position: any) => ({
           ticker: position.ticker || position.symbol || position.stock,
@@ -846,7 +802,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         // If workflow_steps is an array, convert it to an object with named keys
         if (Array.isArray(rebalanceRequest.workflow_steps)) {
-          console.log('📊 Workflow steps is an array, converting to object format');
           workflowStepsData = {};
           for (const step of rebalanceRequest.workflow_steps) {
             if (step.name) {
@@ -854,16 +809,11 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             }
           }
         }
-
-        console.log('📊 Workflow steps data from DB:', workflowStepsData);
         const workflowSteps = [];
 
         // Add threshold check step
         if (!rebalanceRequest.skip_threshold_check) {
           const thresholdStep = workflowStepsData.threshold_check || {};
-          console.log('🔍 Threshold step data:', thresholdStep);
-          console.log('🔍 Threshold step status:', thresholdStep.status);
-          console.log('🔍 Has threshold data:', !!thresholdStep.data);
 
           // Determine threshold step status
           // Priority: 1) Check explicit status field, 2) Check if data exists, 3) Check overall workflow status
@@ -895,25 +845,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         // Add opportunity analysis step
         if (!rebalanceRequest.skip_opportunity_agent) {
-          // Debug the full workflow steps data structure
-          console.log('🔧 DEBUG: Full workflowStepsData:', workflowStepsData);
-          console.log('🔧 DEBUG: workflowStepsData keys:', Object.keys(workflowStepsData || {}));
-
           // Try to get opportunity data from multiple sources
           let opportunityStep = workflowStepsData.opportunity_analysis || {};
-          console.log('🔧 DEBUG: opportunityStep from workflow_steps:', opportunityStep);
-
-          // Also check the opportunity_reasoning field directly from rebalance_requests
-          console.log('🔍 Checking for opportunity_reasoning in rebalance_requests:', rebalanceRequest.opportunity_reasoning);
-          console.log('🔍 Type of opportunity_reasoning:', typeof rebalanceRequest.opportunity_reasoning);
 
           // If not found in workflow_steps, check opportunity_reasoning field directly
           // BUT only if we're past the opportunity_evaluation phase
           if (!opportunityStep.data && rebalanceRequest.opportunity_reasoning &&
             ['analyzing', 'planning', 'pending_approval', 'executing', 'completed'].includes(status)) {
-            console.log('📊 Using opportunity_reasoning field from rebalance_requests');
-            console.log('📊 opportunity_reasoning data:', rebalanceRequest.opportunity_reasoning);
-            console.log('📊 selectedStocks in opportunity_reasoning:', rebalanceRequest.opportunity_reasoning.selectedStocks);
             opportunityStep = {
               status: 'completed',
               data: rebalanceRequest.opportunity_reasoning,
@@ -923,7 +861,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
           // If we still don't have opportunity step data but have opportunity_reasoning, use it anyway
           if (!opportunityStep.data && rebalanceRequest.opportunity_reasoning) {
-            console.log('📊 FALLBACK: Using opportunity_reasoning as fallback');
             opportunityStep = {
               status: 'completed',
               data: rebalanceRequest.opportunity_reasoning,
@@ -931,41 +868,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             };
           }
 
-          console.log('🎯 DEBUG: Current status:', status);
-          console.log('🎯 DEBUG: opportunityStep after all processing:', opportunityStep);
-          console.log('🎯 DEBUG: opportunityStep.data exists:', !!opportunityStep.data);
-          console.log('🎯 DEBUG: Will add opportunity to workflowSteps:', !!opportunityStep.data);
-
-          console.log('🎯 Opportunity step data:', opportunityStep);
-          console.log('🎯 Opportunity step status:', opportunityStep.status);
-          console.log('🎯 Has opportunity data:', !!opportunityStep.data);
-          console.log('🎯 Type of opportunity data:', typeof opportunityStep.data);
-          console.log('🎯 Opportunity data raw:', JSON.stringify(opportunityStep.data, null, 2));
-
-          // Also log the specific fields we're looking for
-          if (opportunityStep.data) {
-            console.log('📋 Opportunity data fields:', {
-              recommendAnalysis: opportunityStep.data.recommendAnalysis,
-              selectedStocks: opportunityStep.data.selectedStocks,
-              reasoning: opportunityStep.data.reasoning,
-              hasSelectedStocks: !!opportunityStep.data.selectedStocks,
-              selectedStocksLength: opportunityStep.data.selectedStocks?.length
-            });
-          }
-
           // Parse the AI response if it's stored as a string (declare insights first)  
-          console.log('🔧 WORKFLOW PROCESSING - Starting workflow processing');
-          console.log('🔧 WORKFLOW PROCESSING - opportunityStep before processing:', opportunityStep);
-
           let insights = opportunityStep.data;
-
-          console.log('🔧 WORKFLOW PROCESSING - Raw opportunityStep.data:', opportunityStep.data);
-          if (opportunityStep.data) {
-            console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data keys:', Object.keys(opportunityStep.data));
-            console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data.reasoning:', opportunityStep.data.reasoning);
-            console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data.recommendAnalysis:', opportunityStep.data.recommendAnalysis);
-            console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data.selectedStocks:', opportunityStep.data.selectedStocks);
-          }
 
           // Determine opportunity step status
           // Priority: 1) Check explicit status field, 2) Check overall workflow status
@@ -993,11 +897,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
           // Parse insights if it's a string
           if (insights && typeof insights === 'string') {
-            console.log('🔍 Parsing opportunity insights from string');
             try {
               insights = JSON.parse(insights);
             } catch (e) {
-              console.error('Failed to parse opportunity insights:', e);
               // Try to extract from AI response text
               insights = {
                 reasoning: insights,
@@ -1016,22 +918,14 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             data: opportunityStatus === 'error' ? opportunityStep.data : undefined // Include error data if failed
           };
 
-          console.log('🚀 Adding opportunity workflow step:', opportunityWorkflowStep);
           workflowSteps.push(opportunityWorkflowStep);
         }
 
         // Add stock analysis step
         if (rebalanceAnalyses && rebalanceAnalyses.length > 0) {
           const stockAnalysisStep = workflowStepsData.stock_analysis || {};
-          console.log('📊 Stock analysis step from DB:', stockAnalysisStep);
 
           const stockAnalyses = rebalanceAnalyses.map((analysis: any) => {
-            console.log(`📊 Analysis for ${analysis.ticker}:`, {
-              analysis_status: analysis.analysis_status,
-              decision: analysis.decision,
-              confidence: analysis.confidence,
-              has_insights: !!analysis.agent_insights
-            });
 
             // Determine individual analysis status based on analysis_status field
             let analysisStatus = 'pending';
@@ -1058,12 +952,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             const fullAnalysis = analysis.full_analysis || {};
             const workflowSteps = fullAnalysis.workflowSteps || [];
 
-            console.log(`📊 Full analysis for ${analysis.ticker}:`, {
-              hasFullAnalysis: !!fullAnalysis,
-              workflowStepsCount: workflowSteps.length,
-              workflowSteps: workflowSteps
-            });
-
             // Try to get agent status from workflow steps first (more reliable)
             let agents = {
               marketAnalyst: 'pending',
@@ -1074,15 +962,12 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
             // Find the analysis step in workflow
             const analysisStep = workflowSteps.find((s: any) => s.id === 'analysis');
-            console.log(`📊 Analysis step for ${analysis.ticker}:`, analysisStep);
 
             if (analysisStep && analysisStep.agents && analysisStep.agents.length > 0) {
               // Read the actual agent statuses from the workflow steps
               analysisStep.agents.forEach((agent: any) => {
                 const agentName = agent.name.toLowerCase().replace(/\s+/g, '');
                 const agentStatus = agent.status || 'pending';
-
-                console.log(`📊 Agent ${agent.name} status from workflow: ${agentStatus}`);
 
                 if (agentName.includes('market')) {
                   agents.marketAnalyst = agentStatus;
@@ -1110,8 +995,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                 fundamentalsAnalyst: insights.fundamentalsAnalyst ? 'completed' :
                   isAnalysisRunning ? 'running' : 'pending'
               };
-
-              console.log(`📊 Fallback agent status for ${analysis.ticker}:`, agents);
             }
 
             return {
@@ -1131,8 +1014,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           const runningAnalyses = stockAnalyses.filter((sa: any) => sa.status === 'running').length;
           const pendingAnalyses = stockAnalyses.filter((sa: any) => sa.status === 'pending').length;
 
-          console.log(`📊 Stock analyses breakdown: ${completedAnalyses} completed, ${runningAnalyses} running, ${pendingAnalyses} pending, ${stockAnalyses.length} total`);
-
           // Determine overall status for the stock analysis step
           // Be very strict about when to mark as completed
           let stockAnalysisStatus = 'pending';
@@ -1151,12 +1032,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             stockAnalysisStatus = 'pending';
           }
 
-          // NEVER trust DB status over our calculation
-          if (stockAnalysisStep.status === 'completed' && stockAnalysisStatus !== 'completed') {
-            console.warn('⚠️ DB says stock analysis completed but we have incomplete analyses - using our calculation');
-          }
-
-          console.log(`📊 Final stock analysis status: ${stockAnalysisStatus}`);
 
           workflowSteps.push({
             id: 'analysis',
@@ -1633,38 +1508,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                         executedTickers.has(p.ticker) || rejectedTickers.has(p.ticker) || p.shareChange === 0
                       );
 
-                      // DEBUG: Log all the state variables
-                      console.log('🐛 ACTIONS TAB DEBUG:', {
-                        status: rebalanceData.status,
-                        isRunning,
-                        isAnalyzing,
-                        isPlanning,
-                        isPendingApproval,
-                        isExecuting,
-                        isCompleted,
-                        isCanceled,
-                        isError,
-                        hasPositions,
-                        positionsCount: rebalanceData.recommendedPositions?.length || 0,
-                        pendingPositionsCount: pendingPositions.length,
-                        executedTickersSize: executedTickers.size,
-                        rejectedTickersSize: rejectedTickers.size,
-                        orderStatusesSize: orderStatuses.size,
-                        allPositionsProcessed
-                      });
-
-                      // DEBUG: Log individual position details
-                      if (rebalanceData.recommendedPositions) {
-                        console.log('🐛 POSITION DETAILS:');
-                        rebalanceData.recommendedPositions.forEach((p: RebalancePosition, idx: number) => {
-                          const orderStatus = orderStatuses.get(p.ticker);
-                          console.log(`  ${idx}: ${p.ticker} - shareChange: ${p.shareChange}, action: ${p.action}, orderStatus: ${orderStatus?.status || 'none'}`);
-                        });
-                      }
-
                       // State 1: Still analyzing stocks
                       if (isAnalyzing) {
-                        console.log('🐛 ACTIONS TAB: Showing analyzing state');
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1687,7 +1532,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
                       // State 2: Planning rebalance (only when still planning and no positions yet)
                       if (isPlanning && !hasPositions) {
-                        console.log('🐛 ACTIONS TAB: Showing planning state');
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1706,7 +1550,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
                       // State 3: Error occurred or Failed status
                       if (isError || rebalanceData.status === 'failed') {
-                        console.log('🐛 ACTIONS TAB: Showing error state');
                         // Extract cleaner error message from various sources
                         let errorMessage = 'Unknown error occurred';
                         let errorDetails = rebalanceData.rebalance_plan?.error || rebalanceData.error_message || '';
@@ -1775,7 +1618,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
                       // State 4: Canceled
                       if (isCanceled) {
-                        console.log('🐛 ACTIONS TAB: Showing canceled state');
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1796,7 +1638,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                         rebalanceData.recommendedPositions.every((p: RebalancePosition) => p.shareChange === 0) &&
                         executedTickers.size === 0 && rejectedTickers.size === 0 &&
                         !Array.from(orderStatuses.values()).some(status => ['pending', 'executed', 'approved'].includes(status.status))) {
-                        console.log('🐛 ACTIONS TAB: Showing no actions needed state');
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1823,7 +1664,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
                       // State 6: Has positions to show (including pending approval)
                       if (hasPositions || isPendingApproval) {
-                        console.log('🐛 ACTIONS TAB: Showing positions state');
                         return (
                           <>
                             {/* Status Banner for pending approval state */}
@@ -1842,12 +1682,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                   <Badge variant="default" className="text-xs">
                                     {(() => {
                                       const tradesCount = rebalanceData.recommendedPositions?.filter((p: RebalancePosition) => p.shareChange !== 0).length || 0;
-                                      console.log('🔍 Trades count calculation:', {
-                                        recommendedPositions: rebalanceData.recommendedPositions,
-                                        positionsLength: rebalanceData.recommendedPositions?.length,
-                                        tradesWithChanges: rebalanceData.recommendedPositions?.filter((p: RebalancePosition) => p.shareChange !== 0),
-                                        tradesCount
-                                      });
                                       return `${tradesCount} trades`;
                                     })()}
                                   </Badge>
@@ -2041,7 +1875,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       }
 
                       // Default empty state
-                      console.log('🐛 ACTIONS TAB: Showing default empty state');
                       return (
                         <div className="flex flex-col items-center justify-center p-12 space-y-6">
                           <div className="relative">

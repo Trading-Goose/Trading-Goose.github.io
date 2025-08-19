@@ -52,14 +52,67 @@ jobs:
       - name: Add .nojekyll file
         run: touch ./dist/.nojekyll
         
-      - name: Create web.config for proper MIME types (if needed)
+      - name: Fix GitHub Pages compatibility and create _headers
         run: |
-          # GitHub Pages uses Jekyll by default, but .nojekyll disables it
-          # Ensure all JS files have proper content-type headers by checking index.html
-          echo "Checking for module script references in index.html..."
-          if grep -q 'type="module"' ./dist/index.html; then
-            echo "Module scripts found - GitHub Pages should handle these correctly"
+          cd ./dist
+          
+          # Create proper Netlify-style _headers file for GitHub Pages compatibility
+          cat > _headers << 'EOF'
+          /*
+            X-Frame-Options: DENY
+            X-Content-Type-Options: nosniff
+            Referrer-Policy: strict-origin-when-cross-origin
+          
+          /*.js
+            Content-Type: text/javascript; charset=utf-8
+            Cache-Control: public, max-age=31536000, immutable
+          
+          /*.mjs  
+            Content-Type: text/javascript; charset=utf-8
+            Cache-Control: public, max-age=31536000, immutable
+          
+          /assets/*.js
+            Content-Type: text/javascript; charset=utf-8
+            Cache-Control: public, max-age=31536000, immutable
+          
+          /*.css
+            Content-Type: text/css; charset=utf-8
+            Cache-Control: public, max-age=31536000, immutable
+          
+          /assets/*.css
+            Content-Type: text/css; charset=utf-8
+            Cache-Control: public, max-age=31536000, immutable
+          
+          /favicon.ico
+            Content-Type: image/x-icon
+            Cache-Control: public, max-age=86400
+          EOF
+          
+          # Verify files exist
+          echo "=== Checking build output ==="
+          ls -la ./
+          echo ""
+          echo "=== Assets directory ==="
+          ls -la assets/ || echo "No assets directory found"
+          echo ""
+          
+          # Find all JavaScript files
+          find . -name "*.js" -type f | while read file; do
+            echo "✓ Found JS file: $file ($(file -b --mime-type "$file"))"
+          done
+          
+          # Verify favicon
+          if [ ! -f "favicon.ico" ]; then
+            echo "ERROR: favicon.ico not found"
+            exit 1
+          else
+            echo "✓ favicon.ico found ($(file -b --mime-type favicon.ico))"
           fi
+          
+          # Check HTML references
+          echo ""
+          echo "=== Module script references in HTML ==="
+          grep 'type="module"' index.html || echo "No module scripts found"
         
       - name: Setup Pages
         uses: actions/configure-pages@v4

@@ -40,15 +40,18 @@ export default defineConfig(({ mode }) => ({
     },
     rollupOptions: {
       output: {
-        // Ensure JS files have proper extensions and format
+        // Ensure JS files have proper extensions and format for GitHub Pages
         format: 'es',
-        entryFileNames: 'assets/[name].[hash].js',
-        chunkFileNames: 'assets/[name].[hash].js',
+        entryFileNames: 'assets/main.[hash].js',
+        chunkFileNames: 'assets/chunk.[hash].js',
         assetFileNames: (assetInfo) => {
-          // Ensure proper file extensions for different asset types
+          // Use simple, clear naming for GitHub Pages compatibility
           const fileName = assetInfo.names?.[0] || 'asset';
           if (fileName.endsWith('.css')) {
-            return 'assets/[name].[hash].css';
+            return 'assets/styles.[hash].css';
+          }
+          if (fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.gif') || fileName.endsWith('.svg')) {
+            return 'assets/images/[name].[hash][extname]';
           }
           return 'assets/[name].[hash][extname]';
         },

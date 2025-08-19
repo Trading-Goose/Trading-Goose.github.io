@@ -180,7 +180,6 @@ export interface ApiSettings {
   opportunity_market_range?: string;
   // Trade execution settings
   auto_execute_trades?: boolean;
-  order_type_preference?: 'dollar_amount' | 'share_amount' | 'auto';
   default_position_size_dollars?: number;
   user_risk_level?: 'conservative' | 'moderate' | 'aggressive';
   created_at: string;

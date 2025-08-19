@@ -125,38 +125,36 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
           // Fetch complete messages including those in queue
           const messageResult = await getCompleteMessages(analysisToLoad.id);
           
-          // Fetch trade order if analysis is completed
+          // Fetch trade order if it exists (regardless of analysis completion status)
           let tradeOrderData = null;
-          if (status === 'completed' && analysisToLoad.decision !== 'HOLD') {
-            const { data: tradeOrders, error: tradeError } = await supabase
-              .from('trading_actions')
-              .select('*')
-              .eq('analysis_id', analysisToLoad.id)
-              .order('created_at', { ascending: false })
-              .limit(1);
-            
-            if (!tradeError && tradeOrders && tradeOrders.length > 0) {
-              const order = tradeOrders[0];
-              tradeOrderData = {
-                id: order.id,
-                shares: parseFloat(order.shares || 0),
-                dollarAmount: parseFloat(order.dollar_amount || 0),
-                status: order.status,
-                alpacaOrderId: order.alpaca_order_id,
-                alpacaOrderStatus: order.alpaca_order_status,
-                alpacaFilledQty: order.alpaca_filled_qty ? parseFloat(order.alpaca_filled_qty) : null,
-                alpacaFilledPrice: order.alpaca_filled_price ? parseFloat(order.alpaca_filled_price) : null,
-                createdAt: order.created_at,
-                executedAt: order.executed_at,
-                price: order.price,
-                beforeAllocation: order.metadata?.beforePosition?.allocation,
-                afterAllocation: order.metadata?.afterPosition?.allocation,
-                beforeShares: order.metadata?.beforePosition?.shares,
-                afterShares: order.metadata?.afterPosition?.shares,
-                beforeValue: order.metadata?.beforePosition?.value,
-                afterValue: order.metadata?.afterPosition?.value
-              };
-            }
+          const { data: tradeOrders, error: tradeError } = await supabase
+            .from('trading_actions')
+            .select('*')
+            .eq('analysis_id', analysisToLoad.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          if (!tradeError && tradeOrders && tradeOrders.length > 0) {
+            const order = tradeOrders[0];
+            tradeOrderData = {
+              id: order.id,
+              shares: parseFloat(order.shares || 0),
+              dollarAmount: parseFloat(order.dollar_amount || 0),
+              status: order.status,
+              alpacaOrderId: order.alpaca_order_id,
+              alpacaOrderStatus: order.alpaca_order_status,
+              alpacaFilledQty: order.alpaca_filled_qty ? parseFloat(order.alpaca_filled_qty) : null,
+              alpacaFilledPrice: order.alpaca_filled_price ? parseFloat(order.alpaca_filled_price) : null,
+              createdAt: order.created_at,
+              executedAt: order.executed_at,
+              price: order.price,
+              beforeAllocation: order.metadata?.beforePosition?.allocation,
+              afterAllocation: order.metadata?.afterPosition?.allocation,
+              beforeShares: order.metadata?.beforePosition?.shares,
+              afterShares: order.metadata?.afterPosition?.shares,
+              beforeValue: order.metadata?.beforePosition?.value,
+              afterValue: order.metadata?.afterPosition?.value
+            };
           }
           
           // Debug logging to understand data structure

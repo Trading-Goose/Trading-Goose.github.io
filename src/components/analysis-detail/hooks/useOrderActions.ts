@@ -76,16 +76,22 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
 
   // Handle order approval
   const handleApproveOrder = async () => {
-    if (!analysisData?.id) {
+    if (!analysisData?.tradeOrder?.id) {
       toast({
         title: "Error",
-        description: "Analysis ID not found",
+        description: "Trade order ID not found",
         variant: "destructive",
       });
       return;
     }
 
     try {
+      console.log('Approving order with data:', {
+        tradeActionId: analysisData.tradeOrder.id,
+        action: 'approve',
+        analysisData: analysisData
+      });
+
       toast({
         title: "Executing Order",
         description: "Submitting order to Alpaca...",
@@ -94,12 +100,24 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
       // Call the edge function to execute the trade
       const { data, error } = await supabase.functions.invoke('execute-trade', {
         body: {
-          analysisId: analysisData.id,
+          tradeActionId: analysisData.tradeOrder.id,
           action: 'approve'
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        // Try to get the actual error response
+        if (error.context && typeof error.context.text === 'function') {
+          try {
+            const errorText = await error.context.text();
+            console.error('Error response body:', errorText);
+          } catch (e) {
+            console.error('Could not read error response:', e);
+          }
+        }
+        throw error;
+      }
 
       if (data.success) {
         setIsOrderExecuted(true);
@@ -135,6 +153,12 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
       }
     } catch (error: any) {
       console.error('Error executing order:', error);
+      console.error('Error details:', {
+        message: error.message,
+        context: error.context,
+        details: error.details,
+        status: error.status
+      });
       toast({
         title: "Order Failed",
         description: error.message || "Failed to execute order on Alpaca",
@@ -145,25 +169,38 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
 
   // Handle order rejection  
   const handleRejectOrder = async () => {
-    if (!analysisData?.id) {
+    if (!analysisData?.tradeOrder?.id) {
       toast({
         title: "Error",
-        description: "Analysis ID not found",
+        description: "Trade order ID not found",
         variant: "destructive",
       });
       return;
     }
 
     try {
+
       // Call the edge function to reject the trade
       const { data, error } = await supabase.functions.invoke('execute-trade', {
         body: {
-          analysisId: analysisData.id,
+          tradeActionId: analysisData.tradeOrder.id,
           action: 'reject'
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        // Try to get the actual error response
+        if (error.context && typeof error.context.text === 'function') {
+          try {
+            const errorText = await error.context.text();
+            console.error('Error response body:', errorText);
+          } catch (e) {
+            console.error('Could not read error response:', e);
+          }
+        }
+        throw error;
+      }
 
       if (data.success) {
         // Update the local trade order data
@@ -185,6 +222,12 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
       }
     } catch (error: any) {
       console.error('Error rejecting order:', error);
+      console.error('Error details:', {
+        message: error.message,
+        context: error.context,
+        details: error.details,
+        status: error.status
+      });
       toast({
         title: "Error",
         description: error.message || "Failed to reject order",

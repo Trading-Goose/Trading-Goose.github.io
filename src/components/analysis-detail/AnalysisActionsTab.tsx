@@ -1,4 +1,4 @@
-import { 
+import {
   Activity,
   ArrowRight,
   Shield,
@@ -16,12 +16,12 @@ interface AnalysisActionsTabProps {
   getConfidenceColor: (confidence: number) => string;
 }
 
-export default function AnalysisActionsTab({ 
-  analysisData, 
-  handleApproveOrder, 
-  handleRejectOrder, 
+export default function AnalysisActionsTab({
+  analysisData,
+  handleApproveOrder,
+  handleRejectOrder,
   isOrderExecuted,
-  getConfidenceColor 
+  getConfidenceColor
 }: AnalysisActionsTabProps) {
   // For rebalance analyses, show a message that actions are handled at rebalance level
   if (analysisData.rebalance_request_id) {
@@ -30,7 +30,7 @@ export default function AnalysisActionsTab({
         <Shield className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
         <h3 className="text-lg font-semibold mb-2">Part of Rebalance Workflow</h3>
         <p className="text-sm text-muted-foreground">
-          This analysis is part of a portfolio rebalance. Trade orders will be generated 
+          This analysis is part of a portfolio rebalance. Trade orders will be generated
           after all stock analyses complete and are managed in the Rebalance view.
         </p>
       </div>
@@ -52,11 +52,10 @@ export default function AnalysisActionsTab({
               <Activity className="w-4 h-4 text-gray-500" />
             )}
           </div>
-          <p className={`text-lg font-semibold ${
-            analysisData.decision === 'BUY' ? 'text-green-600' :
-            analysisData.decision === 'SELL' ? 'text-red-600' :
-            'text-gray-600'
-          }`}>
+          <p className={`text-lg font-semibold ${analysisData.decision === 'BUY' ? 'text-green-600' :
+              analysisData.decision === 'SELL' ? 'text-red-600' :
+                'text-gray-600'
+            }`}>
             {analysisData.decision}
           </p>
         </Card>
@@ -83,7 +82,7 @@ export default function AnalysisActionsTab({
       {/* Trade Order Card */}
       <div>
         <h3 className="text-lg font-semibold mb-3">Trade Order</h3>
-        <TradeOrderCard 
+        <TradeOrderCard
           analysisData={analysisData}
           onApprove={handleApproveOrder}
           onReject={handleRejectOrder}

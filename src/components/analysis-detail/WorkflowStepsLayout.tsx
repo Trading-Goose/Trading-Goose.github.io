@@ -169,7 +169,15 @@ export default function WorkflowStepsLayout({
         const shouldShow = displayDecision && displayDecision !== 'CANCELED' && analysisData.status === 'completed';
         
         return shouldShow && (
-          <div className="rounded-lg border bg-gradient-to-r from-blue-500/5 to-primary/5 p-6">
+          <div className={`rounded-lg border p-6 ${
+            displayDecision === 'BUY' 
+              ? 'bg-gradient-to-r from-green-500/5 to-green-600/5 border-green-500/20' 
+              : displayDecision === 'SELL' 
+              ? 'bg-gradient-to-r from-red-500/5 to-red-600/5 border-red-500/20'
+              : displayDecision === 'HOLD'
+              ? 'bg-gradient-to-r from-gray-500/5 to-gray-600/5 border-gray-500/20'
+              : 'bg-gradient-to-r from-blue-500/5 to-primary/5 border-border'
+          }`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-primary/10 rounded-lg">
@@ -244,17 +252,41 @@ export default function WorkflowStepsLayout({
               <div>
                 <p className="text-xs text-muted-foreground">Status</p>
                 <p className="font-semibold flex items-center gap-1">
-                  {isOrderExecuted ? (
-                    <>
-                      <CheckCircle className="w-3 h-3 text-green-500" />
-                      <span className="text-green-600 dark:text-green-400">Executed</span>
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="w-3 h-3 text-yellow-500" />
-                      <span className="text-yellow-600 dark:text-yellow-400">Pending Approval</span>
-                    </>
-                  )}
+                  {(() => {
+                    const tradeOrder = analysisData.tradeOrder;
+                    const orderStatus = tradeOrder?.status;
+                    const isExecuted = orderStatus === 'executed' || isOrderExecuted;
+                    
+                    if (isExecuted) {
+                      return (
+                        <>
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                          <span className="text-green-600 dark:text-green-400">Executed</span>
+                        </>
+                      );
+                    } else if (orderStatus === 'approved') {
+                      return (
+                        <>
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                          <span className="text-green-600 dark:text-green-400">Approved</span>
+                        </>
+                      );
+                    } else if (orderStatus === 'rejected') {
+                      return (
+                        <>
+                          <XCircle className="w-3 h-3 text-red-500" />
+                          <span className="text-red-600 dark:text-red-400">Rejected</span>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <>
+                          <Clock className="w-3 h-3 text-yellow-500" />
+                          <span className="text-yellow-600 dark:text-yellow-400">Pending Approval</span>
+                        </>
+                      );
+                    }
+                  })()}
                 </p>
               </div>
             </div>

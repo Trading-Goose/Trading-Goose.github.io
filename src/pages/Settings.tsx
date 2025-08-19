@@ -145,7 +145,6 @@ export default function SettingsPage() {
   const [alpacaLiveSecretKey, setAlpacaLiveSecretKey] = useState(apiSettings?.alpaca_live_secret_key || '');
   const [alpacaPaperTrading, setAlpacaPaperTrading] = useState(apiSettings?.alpaca_paper_trading ?? true);
   const [autoExecuteTrades, setAutoExecuteTrades] = useState(apiSettings?.auto_execute_trades ?? false);
-  const [orderTypePreference, setOrderTypePreference] = useState(apiSettings?.order_type_preference || 'auto');
   const [userRiskLevel, setUserRiskLevel] = useState(apiSettings?.user_risk_level || 'moderate');
   const [defaultPositionSizeDollars, setDefaultPositionSizeDollars] = useState(apiSettings?.default_position_size_dollars || 1000);
 
@@ -215,7 +214,6 @@ export default function SettingsPage() {
       setAlpacaLiveSecretKey(apiSettings.alpaca_live_secret_key || '');
       setAlpacaPaperTrading(apiSettings.alpaca_paper_trading ?? true);
       setAutoExecuteTrades(apiSettings.auto_execute_trades ?? false);
-      setOrderTypePreference(apiSettings.order_type_preference || 'auto');
       setUserRiskLevel(apiSettings.user_risk_level || 'moderate');
       setDefaultPositionSizeDollars(apiSettings.default_position_size_dollars || 1000);
       
@@ -485,7 +483,6 @@ export default function SettingsPage() {
           alpaca_live_secret_key: alpacaLiveSecretKey,
           alpaca_paper_trading: alpacaPaperTrading,
           auto_execute_trades: autoExecuteTrades,
-          order_type_preference: orderTypePreference,
           user_risk_level: userRiskLevel,
           default_position_size_dollars: defaultPositionSizeDollars
         };
@@ -1238,7 +1235,6 @@ export default function SettingsPage() {
               alpacaLiveSecretKey={alpacaLiveSecretKey}
               alpacaPaperTrading={alpacaPaperTrading}
               autoExecuteTrades={autoExecuteTrades}
-              orderTypePreference={orderTypePreference}
               userRiskLevel={userRiskLevel}
               defaultPositionSizeDollars={defaultPositionSizeDollars}
               configuredProviders={configuredProviders}
@@ -1251,7 +1247,6 @@ export default function SettingsPage() {
               setAlpacaLiveSecretKey={setAlpacaLiveSecretKey}
               setAlpacaPaperTrading={setAlpacaPaperTrading}
               setAutoExecuteTrades={setAutoExecuteTrades}
-              setOrderTypePreference={setOrderTypePreference}
               setUserRiskLevel={setUserRiskLevel}
               setDefaultPositionSizeDollars={setDefaultPositionSizeDollars}
               toggleShowKey={toggleShowKey}

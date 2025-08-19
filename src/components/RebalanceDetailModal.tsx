@@ -66,11 +66,11 @@ interface RebalancePosition {
 }
 
 // Helper functions for analysis card rendering
-const getDecisionVariant = (decision: string): "default" | "secondary" | "destructive" | "outline" => {
+const getDecisionVariant = (decision: string): "default" | "secondary" | "destructive" | "outline" | "buy" | "sell" | "hold" => {
   switch (decision) {
-    case 'BUY': return 'default';
-    case 'SELL': return 'destructive';
-    case 'HOLD': return 'secondary';
+    case 'BUY': return 'buy';
+    case 'SELL': return 'sell';
+    case 'HOLD': return 'hold';
     default: return 'outline';
   }
 };
@@ -79,6 +79,7 @@ const getDecisionIcon = (decision: string) => {
   switch (decision) {
     case 'BUY': return <TrendingUp className="w-3 h-3" />;
     case 'SELL': return <TrendingDown className="w-3 h-3" />;
+    case 'HOLD': return <Activity className="w-3 h-3" />;
     default: return <Activity className="w-3 h-3" />;
   }
 };
@@ -138,9 +139,9 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                 ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
                 : isError
                   ? 'bg-destructive/10 dark:bg-destructive/5 border-destructive/20 dark:border-destructive/10'
-                : isRunning
-                  ? 'bg-primary/5 border-primary/20'
-                  : 'bg-card border-border'
+                  : isRunning
+                    ? 'bg-primary/5 border-primary/20'
+                    : 'bg-card border-border'
                 }`}>
                 <div className="relative">
                   <div className="flex items-start justify-between">
@@ -150,9 +151,9 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                         ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
                         : isError
                           ? 'bg-destructive/20 dark:bg-destructive/10 text-destructive'
-                        : isRunning
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-muted text-muted-foreground'
+                          : isRunning
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground'
                         }`}>
                         <Icon className="w-6 h-6" />
                       </div>
@@ -187,7 +188,7 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">{step.description}</p>
-                        
+
                         {/* Show error details if step failed */}
                         {isError && step.data?.error && (
                           <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded text-sm">
@@ -476,10 +477,17 @@ function RebalancePositionCard({ position, onApprove, onReject, isExecuted, orde
 
   return (
     <div
-      className={`p-4 rounded-lg border transition-all ${isExecuted
-        ? 'bg-green-500/5 border-green-500/20'
-        : isPending
-          ? 'bg-blue-500/5 border-blue-500/20'
+      className={`p-4 rounded-lg border transition-all ${
+        isExecuted 
+          ? (position.action === 'BUY' ? 'bg-green-500/5 border-green-500/20' : 
+             position.action === 'SELL' ? 'bg-red-500/5 border-red-500/20' : 
+             'bg-gray-500/5 border-gray-500/20')
+          : isPending
+          ? (position.action === 'BUY' ? 'bg-green-500/5 border-green-500/20' : 
+             position.action === 'SELL' ? 'bg-red-500/5 border-red-500/20' : 
+             'bg-gray-500/5 border-gray-500/20')
+          : isHold
+          ? 'bg-gray-500/5 border-gray-500/20'
           : 'bg-muted/20 border-muted opacity-60'
         }`}
     >
@@ -488,11 +496,8 @@ function RebalancePositionCard({ position, onApprove, onReject, isExecuted, orde
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="font-semibold text-lg">{position.ticker}</span>
-            <Badge variant={
-              position.action === 'BUY' ? 'secondary' :
-                position.action === 'SELL' ? 'destructive' :
-                  'outline'
-            }>
+            <Badge variant={getDecisionVariant(position.action)}>
+              {getDecisionIcon(position.action)}
               {position.action}
             </Badge>
             {position.shareChange !== 0 && (
@@ -502,16 +507,15 @@ function RebalancePositionCard({ position, onApprove, onReject, isExecuted, orde
               </span>
             )}
             {orderStatus && (
-              <Badge 
+              <Badge
                 variant={
-                  orderStatus.status === 'executed' || orderStatus.status === 'approved' ? 'default' :
-                  orderStatus.status === 'rejected' ? 'destructive' :
-                  'secondary'
-                } 
+                  orderStatus.status === 'executed' || orderStatus.status === 'approved' ? 'success' :
+                    orderStatus.status === 'rejected' ? 'destructive' :
+                      'secondary'
+                }
                 className="text-xs"
               >
-                {orderStatus.status === 'executed' && <CheckCircle className="w-3 h-3 mr-1" />}
-                {orderStatus.status === 'approved' && <CheckCircle className="w-3 h-3 mr-1" />}
+                {(orderStatus.status === 'executed' || orderStatus.status === 'approved') && <CheckCircle className="w-3 h-3 mr-1" />}
                 {orderStatus.status === 'rejected' && <XCircle className="w-3 h-3 mr-1" />}
                 {orderStatus.status.charAt(0).toUpperCase() + orderStatus.status.slice(1)}
               </Badge>
@@ -630,7 +634,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
       try {
         // Add a small delay to ensure auth state is stable
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         // Fetch rebalance request data
         const { data: rebalanceRequest, error: requestError } = await supabase
           .from('rebalance_requests')
@@ -647,7 +651,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               .select('id, user_id')
               .eq('id', rebalanceId)
               .single();
-              
+
             if (anyRebalance) {
               throw new Error('Access denied. This rebalance belongs to another user.');
             } else {
@@ -663,7 +667,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         console.log('🔍 Full rebalance request:', rebalanceRequest);
         console.log('🔍 Rebalance request keys:', Object.keys(rebalanceRequest));
-        
+
         // Deep inspection of opportunity agent data
         console.log('🎯 OPPORTUNITY AGENT DATA INSPECTION:');
         console.log('1. workflow_steps:', rebalanceRequest.workflow_steps);
@@ -784,27 +788,27 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           .select('id, ticker, status, metadata')
           .eq('rebalance_request_id', rebalanceId)
           .eq('user_id', user.id);
-        
+
         if (tradingActions && tradingActions.length > 0) {
           const newOrderStatuses = new Map();
           const newExecutedTickers = new Set<string>();
           const newRejectedTickers = new Set<string>();
-          
+
           // Create a map of ticker to trade action for easier lookup
           const tradeActionMap = new Map();
-          
+
           tradingActions.forEach(action => {
             const alpacaOrderId = action.metadata?.alpaca_order?.id;
             const alpacaStatus = action.metadata?.alpaca_order?.status;
-            
+
             newOrderStatuses.set(action.ticker, {
               status: action.status,
               alpacaOrderId,
               alpacaStatus
             });
-            
+
             tradeActionMap.set(action.ticker, action.id);
-            
+
             // Update executed/rejected sets based on actual status
             if (action.status === 'executed') {
               newExecutedTickers.add(action.ticker);
@@ -812,12 +816,15 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               // Check if Alpaca order is filled
               if (alpacaStatus === 'filled') {
                 newExecutedTickers.add(action.ticker);
+              } else {
+                // Approved orders should also be treated as executed for UI purposes
+                newExecutedTickers.add(action.ticker);
               }
             } else if (action.status === 'rejected') {
               newRejectedTickers.add(action.ticker);
             }
           });
-          
+
           // Update positions with trade action IDs
           recommendedPositions.forEach(position => {
             const tradeActionId = tradeActionMap.get(position.ticker);
@@ -825,7 +832,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               position.tradeActionId = tradeActionId;
             }
           });
-          
+
           if (mounted) {
             setOrderStatuses(newOrderStatuses);
             setExecutedTickers(newExecutedTickers);
@@ -836,7 +843,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         // Build workflow steps based on status and workflow_steps data
         // Handle both array and object formats for workflow_steps
         let workflowStepsData = rebalanceRequest.workflow_steps || {};
-        
+
         // If workflow_steps is an array, convert it to an object with named keys
         if (Array.isArray(rebalanceRequest.workflow_steps)) {
           console.log('📊 Workflow steps is an array, converting to object format');
@@ -847,7 +854,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             }
           }
         }
-        
+
         console.log('📊 Workflow steps data from DB:', workflowStepsData);
         const workflowSteps = [];
 
@@ -891,19 +898,19 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           // Debug the full workflow steps data structure
           console.log('🔧 DEBUG: Full workflowStepsData:', workflowStepsData);
           console.log('🔧 DEBUG: workflowStepsData keys:', Object.keys(workflowStepsData || {}));
-          
+
           // Try to get opportunity data from multiple sources
           let opportunityStep = workflowStepsData.opportunity_analysis || {};
           console.log('🔧 DEBUG: opportunityStep from workflow_steps:', opportunityStep);
-          
+
           // Also check the opportunity_reasoning field directly from rebalance_requests
           console.log('🔍 Checking for opportunity_reasoning in rebalance_requests:', rebalanceRequest.opportunity_reasoning);
           console.log('🔍 Type of opportunity_reasoning:', typeof rebalanceRequest.opportunity_reasoning);
-          
+
           // If not found in workflow_steps, check opportunity_reasoning field directly
           // BUT only if we're past the opportunity_evaluation phase
-          if (!opportunityStep.data && rebalanceRequest.opportunity_reasoning && 
-              ['analyzing', 'planning', 'pending_approval', 'executing', 'completed'].includes(status)) {
+          if (!opportunityStep.data && rebalanceRequest.opportunity_reasoning &&
+            ['analyzing', 'planning', 'pending_approval', 'executing', 'completed'].includes(status)) {
             console.log('📊 Using opportunity_reasoning field from rebalance_requests');
             console.log('📊 opportunity_reasoning data:', rebalanceRequest.opportunity_reasoning);
             console.log('📊 selectedStocks in opportunity_reasoning:', rebalanceRequest.opportunity_reasoning.selectedStocks);
@@ -913,7 +920,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               timestamp: rebalanceRequest.opportunity_reasoning?.timestamp
             };
           }
-          
+
           // If we still don't have opportunity step data but have opportunity_reasoning, use it anyway
           if (!opportunityStep.data && rebalanceRequest.opportunity_reasoning) {
             console.log('📊 FALLBACK: Using opportunity_reasoning as fallback');
@@ -923,18 +930,18 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
               timestamp: rebalanceRequest.opportunity_reasoning?.timestamp
             };
           }
-          
+
           console.log('🎯 DEBUG: Current status:', status);
           console.log('🎯 DEBUG: opportunityStep after all processing:', opportunityStep);
           console.log('🎯 DEBUG: opportunityStep.data exists:', !!opportunityStep.data);
           console.log('🎯 DEBUG: Will add opportunity to workflowSteps:', !!opportunityStep.data);
-          
+
           console.log('🎯 Opportunity step data:', opportunityStep);
           console.log('🎯 Opportunity step status:', opportunityStep.status);
           console.log('🎯 Has opportunity data:', !!opportunityStep.data);
           console.log('🎯 Type of opportunity data:', typeof opportunityStep.data);
           console.log('🎯 Opportunity data raw:', JSON.stringify(opportunityStep.data, null, 2));
-          
+
           // Also log the specific fields we're looking for
           if (opportunityStep.data) {
             console.log('📋 Opportunity data fields:', {
@@ -949,9 +956,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           // Parse the AI response if it's stored as a string (declare insights first)  
           console.log('🔧 WORKFLOW PROCESSING - Starting workflow processing');
           console.log('🔧 WORKFLOW PROCESSING - opportunityStep before processing:', opportunityStep);
-          
+
           let insights = opportunityStep.data;
-          
+
           console.log('🔧 WORKFLOW PROCESSING - Raw opportunityStep.data:', opportunityStep.data);
           if (opportunityStep.data) {
             console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data keys:', Object.keys(opportunityStep.data));
@@ -959,7 +966,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data.recommendAnalysis:', opportunityStep.data.recommendAnalysis);
             console.log('🔧 WORKFLOW PROCESSING - opportunityStep.data.selectedStocks:', opportunityStep.data.selectedStocks);
           }
-          
+
           // Determine opportunity step status
           // Priority: 1) Check explicit status field, 2) Check overall workflow status
           let opportunityStatus = 'pending';
@@ -1008,7 +1015,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             insights: insights, // Use the parsed insights
             data: opportunityStatus === 'error' ? opportunityStep.data : undefined // Include error data if failed
           };
-          
+
           console.log('🚀 Adding opportunity workflow step:', opportunityWorkflowStep);
           workflowSteps.push(opportunityWorkflowStep);
         }
@@ -1190,7 +1197,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         // Check if the portfolio manager is complete
         const portfolioManagerComplete = portfolioManagerStatus === 'completed' || rebalanceRequest.rebalance_plan;
-        
+
         // Overall workflow status should be 'completed' when portfolio manager is done, even if orders are pending
         let overallStatus;
         if (isFailed) {
@@ -1228,9 +1235,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             rebalanceAgent: rebalancePlan.rebalance_agent_insight || '',
             opportunityAgent: rebalancePlan.opportunity_agent_insight || '',
             // Also include Portfolio Manager insights here for easier access
-            portfolioManager: rebalancePlan.portfolioManagerAnalysis || 
-                             rebalancePlan.portfolioManagerInsights || 
-                             rebalancePlan.rebalance_agent_insight || ''
+            portfolioManager: rebalancePlan.portfolioManagerAnalysis ||
+              rebalancePlan.portfolioManagerInsights ||
+              rebalancePlan.rebalance_agent_insight || ''
           },
 
           opportunityAgentUsed: !rebalanceRequest.skip_opportunity_agent,
@@ -1328,7 +1335,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         setExecutedTickers(new Set([...executedTickers, ticker]));
 
         setOrderStatuses(prev => new Map(prev.set(ticker, {
-          status: 'executed',
+          status: 'approved',
           alpacaOrderId: data.alpacaOrderId
         })));
 
@@ -1336,7 +1343,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         const position = rebalanceData.recommendedPositions.find((p: RebalancePosition) => p.ticker === ticker);
         if (position) {
           position.executed = true;
-          position.orderStatus = 'executed';
+          position.orderStatus = 'approved';
           position.alpacaOrderId = data.alpacaOrderId;
         }
 
@@ -1460,7 +1467,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           successCount++;
           newExecutedTickers.add(position.ticker);
           position.executed = true;
-          position.orderStatus = 'executed';
+          position.orderStatus = 'approved';
           position.alpacaOrderId = result.value.data.alpacaOrderId;
         } else {
           failedCount++;
@@ -1496,7 +1503,15 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
   const pendingPositions = rebalanceData?.recommendedPositions
     ?.filter((p: RebalancePosition) => {
       const orderStatus = orderStatuses.get(p.ticker);
-      return p.shareChange !== 0 && orderStatus?.status === 'pending';
+      // Include positions that have share changes and either:
+      // 1. Have explicit 'pending' status, OR
+      // 2. Have no order status yet (new positions awaiting approval), OR  
+      // 3. Are not executed and not rejected
+      return p.shareChange !== 0 && (
+        orderStatus?.status === 'pending' ||
+        (!orderStatus && rebalanceData.status === 'pending_approval') ||
+        (!executedTickers.has(p.ticker) && !rejectedTickers.has(p.ticker) && !orderStatus?.status)
+      );
     }) || [];
 
   const totalBuyValue = pendingPositions
@@ -1618,8 +1633,38 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                         executedTickers.has(p.ticker) || rejectedTickers.has(p.ticker) || p.shareChange === 0
                       );
 
+                      // DEBUG: Log all the state variables
+                      console.log('🐛 ACTIONS TAB DEBUG:', {
+                        status: rebalanceData.status,
+                        isRunning,
+                        isAnalyzing,
+                        isPlanning,
+                        isPendingApproval,
+                        isExecuting,
+                        isCompleted,
+                        isCanceled,
+                        isError,
+                        hasPositions,
+                        positionsCount: rebalanceData.recommendedPositions?.length || 0,
+                        pendingPositionsCount: pendingPositions.length,
+                        executedTickersSize: executedTickers.size,
+                        rejectedTickersSize: rejectedTickers.size,
+                        orderStatusesSize: orderStatuses.size,
+                        allPositionsProcessed
+                      });
+
+                      // DEBUG: Log individual position details
+                      if (rebalanceData.recommendedPositions) {
+                        console.log('🐛 POSITION DETAILS:');
+                        rebalanceData.recommendedPositions.forEach((p: RebalancePosition, idx: number) => {
+                          const orderStatus = orderStatuses.get(p.ticker);
+                          console.log(`  ${idx}: ${p.ticker} - shareChange: ${p.shareChange}, action: ${p.action}, orderStatus: ${orderStatus?.status || 'none'}`);
+                        });
+                      }
+
                       // State 1: Still analyzing stocks
                       if (isAnalyzing) {
+                        console.log('🐛 ACTIONS TAB: Showing analyzing state');
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1642,6 +1687,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
                       // State 2: Planning rebalance (only when still planning and no positions yet)
                       if (isPlanning && !hasPositions) {
+                        console.log('🐛 ACTIONS TAB: Showing planning state');
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1660,10 +1706,11 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
                       // State 3: Error occurred or Failed status
                       if (isError || rebalanceData.status === 'failed') {
+                        console.log('🐛 ACTIONS TAB: Showing error state');
                         // Extract cleaner error message from various sources
                         let errorMessage = 'Unknown error occurred';
                         let errorDetails = rebalanceData.rebalance_plan?.error || rebalanceData.error_message || '';
-                        
+
                         // Try to parse error message if it's a JSON string
                         if (errorDetails && typeof errorDetails === 'string') {
                           // Check if it's a JSON error response
@@ -1693,10 +1740,10 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                             errorMessage = errorDetails;
                           }
                         }
-                        
+
                         const errorDetailsText = rebalanceData.rebalance_plan?.errorDetails || '';
                         const failedAt = rebalanceData.rebalance_plan?.failedAt || '';
-                        
+
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1728,6 +1775,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
                       // State 4: Canceled
                       if (isCanceled) {
+                        console.log('🐛 ACTIONS TAB: Showing canceled state');
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1744,10 +1792,11 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       }
 
                       // State 5: No actions needed (only if no executed/pending/rejected orders exist)
-                      if (hasPositions && 
-                          rebalanceData.recommendedPositions.every((p: RebalancePosition) => p.shareChange === 0) &&
-                          executedTickers.size === 0 && rejectedTickers.size === 0 && 
-                          !Array.from(orderStatuses.values()).some(status => ['pending', 'executed', 'approved'].includes(status.status))) {
+                      if (hasPositions &&
+                        rebalanceData.recommendedPositions.every((p: RebalancePosition) => p.shareChange === 0) &&
+                        executedTickers.size === 0 && rejectedTickers.size === 0 &&
+                        !Array.from(orderStatuses.values()).some(status => ['pending', 'executed', 'approved'].includes(status.status))) {
+                        console.log('🐛 ACTIONS TAB: Showing no actions needed state');
                         return (
                           <div className="flex flex-col items-center justify-center p-12 space-y-6">
                             <div className="relative">
@@ -1774,6 +1823,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
                       // State 6: Has positions to show (including pending approval)
                       if (hasPositions || isPendingApproval) {
+                        console.log('🐛 ACTIONS TAB: Showing positions state');
                         return (
                           <>
                             {/* Status Banner for pending approval state */}
@@ -1915,18 +1965,21 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                 <div className="space-y-3">
                                   {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
                                     const orderStatus = orderStatuses.get(position.ticker);
-                                    const isExecuted = orderStatus?.status === 'executed' || (orderStatus?.status === 'approved' && (orderStatus as any)?.alpacaStatus === 'filled');
-                                    
+                                    const isExecuted = orderStatus?.status === 'executed' ||
+                                      orderStatus?.status === 'approved' ||
+                                      (orderStatus?.status === 'approved' && orderStatus?.alpacaStatus === 'filled') ||
+                                      executedTickers.has(position.ticker);
+
                                     if (!isExecuted) return null;
-                                    
+
                                     return (
                                       <RebalancePositionCard
                                         key={`executed-${position.ticker}`}
                                         position={position}
                                         isExecuted={isExecuted}
                                         orderStatus={orderStatus}
-                                        onApprove={() => {}} // No action needed for executed orders
-                                        onReject={() => {}} // No action needed for executed orders
+                                        onApprove={() => { }} // No action needed for executed orders
+                                        onReject={() => { }} // No action needed for executed orders
                                       />
                                     );
                                   })}
@@ -1954,13 +2007,19 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                               <div className="space-y-3 mb-6">
                                 {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
                                   const orderStatus = orderStatuses.get(position.ticker);
-                                  const isExecuted = orderStatus?.status === 'executed' || (orderStatus?.status === 'approved' && (orderStatus as any)?.alpacaStatus === 'filled');
-                                  const isRejected = orderStatus?.status === 'rejected';
-                                  const isPending = orderStatus?.status === 'pending';
+                                  const isExecuted = orderStatus?.status === 'approved' ||
+                                    orderStatus?.status === 'approved' ||
+                                    (orderStatus?.status === 'approved' && orderStatus?.alpacaStatus === 'filled') ||
+                                    executedTickers.has(position.ticker);
+                                  const isRejected = orderStatus?.status === 'rejected' || rejectedTickers.has(position.ticker);
+                                  // Updated pending logic to match pendingPositions calculation
+                                  const isPending = orderStatus?.status === 'pending' ||
+                                    (!orderStatus && rebalanceData.status === 'pending_approval') ||
+                                    (!executedTickers.has(position.ticker) && !rejectedTickers.has(position.ticker) && !orderStatus?.status);
 
                                   // Only show pending orders in this section
                                   if (!isPending || isExecuted || isRejected) return null;
-                                  
+
                                   // Don't show HOLD positions (no change needed)
                                   if (position.shareChange === 0) return null;
 
@@ -1982,6 +2041,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       }
 
                       // Default empty state
+                      console.log('🐛 ACTIONS TAB: Showing default empty state');
                       return (
                         <div className="flex flex-col items-center justify-center p-12 space-y-6">
                           <div className="relative">
@@ -2134,56 +2194,39 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       {/* Opportunity Analysis Insights */}
                       {!rebalanceData.skipOpportunityAgent && (() => {
                         const opportunityStep = rebalanceData.workflowSteps?.find((s: any) => s.id === 'opportunity');
-                        console.log('🎨 INSIGHTS TAB - Opportunity step:', opportunityStep);
-                        console.log('🎨 INSIGHTS TAB - Opportunity insights:', opportunityStep?.insights);
-                        console.log('🎨 INSIGHTS TAB - Type of insights:', typeof opportunityStep?.insights);
-                        console.log('🎨 INSIGHTS TAB - Raw rebalanceData:', rebalanceData);
-                        console.log('🎨 INSIGHTS TAB - rebalanceData keys:', Object.keys(rebalanceData));
-                        console.log('🎨 INSIGHTS TAB - rebalanceData.rebalance_plan:', rebalanceData.rebalance_plan);
-                        
+
                         // Check if we have insights in the workflow step
                         let insights = opportunityStep?.insights || opportunityStep?.data;
-                        
-                        console.log('🎨 INSIGHTS TAB - Final insights from workflow step:', insights);
-                        console.log('🎨 INSIGHTS TAB - Insights keys:', insights ? Object.keys(insights) : 'null');
-                        console.log('🎨 INSIGHTS TAB - insights.recommendAnalysis:', insights?.recommendAnalysis);
-                        console.log('🎨 INSIGHTS TAB - insights.reasoning:', insights?.reasoning);
-                        console.log('🎨 INSIGHTS TAB - insights.selectedStocks length:', insights?.selectedStocks?.length);
-                        
+
                         // If we have basic selectedStocks data but no complete insights structure, create one
                         if (insights && insights.selectedStocks && insights.recommendAnalysis !== true && insights.recommendAnalysis !== false) {
-                          console.log('🎨 INSIGHTS TAB - Converting basic data to full insights structure');
-                          
+
                           // Try to find the reasoning from the original opportunity step data
                           const fullOpportunityData = opportunityStep?.data;
-                          console.log('🎨 INSIGHTS TAB - fullOpportunityData:', fullOpportunityData);
-                          console.log('🎨 INSIGHTS TAB - fullOpportunityData?.reasoning:', fullOpportunityData?.reasoning);
-                          
+
                           // Check multiple sources for the reasoning text
                           let reasoningText = fullOpportunityData?.reasoning || insights.reasoning;
-                          
+
                           // If still no reasoning, try to get it from rebalanceData.opportunity_reasoning
                           if (!reasoningText && rebalanceData.opportunity_reasoning?.reasoning) {
                             reasoningText = rebalanceData.opportunity_reasoning.reasoning;
                           }
-                          
+
                           // Try to get from rebalance_plan
                           if (!reasoningText && rebalanceData.rebalance_plan?.opportunity_reasoning) {
                             reasoningText = rebalanceData.rebalance_plan.opportunity_reasoning.reasoning;
                           }
-                          
+
                           // Try to get from agentInsights
                           if (!reasoningText && rebalanceData.agentInsights?.opportunityAgent) {
                             reasoningText = rebalanceData.agentInsights.opportunityAgent;
                           }
-                          
+
                           // Last fallback
                           if (!reasoningText) {
                             reasoningText = 'Market conditions suggest analyzing the selected stocks for potential opportunities.';
                           }
-                          
-                          console.log('🎨 INSIGHTS TAB - Selected reasoningText:', reasoningText);
-                          
+
                           insights = {
                             ...insights,
                             recommendAnalysis: true, // If we have selected stocks, analysis was recommended
@@ -2191,35 +2234,29 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                             selectedStocksCount: insights.selectedStocks?.length || 0,
                             evaluatedStocksCount: insights.evaluatedStocks?.length || 0
                           };
-                        } else {
-                          console.log('🎨 INSIGHTS TAB - Using existing insights structure, recommendAnalysis:', insights?.recommendAnalysis);
                         }
-                        
-                        console.log('🎨 INSIGHTS TAB - Final insights to display:', insights);
-                        
+
                         if (insights) {
                           // Handle case where insights might be a string (raw AI response)
                           let parsedInsights = insights;
                           if (typeof parsedInsights === 'string') {
-                            console.log('📝 Opportunity insights is string, attempting to parse');
-                            console.log('📝 Raw string content:', parsedInsights);
-                            
+
                             // Try to parse the JSON string
                             try {
                               parsedInsights = JSON.parse(parsedInsights);
-                              console.log('✅ Successfully parsed opportunity insights JSON');
+
                             } catch (parseError) {
                               console.error('❌ Failed to parse opportunity insights:', parseError);
-                              
+
                               // Try to extract key information from the malformed JSON string
                               const recommendMatch = parsedInsights.match(/"recommendAnalysis"\s*:\s*(true|false)/);
                               const selectedStocksMatch = parsedInsights.match(/"selectedStocks"\s*:\s*\[(.*?)\]/s);
                               const reasoningMatch = parsedInsights.match(/"reasoning"\s*:\s*"([^"]+)"/);
-                              
+
                               if (recommendMatch || selectedStocksMatch) {
                                 // Attempt to extract meaningful data from the malformed JSON
                                 const extractedStocks: any[] = [];
-                                
+
                                 if (selectedStocksMatch && selectedStocksMatch[1]) {
                                   // Try to extract stock information using regex
                                   const stockMatches = selectedStocksMatch[1].matchAll(/"ticker"\s*:\s*"([^"]+)"[^}]*?"reason"\s*:\s*"([^"]+)"[^}]*?"priority"\s*:\s*"([^"]+)"/g);
@@ -2231,7 +2268,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                     });
                                   }
                                 }
-                                
+
                                 return (
                                   <Card className="overflow-hidden">
                                     <CardHeader className="bg-muted/30">
@@ -2255,7 +2292,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                           </p>
                                         </div>
                                       </div>
-                                      
+
                                       {extractedStocks.length > 0 && (
                                         <div className="border-t pt-3">
                                           <p className="text-sm font-medium mb-2">Selected Stocks for Analysis</p>
@@ -2274,7 +2311,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                           </div>
                                         </div>
                                       )}
-                                      
+
                                       {reasoningMatch && reasoningMatch[1] && (
                                         <div className="border-t pt-3">
                                           <p className="text-sm text-muted-foreground italic">{reasoningMatch[1]}</p>
@@ -2284,7 +2321,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                   </Card>
                                 );
                               }
-                              
+
                               // If we can't extract anything meaningful, show a clean error message
                               return (
                                 <Card className="overflow-hidden">
@@ -2346,7 +2383,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                         const ticker = typeof stock === 'string' ? stock : stock.ticker;
                                         const reason = typeof stock === 'string' ? 'Selected for analysis based on market conditions' : stock.reason;
                                         const priority = typeof stock === 'string' ? 'High' : stock.priority;
-                                        
+
                                         return (
                                           <div key={ticker || idx} className="p-2 bg-muted/30 rounded">
                                             <div className="flex items-center gap-2 mb-1">
@@ -2368,7 +2405,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                 )}
 
                                 <div className="border-t pt-3">
-                                  {console.log('🔍 RENDERING reasoning:', parsedInsights.reasoning)}
                                   <MarkdownRenderer content={parsedInsights.reasoning} className="text-sm text-muted-foreground italic" />
                                 </div>
                               </CardContent>
@@ -2404,13 +2440,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                     </span>
                                   )}
                                   {/* Show completed badge if risk manager is done in rebalance context */}
-                                  {(analysis.analysis_status === 1 || 
+                                  {(analysis.analysis_status === 1 ||
                                     (analysis.analysis_status === 0 && analysis.agent_insights?.riskManager)) && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      <CheckCircle className="w-3 h-3 mr-1" />
-                                      Completed
-                                    </Badge>
-                                  )}
+                                      <Badge variant="secondary" className="text-xs">
+                                        <CheckCircle className="w-3 h-3 mr-1" />
+                                        Completed
+                                      </Badge>
+                                    )}
                                   {analysis.analysis_status === 0 && !analysis.agent_insights?.riskManager && (
                                     <Badge variant="outline" className="text-xs">
                                       <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -2466,7 +2502,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                         const portfolioStep = rebalanceData.workflowSteps?.find((s: any) => s.id === 'rebalance');
                         // Check all possible locations where Portfolio Manager insights might be stored
                         // Priority: Check new fields first, then legacy fields
-                        const portfolioInsights = 
+                        const portfolioInsights =
                           rebalanceData.rebalance_plan?.portfolioManagerAnalysis ||
                           rebalanceData.rebalance_plan?.portfolioManagerInsights ||
                           rebalanceData.rebalance_plan?.rebalance_agent_insight ||
@@ -2475,24 +2511,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                           rebalanceData.agentInsights?.portfolioManager ||
                           rebalanceData.agentInsights?.rebalanceAgent;
 
-                        // Debug logging to understand the data structure
-                        console.log('Portfolio Manager Insights Debug:', {
-                          portfolioStepStatus: portfolioStep?.status,
-                          hasPortfolioInsights: !!portfolioInsights,
-                          foundAt: portfolioInsights ? (
-                            rebalanceData.rebalance_plan?.portfolioManagerAnalysis ? 'rebalance_plan.portfolioManagerAnalysis' :
-                            rebalanceData.rebalance_plan?.portfolioManagerInsights ? 'rebalance_plan.portfolioManagerInsights' :
-                            rebalanceData.rebalance_plan?.rebalance_agent_insight ? 'rebalance_plan.rebalance_agent_insight' :
-                            rebalanceData.rebalance_plan?.agentInsights?.portfolioManager ? 'rebalance_plan.agentInsights.portfolioManager' :
-                            rebalanceData.rebalance_plan?.agentInsights?.rebalanceAgent ? 'rebalance_plan.agentInsights.rebalanceAgent' :
-                            rebalanceData.agentInsights?.portfolioManager ? 'agentInsights.portfolioManager' :
-                            rebalanceData.agentInsights?.rebalanceAgent ? 'agentInsights.rebalanceAgent' :
-                            'unknown'
-                          ) : 'not found',
-                          rebalancePlan: rebalanceData.rebalance_plan,
-                          agentInsights: rebalanceData.agentInsights,
-                          nestedAgentInsights: rebalanceData.rebalance_plan?.agentInsights
-                        });
 
                         // Show insights if they exist, even if status isn't marked complete yet
                         if (portfolioInsights) {

@@ -6,6 +6,7 @@ import {
   MessageCircle,
   MessageSquare,
   TrendingUp,
+  TrendingDown,
   XCircle
 } from "lucide-react";
 
@@ -37,10 +38,11 @@ export const getMessageIcon = (type: string) => {
   }
 };
 
-export const getDecisionVariant = (decision: string): "default" | "secondary" | "destructive" | "outline" => {
+export const getDecisionVariant = (decision: string): "default" | "secondary" | "destructive" | "outline" | "buy" | "sell" | "hold" => {
   switch (decision) {
-    case 'BUY': return 'default';
-    case 'SELL': return 'destructive';
+    case 'BUY': return 'buy';
+    case 'SELL': return 'sell';
+    case 'HOLD': return 'hold';
     case 'CANCELED': return 'outline';
     default: return 'secondary';
   }
@@ -51,7 +53,7 @@ export const getDecisionIcon = (decision: string) => {
     case 'BUY':
       return <TrendingUp className="w-3 h-3 mr-1" />;
     case 'SELL':
-      return <TrendingUp className="w-3 h-3 mr-1 rotate-180" />;
+      return <TrendingDown className="w-3 h-3 mr-1" />;
     default:
       return null;
   }

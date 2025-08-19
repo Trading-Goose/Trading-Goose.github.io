@@ -33,12 +33,18 @@ export default defineConfig(({ mode }) => ({
         drop_debugger: true
       }
     },
+    target: 'es2015',
+    modulePreload: {
+      polyfill: true
+    },
     rollupOptions: {
       output: {
-        // Ensure JS files have proper extensions
-        entryFileNames: 'assets/[name]-[hash].js',
-        chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
+        // Ensure JS files have proper extensions and format
+        format: 'es',
+        entryFileNames: 'assets/[name].[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash][extname]',
+        manualChunks: undefined
       }
     }
   },

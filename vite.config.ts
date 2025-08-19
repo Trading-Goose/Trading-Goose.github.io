@@ -26,6 +26,13 @@ export default defineConfig(({ mode }) => ({
     // Ensure assets are properly referenced with base path
     assetsDir: 'assets',
     sourcemap: false, // Disable sourcemaps for production
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    },
     rollupOptions: {
       output: {
         // Ensure JS files have proper extensions

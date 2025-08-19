@@ -38,7 +38,18 @@
       "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-social-media-analyst --project-ref lnvjsqyvhczgxvygbqer)",
       "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-risky-analyst --project-ref lnvjsqyvhczgxvygbqer)",
       "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-safe-analyst --project-ref lnvjsqyvhczgxvygbqer)",
-      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-neutral-analyst --project-ref lnvjsqyvhczgxvygbqer)"
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-neutral-analyst --project-ref lnvjsqyvhczgxvygbqer)",
+      "Bash(do)",
+      "Bash(echo:*)",
+      "Bash(if grep -q \"appendAnalysisMessage.*updateAgentInsights.*updateWorkflowStepStatus\" /home/TradingAgent/TradingGoose/supabase/functions/$agent/index.ts)",
+      "Bash(then)",
+      "Bash(else)",
+      "Bash(fi)",
+      "Bash(if [ -f \"/home/TradingAgent/TradingGoose/supabase/functions/agent-$agent/index.ts.tmp\" ])",
+      "Bash(cp:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-news-analyst --project-ref lnvjsqyvhczgxvygbqer)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-fundamentals-analyst --project-ref lnvjsqyvhczgxvygbqer)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-trader --project-ref lnvjsqyvhczgxvygbqer)"
     ],
     "deny": [],
     "additionalDirectories": [

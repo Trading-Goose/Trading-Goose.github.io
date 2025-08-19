@@ -13,7 +13,8 @@ import {
   TrendingDown,
   TrendingUp,
   Users,
-  XCircle
+  XCircle,
+  AlertTriangle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -128,7 +129,7 @@ export default function WorkflowStepsLayout({
     if (analysisData.agent_insights) {
       // Check for error conditions first
       if (analysisData.agent_insights[agentKey + '_error']) {
-        return 'failed';
+        return 'error';
       }
       // Then check for normal completion
       if (analysisData.agent_insights[agentKey]) {
@@ -145,6 +146,14 @@ export default function WorkflowStepsLayout({
       }
     }
     return 'pending';
+  };
+
+  // Get error details for an agent
+  const getAgentError = (agentKey: string) => {
+    if (analysisData.agent_insights?.[agentKey + '_error']) {
+      return analysisData.agent_insights[agentKey + '_error'];
+    }
+    return null;
   };
 
   const getStepTimestamp = (stepId: string) => {
@@ -297,9 +306,11 @@ export default function WorkflowStepsLayout({
         const Icon = step.icon;
         const completedAgents = step.agents.filter(agent => getAgentStatus(agent.key, step.id) === 'completed').length;
         const runningAgents = step.agents.filter(agent => getAgentStatus(agent.key, step.id) === 'running').length;
+        const errorAgents = step.agents.filter(agent => getAgentStatus(agent.key, step.id) === 'error').length;
         const totalAgents = step.agents.length;
         const isCompleted = completedAgents === totalAgents;
-        const isActive = completedAgents > 0 || runningAgents > 0;
+        const hasErrors = errorAgents > 0;
+        const isActive = completedAgents > 0 || runningAgents > 0 || hasErrors;
         const isPending = !isActive && !isCompleted;
         const progressPercentage = Math.round((completedAgents / totalAgents) * 100);
         const timestamp = getStepTimestamp(step.id);
@@ -310,9 +321,11 @@ export default function WorkflowStepsLayout({
               {/* Step Header */}
               <div className={`rounded-lg border p-4 transition-all ${isCompleted
                 ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
-                : isActive
-                  ? 'bg-primary/5 border-primary/20'
-                  : 'bg-card border-border'
+                : hasErrors
+                  ? 'bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10'
+                  : isActive
+                    ? 'bg-primary/5 border-primary/20'
+                    : 'bg-card border-border'
                 }`}>
 
                 <div className="relative">
@@ -321,9 +334,11 @@ export default function WorkflowStepsLayout({
                       {/* Step Icon */}
                       <div className={`p-3 rounded-lg ${isCompleted
                         ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
-                        : isActive
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-muted text-muted-foreground'
+                        : hasErrors
+                          ? 'bg-red-500/20 dark:bg-red-500/10 text-red-600 dark:text-red-400'
+                          : isActive
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground'
                         }`}>
                         <Icon className="w-6 h-6" />
                       </div>
@@ -338,7 +353,13 @@ export default function WorkflowStepsLayout({
                               Complete
                             </Badge>
                           )}
-                          {isActive && !isCompleted && (
+                          {hasErrors && (
+                            <Badge variant="destructive" className="text-xs">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              {errorAgents} Error{errorAgents !== 1 ? 's' : ''}
+                            </Badge>
+                          )}
+                          {isActive && !isCompleted && !hasErrors && (
                             <Badge variant="outline" className="text-xs border-primary/50 text-primary">
                               <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                               In Progress
@@ -414,6 +435,7 @@ export default function WorkflowStepsLayout({
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pl-14">
                   {step.agents.map((agent) => {
                     const status = getAgentStatus(agent.key, step.id);
+                    const agentError = getAgentError(agent.key);
                     const AgentIcon = agent.icon;
 
                     return (
@@ -421,18 +443,23 @@ export default function WorkflowStepsLayout({
                         key={agent.key}
                         className={`relative rounded-lg border p-4 transition-all ${status === 'completed'
                           ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
-                          : status === 'running'
-                            ? 'bg-primary/5 border-primary/30 shadow-sm'
-                            : 'bg-card border-border'
+                          : status === 'error'
+                            ? 'bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10'
+                            : status === 'running'
+                              ? 'bg-primary/5 border-primary/30 shadow-sm'
+                              : 'bg-card border-border'
                           }`}
+                        title={status === 'error' && agentError ? `Error: ${agentError.error || 'Unknown error'}` : undefined}
                       >
                         <div className="flex flex-col items-center text-center space-y-2">
                           {/* Agent Icon */}
                           <div className={`p-2 rounded-lg ${status === 'completed'
                             ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
-                            : status === 'running'
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-muted text-muted-foreground'
+                            : status === 'error'
+                              ? 'bg-red-500/20 dark:bg-red-500/10 text-red-600 dark:text-red-400'
+                              : status === 'running'
+                                ? 'bg-primary/10 text-primary'
+                                : 'bg-muted text-muted-foreground'
                             }`}>
                             <AgentIcon className="w-5 h-5" />
                           </div>
@@ -442,13 +469,14 @@ export default function WorkflowStepsLayout({
 
                           {/* Status Badge */}
                           <Badge
-                            variant={status === 'completed' ? 'secondary' : 'outline'}
+                            variant={status === 'completed' ? 'secondary' : status === 'error' ? 'destructive' : 'outline'}
                             className="text-xs"
                           >
                             {status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                            {status === 'error' && <XCircle className="w-3 h-3 mr-1" />}
                             {status === 'running' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
                             {status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                            {status === 'error' ? 'Failed' : status.charAt(0).toUpperCase() + status.slice(1)}
                           </Badge>
                         </div>
                       </div>

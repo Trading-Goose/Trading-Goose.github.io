@@ -2,7 +2,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -214,11 +213,15 @@ export default function RebalanceTab({
                   </Select>
                   {opportunityAgentModel === 'custom' && (
                     <Input
-                      className="mt-2"
-                      placeholder="Enter custom model name"
+                      className={`mt-2 ${!opportunityCustomModel ? 'border-red-500' : ''}`}
+                      placeholder="Enter custom model name *"
                       value={opportunityCustomModel}
                       onChange={(e) => setOpportunityCustomModel(e.target.value)}
+                      required
                     />
+                  )}
+                  {opportunityAgentModel === 'custom' && !opportunityCustomModel && (
+                    <p className="text-sm text-red-500 mt-1">Custom model name is required</p>
                   )}
                 </div>
               )}
@@ -269,22 +272,6 @@ export default function RebalanceTab({
 
         {/* Save Button for Rebalance Tab */}
         <div className="flex justify-end pt-4">
-          {saved && activeTab === 'rebalance' && (
-            <Alert className="mr-4 w-auto bg-green-50 border-green-200">
-              <Check className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                Rebalance configuration saved successfully!
-              </AlertDescription>
-            </Alert>
-          )}
-          {errors.save && activeTab === 'rebalance' && (
-            <Alert className="mr-4 w-auto bg-red-50 border-red-200">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">
-                {errors.save}
-              </AlertDescription>
-            </Alert>
-          )}
           <Button 
             onClick={() => handleSaveTab('rebalance')} 
             size="lg"

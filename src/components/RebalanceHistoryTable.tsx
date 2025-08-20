@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import {
   DropdownMenu,
@@ -24,14 +24,14 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
-import { 
-  RefreshCw, 
-  Loader2, 
-  Eye, 
-  Trash2, 
-  XCircle, 
-  CheckCircle, 
-  Clock, 
+import {
+  RefreshCw,
+  Loader2,
+  Eye,
+  Trash2,
+  XCircle,
+  CheckCircle,
+  Clock,
   AlertCircle,
   MoreVertical,
   StopCircle,
@@ -84,13 +84,13 @@ export default function RebalanceHistoryTable() {
       // Set up real-time subscription for instant updates
       const subscription = supabase
         .channel('rebalance_updates')
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
             table: 'rebalance_requests',
             filter: `user_id=eq.${user.id}`
-          }, 
+          },
           (payload) => {
             fetchRebalanceRequests();
           }
@@ -121,11 +121,11 @@ export default function RebalanceHistoryTable() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       // Debug logging
-      console.log('Fetched rebalance requests:', data?.map(r => ({ 
-        id: r.id, 
-        status: r.status, 
+      console.log('Fetched rebalance requests:', data?.map(r => ({
+        id: r.id,
+        status: r.status,
         error_message: r.error_message,
         rebalance_plan: r.rebalance_plan ? 'exists' : 'null'
       })));
@@ -253,7 +253,7 @@ export default function RebalanceHistoryTable() {
         // Fallback to direct update if RPC function doesn't exist yet
         const { error: updateError } = await supabase
           .from('rebalance_requests')
-          .update({ 
+          .update({
             status: 'cancelled',
             is_canceled: true  // Set the boolean flag for coordinator to check
           })
@@ -392,18 +392,18 @@ export default function RebalanceHistoryTable() {
                             Started {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             {(item.status === 'analyzing' || item.status === 'initializing' || item.status === 'planning' || item.status === 'portfolio_management_started') && (
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                  <div 
+                                  <div
                                     className="h-full bg-blue-500 transition-all duration-300"
-                                    style={{ 
-                                      width: `${item.total_stocks > 0 
-                                        ? (item.stocks_analyzed / item.total_stocks) * 100 
-                                        : 0}%` 
+                                    style={{
+                                      width: `${item.total_stocks > 0
+                                        ? (item.stocks_analyzed / item.total_stocks) * 100
+                                        : 0}%`
                                     }}
                                   />
                                 </div>
@@ -500,7 +500,7 @@ export default function RebalanceHistoryTable() {
                           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
                           Completed on: {new Date(item.created_at).toLocaleDateString()}
@@ -574,11 +574,11 @@ export default function RebalanceHistoryTable() {
                           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          {item.status === 'failed' 
-                            ? (item.error_message || item.rebalance_plan?.error || item.rebalance_plan?.errorDetails || 'Rebalance failed') 
+                          {item.status === 'failed'
+                            ? (item.error_message || item.rebalance_plan?.error || item.rebalance_plan?.errorDetails || 'Rebalance failed')
                             : (item.error_message || 'Rebalance was cancelled by user')}
                         </span>
                         <div className="flex items-center gap-2">
@@ -665,18 +665,18 @@ export default function RebalanceHistoryTable() {
                           Started {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           {(item.status === 'analyzing' || item.status === 'initializing' || item.status === 'planning') && (
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                   className="h-full bg-blue-500 transition-all duration-300"
-                                  style={{ 
-                                    width: `${item.total_stocks > 0 
-                                      ? (item.stocks_analyzed / item.total_stocks) * 100 
-                                      : 0}%` 
+                                  style={{
+                                    width: `${item.total_stocks > 0
+                                      ? (item.stocks_analyzed / item.total_stocks) * 100
+                                      : 0}%`
                                   }}
                                 />
                               </div>
@@ -774,7 +774,7 @@ export default function RebalanceHistoryTable() {
                           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
                           Completed on: {new Date(item.created_at).toLocaleDateString()}
@@ -852,11 +852,11 @@ export default function RebalanceHistoryTable() {
                           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          {item.status === 'failed' 
-                            ? (item.error_message || item.rebalance_plan?.error || item.rebalance_plan?.errorDetails || 'Rebalance failed') 
+                          {item.status === 'failed'
+                            ? (item.error_message || item.rebalance_plan?.error || item.rebalance_plan?.errorDetails || 'Rebalance failed')
                             : (item.error_message || 'Rebalance was cancelled by user')}
                         </span>
                         <div className="flex items-center gap-2">
@@ -921,8 +921,8 @@ export default function RebalanceHistoryTable() {
             <AlertDialogCancel onClick={() => setSelectedRebalanceId(null)}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
+            <AlertDialogAction
+              onClick={handleDelete}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
@@ -952,7 +952,9 @@ export default function RebalanceHistoryTable() {
             <AlertDialogCancel onClick={() => setSelectedRebalanceId(null)}>
               Keep Running
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleCancel} disabled={cancelling}>
+            <AlertDialogAction onClick={handleCancel} disabled={cancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               {cancelling ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -127,12 +127,15 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
           
           // Fetch trade order if it exists (regardless of analysis completion status)
           let tradeOrderData = null;
+          console.log('Looking for trade orders for analysis_id:', analysisToLoad.id);
           const { data: tradeOrders, error: tradeError } = await supabase
             .from('trading_actions')
             .select('*')
             .eq('analysis_id', analysisToLoad.id)
             .order('created_at', { ascending: false })
             .limit(1);
+          
+          console.log('Trade orders query result:', { tradeOrders, tradeError });
           
           if (!tradeError && tradeOrders && tradeOrders.length > 0) {
             const order = tradeOrders[0];

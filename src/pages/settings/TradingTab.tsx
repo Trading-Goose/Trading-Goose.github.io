@@ -3,7 +3,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -371,14 +370,6 @@ export default function TradingTab({
 
         {/* Save Button for Trading Tab */}
         <div className="flex justify-end pt-4">
-          {saved && activeTab === 'trading' && (
-            <Alert className="mr-4 w-auto bg-green-50 border-green-200">
-              <Check className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                Trading settings saved successfully!
-              </AlertDescription>
-            </Alert>
-          )}
           <Button 
             onClick={() => {
               console.log('Button clicked - calling handleSaveTab for trading');

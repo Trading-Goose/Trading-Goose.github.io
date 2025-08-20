@@ -2,7 +2,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -73,13 +72,16 @@ export default function ProvidersTab({
                     />
                   </div>
                   <div className="flex-1">
-                    <Label className="text-xs mb-1">Provider</Label>
+                    <Label className="text-xs mb-1">
+                      Provider <span className="text-red-500">*</span>
+                    </Label>
                     <Select
                       value={provider.provider}
                       onValueChange={(value) => updateAiProvider(provider.id, 'provider', value)}
+                      required
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select provider" />
+                      <SelectTrigger className={!provider.provider ? "border-red-500" : ""}>
+                        <SelectValue placeholder="Select provider *" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="openai">OpenAI</SelectItem>
@@ -89,18 +91,24 @@ export default function ProvidersTab({
                         <SelectItem value="openrouter">OpenRouter</SelectItem>
                       </SelectContent>
                     </Select>
+                    {!provider.provider && (
+                      <p className="text-sm text-red-500 mt-1">Provider selection is required</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-4 items-start">
                   <div className="flex-1">
-                    <Label className="text-xs mb-1">API Key</Label>
+                    <Label className="text-xs mb-1">
+                      API Key <span className="text-red-500">*</span>
+                    </Label>
                     <div className="relative">
                       <Input
                         type={showKeys[`provider_${provider.id}`] ? "text" : "password"}
-                        placeholder="Enter your default AI provider API key"
+                        placeholder="Enter your default AI provider API key *"
                         value={provider.apiKey}
                         onChange={(e) => updateAiProvider(provider.id, 'apiKey', e.target.value)}
-                        className={errors[`provider_${provider.id}`] ? "border-red-500 font-mono text-sm" : "font-mono text-sm"}
+                        className={errors[`provider_${provider.id}`] || !provider.apiKey ? "border-red-500 font-mono text-sm" : "font-mono text-sm"}
+                        required
                       />
                       <Button
                         type="button"
@@ -119,10 +127,13 @@ export default function ProvidersTab({
                     {errors[`provider_${provider.id}`] && (
                       <p className="text-sm text-red-500 mt-1">{errors[`provider_${provider.id}`]}</p>
                     )}
+                    {!errors[`provider_${provider.id}`] && !provider.apiKey && (
+                      <p className="text-sm text-red-500 mt-1">API key is required</p>
+                    )}
                   </div>
                 </div>
                 {provider.provider && (
-                  <div className="flex-1">
+                  <div className="space-y-2">
                     <Label className="text-xs mb-1">Default Model</Label>
                     <Select value={defaultAiModel} onValueChange={setDefaultAiModel}>
                       <SelectTrigger>
@@ -138,11 +149,15 @@ export default function ProvidersTab({
                     </Select>
                     {defaultAiModel === 'custom' && (
                       <Input
-                        className="mt-2"
-                        placeholder="Enter custom model name"
+                        className={`mt-2 ${!defaultCustomModel ? 'border-red-500' : ''}`}
+                        placeholder="Enter custom model name *"
                         value={defaultCustomModel}
                         onChange={(e) => setDefaultCustomModel(e.target.value)}
+                        required
                       />
+                    )}
+                    {defaultAiModel === 'custom' && !defaultCustomModel && (
+                      <p className="text-sm text-red-500 mt-1">Custom model name is required</p>
                     )}
                   </div>
                 )}
@@ -181,13 +196,16 @@ export default function ProvidersTab({
                       />
                     </div>
                     <div className="flex-1">
-                      <Label className="text-xs mb-1">Provider</Label>
+                      <Label className="text-xs mb-1">
+                        Provider <span className="text-red-500">*</span>
+                      </Label>
                       <Select
                         value={provider.provider}
                         onValueChange={(value) => updateAiProvider(provider.id, 'provider', value)}
+                        required
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select provider" />
+                        <SelectTrigger className={!provider.provider ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Select provider *" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="openai">OpenAI</SelectItem>
@@ -197,18 +215,24 @@ export default function ProvidersTab({
                           <SelectItem value="openrouter">OpenRouter</SelectItem>
                         </SelectContent>
                       </Select>
+                      {!provider.provider && (
+                        <p className="text-sm text-red-500 mt-1">Provider selection is required</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-4 items-start">
                     <div className="flex-1">
-                      <Label className="text-xs mb-1">API Key</Label>
+                      <Label className="text-xs mb-1">
+                        API Key <span className="text-red-500">*</span>
+                      </Label>
                       <div className="relative">
                         <Input
                           type={showKeys[`provider_${provider.id}`] ? "text" : "password"}
-                          placeholder="Enter API key"
+                          placeholder="Enter API key *"
                           value={provider.apiKey}
                           onChange={(e) => updateAiProvider(provider.id, 'apiKey', e.target.value)}
-                          className={errors[`provider_${provider.id}`] ? "border-red-500 font-mono text-sm" : "font-mono text-sm"}
+                          className={errors[`provider_${provider.id}`] || !provider.apiKey ? "border-red-500 font-mono text-sm" : "font-mono text-sm"}
+                          required
                         />
                         <Button
                           type="button"
@@ -226,6 +250,9 @@ export default function ProvidersTab({
                       </div>
                       {errors[`provider_${provider.id}`] && (
                         <p className="text-sm text-red-500 mt-1">{errors[`provider_${provider.id}`]}</p>
+                      )}
+                      {!errors[`provider_${provider.id}`] && !provider.apiKey && (
+                        <p className="text-sm text-red-500 mt-1">API key is required</p>
                       )}
                     </div>
                     <Button
@@ -255,28 +282,6 @@ export default function ProvidersTab({
 
         {/* Save Button for Providers Tab */}
         <div className="flex justify-end pt-4">
-          {saved && activeTab === 'providers' && (
-            <Alert className="mr-4 w-auto bg-green-50 border-green-200">
-              <Check className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                Provider settings saved successfully!
-              </AlertDescription>
-            </Alert>
-          )}
-          {errors.save && activeTab === 'providers' && !errors.save.includes('Cannot delete provider') && !errors.save.includes('Cannot remove') && (
-            <Alert className="mr-4 w-auto bg-red-50 border-red-200">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">
-                {errors.save}
-                {errors.save.includes('column') && (
-                  <div className="mt-2 text-sm">
-                    <p className="font-semibold">Database migration may be needed:</p>
-                    <p>Run: <code className="bg-red-100 px-1 rounded">npx supabase db push</code></p>
-                  </div>
-                )}
-              </AlertDescription>
-            </Alert>
-          )}
           <Button 
             onClick={() => handleSaveTab('providers')} 
             size="lg"

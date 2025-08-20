@@ -322,24 +322,26 @@ export default function TradeHistoryTable() {
       }
     });
 
-    // Convert to array and sort
+    // Convert to array and sort chronologically (mixing both types)
     const result: (TradeDecision | RebalanceGroup)[] = [];
     
-    // Add rebalance groups
-    Array.from(rebalanceGroups.values())
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .forEach(group => {
-        // Sort trades within group by creation time
-        group.trades.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        result.push(group);
-      });
+    // Sort trades within each rebalance group
+    Array.from(rebalanceGroups.values()).forEach(group => {
+      group.trades.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    });
+    
+    // Combine rebalance groups and standalone trades, then sort by creation time
+    const rebalanceGroupsArray = Array.from(rebalanceGroups.values());
+    const allItems: (TradeDecision | RebalanceGroup)[] = [...rebalanceGroupsArray, ...standaloneTradesList];
+    
+    // Sort all items by their creation time (newest first)
+    allItems.sort((a, b) => {
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      return timeB - timeA;
+    });
 
-    // Add standalone trades
-    standaloneTradesList
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .forEach(trade => result.push(trade));
-
-    return result;
+    return allItems;
   };
 
   const renderTradeCard = (decision: TradeDecision, isInGroup = false) => {

@@ -2,7 +2,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -154,11 +153,15 @@ export default function AgentsTab({
                   </Select>
                   {analysisTeamModel === 'custom' && (
                     <Input
-                      className="mt-2"
-                      placeholder="Enter custom model name"
+                      className={`mt-2 ${!analysisCustomModel ? 'border-red-500' : ''}`}
+                      placeholder="Enter custom model name *"
                       value={analysisCustomModel}
                       onChange={(e) => setAnalysisCustomModel(e.target.value)}
+                      required
                     />
+                  )}
+                  {analysisTeamModel === 'custom' && !analysisCustomModel && (
+                    <p className="text-sm text-red-500 mt-1">Custom model name is required</p>
                   )}
                 </div>
               )}
@@ -280,11 +283,15 @@ export default function AgentsTab({
                   </Select>
                   {researchTeamModel === 'custom' && (
                     <Input
-                      className="mt-2"
-                      placeholder="Enter custom model name"
+                      className={`mt-2 ${!researchCustomModel ? 'border-red-500' : ''}`}
+                      placeholder="Enter custom model name *"
                       value={researchCustomModel}
                       onChange={(e) => setResearchCustomModel(e.target.value)}
+                      required
                     />
+                  )}
+                  {researchTeamModel === 'custom' && !researchCustomModel && (
+                    <p className="text-sm text-red-500 mt-1">Custom model name is required</p>
                   )}
                 </div>
               )}
@@ -383,11 +390,15 @@ export default function AgentsTab({
                   </Select>
                   {tradingTeamModel === 'custom' && (
                     <Input
-                      className="mt-2"
-                      placeholder="Enter custom model name"
+                      className={`mt-2 ${!tradingCustomModel ? 'border-red-500' : ''}`}
+                      placeholder="Enter custom model name *"
                       value={tradingCustomModel}
                       onChange={(e) => setTradingCustomModel(e.target.value)}
+                      required
                     />
+                  )}
+                  {tradingTeamModel === 'custom' && !tradingCustomModel && (
+                    <p className="text-sm text-red-500 mt-1">Custom model name is required</p>
                   )}
                 </div>
               )}
@@ -469,11 +480,15 @@ export default function AgentsTab({
                   </Select>
                   {riskTeamModel === 'custom' && (
                     <Input
-                      className="mt-2"
-                      placeholder="Enter custom model name"
+                      className={`mt-2 ${!riskCustomModel ? 'border-red-500' : ''}`}
+                      placeholder="Enter custom model name *"
                       value={riskCustomModel}
                       onChange={(e) => setRiskCustomModel(e.target.value)}
+                      required
                     />
+                  )}
+                  {riskTeamModel === 'custom' && !riskCustomModel && (
+                    <p className="text-sm text-red-500 mt-1">Custom model name is required</p>
                   )}
                 </div>
               )}
@@ -558,11 +573,15 @@ export default function AgentsTab({
                   </Select>
                   {portfolioManagerModel === 'custom' && (
                     <Input
-                      className="mt-2"
-                      placeholder="Enter custom model name"
+                      className={`mt-2 ${!portfolioManagerCustomModel ? 'border-red-500' : ''}`}
+                      placeholder="Enter custom model name *"
                       value={portfolioManagerCustomModel}
                       onChange={(e) => setPortfolioManagerCustomModel(e.target.value)}
+                      required
                     />
+                  )}
+                  {portfolioManagerModel === 'custom' && !portfolioManagerCustomModel && (
+                    <p className="text-sm text-red-500 mt-1">Custom model name is required</p>
                   )}
                 </div>
               )}
@@ -593,14 +612,6 @@ export default function AgentsTab({
 
         {/* Save Button for Agents Tab */}
         <div className="flex justify-end pt-4">
-          {saved && activeTab === 'agents' && (
-            <Alert className="mr-4 w-auto bg-green-50 border-green-200">
-              <Check className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                Agent configuration saved successfully!
-              </AlertDescription>
-            </Alert>
-          )}
           <Button 
             onClick={() => handleSaveTab('agents')} 
             size="lg"

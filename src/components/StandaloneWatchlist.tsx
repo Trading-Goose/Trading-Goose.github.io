@@ -494,16 +494,6 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       // View existing running analysis
       setSelectedTicker(ticker);
     } else {
-      // Start new analysis
-      if (!apiSettings?.ai_api_key) {
-        toast({
-          title: "Configuration Required",
-          description: "Please configure your API settings in the Settings page",
-          variant: "destructive",
-        });
-        return;
-      }
-
       try {
         // Start analysis via unified coordinator
         // Don't send any credentials from frontend - coordinator will fetch from database
@@ -516,7 +506,18 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
         });
 
         if (error) throw error;
-        if (!data.success) throw new Error(data.error);
+        if (!data.success) {
+          // Check if it's a configuration issue
+          if (data.error?.includes('API settings not found') || data.error?.includes('not configured')) {
+            toast({
+              title: "Configuration Required",
+              description: "Please configure your API settings in the Settings page",
+              variant: "destructive",
+            });
+            return;
+          }
+          throw new Error(data.error);
+        }
 
         // Immediately add to running analyses
         setRunningAnalyses(prev => {
@@ -665,7 +666,6 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                         e.stopPropagation();
                         openAnalysis(item.ticker);
                       }}
-                      disabled={!apiSettings?.ai_api_key}
                     >
                       {runningAnalyses.has(item.ticker) ? (
                         <>

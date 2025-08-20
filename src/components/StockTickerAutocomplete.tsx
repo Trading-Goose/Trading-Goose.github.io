@@ -49,18 +49,19 @@ export default function StockTickerAutocomplete({
       return;
     }
 
-    // If no Alpaca credentials, can't search
-    if (!apiSettings?.alpaca_paper_api_key && !apiSettings?.alpaca_live_api_key) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
     setIsLoading(true);
     
     try {
-      // Use Alpaca API to search for assets
-      const assets = await alpacaAPI.getAssets(query);
+      // Use Alpaca API to search for assets via edge function
+      // The edge function will handle checking if Alpaca is configured
+      const assets = await alpacaAPI.getAssets(query).catch(err => {
+        // If it's a configuration error, silently return empty
+        if (err.message?.includes('API settings not found') || err.message?.includes('not configured')) {
+          console.log("Alpaca API not configured for symbol search");
+          return [];
+        }
+        throw err;
+      });
       
       // Format Alpaca suggestions
       const suggestions: StockSuggestion[] = assets
@@ -103,7 +104,7 @@ export default function StockTickerAutocomplete({
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [value, apiSettings?.alpaca_paper_api_key, apiSettings?.alpaca_live_api_key]);
+  }, [value]);
 
   // Handle click outside to close suggestions
   useEffect(() => {

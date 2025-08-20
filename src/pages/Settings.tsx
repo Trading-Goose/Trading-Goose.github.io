@@ -24,6 +24,7 @@ import { useAuth } from "@/lib/auth";
 import { supabaseHelpers, supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import type { ApiSettings } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 // Import tab components
 import ProvidersTab from "./settings/ProvidersTab";
@@ -71,6 +72,7 @@ const checkConfiguredProviders = async (): Promise<{ configured: Record<string, 
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { user, apiSettings, updateApiSettings, isAuthenticated, isLoading, initialize } = useAuth();
+  const { toast } = useToast();
   
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -178,85 +180,77 @@ export default function SettingsPage() {
   }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
-    // Only load settings once when they first become available
-    if (apiSettings && !initialLoadComplete) {
-      console.log('Loading initial settings from apiSettings...');
+    // Only load settings once when they first become available or when user logs in
+    if ((apiSettings || isAuthenticated) && !initialLoadComplete) {
+      console.log('Loading initial settings...', { hasApiSettings: !!apiSettings, isAuthenticated });
       
-      // Default settings (ai_provider is handled by provider configuration loading)
-      
-      // Check if the default model is a custom one (not in the preset list)
-      const savedDefaultModel = apiSettings.ai_model || 'gpt-4';
-      const availableModels = getModelOptions(apiSettings.ai_provider || 'openai');
-      console.log('Loading default model:', {
-        savedModel: savedDefaultModel,
-        provider: apiSettings.ai_provider,
-        availableModels: availableModels,
-        isCustom: !availableModels.includes(savedDefaultModel)
-      });
-      
-      if (savedDefaultModel && !availableModels.includes(savedDefaultModel)) {
-        setDefaultAiModel('custom');
-        setDefaultCustomModel(savedDefaultModel);
-        console.log('Set as custom model:', savedDefaultModel);
-      } else {
-        setDefaultAiModel(savedDefaultModel);
-        setDefaultCustomModel(''); // Clear custom model if using preset
+      // If we have apiSettings, use them for non-credential settings
+      if (apiSettings) {
+        // Default settings (ai_provider is handled by provider configuration loading)
+        
+        // Check if the default model is a custom one (not in the preset list)
+        const savedDefaultModel = apiSettings.ai_model || 'gpt-4';
+        const availableModels = getModelOptions(apiSettings.ai_provider || 'openrouter');
+        console.log('Loading default model:', {
+          savedModel: savedDefaultModel,
+          provider: apiSettings.ai_provider,
+          availableModels: availableModels,
+          isCustom: !availableModels.includes(savedDefaultModel)
+        });
+        
+        if (savedDefaultModel && !availableModels.includes(savedDefaultModel)) {
+          setDefaultAiModel('custom');
+          setDefaultCustomModel(savedDefaultModel);
+          console.log('Set as custom model:', savedDefaultModel);
+        } else {
+          setDefaultAiModel(savedDefaultModel);
+          setDefaultCustomModel(''); // Clear custom model if using preset
+        }
+        
+        // Non-credential settings from apiSettings
+        setAlpacaPaperTrading(apiSettings.alpaca_paper_trading ?? true);
+        setAutoExecuteTrades(apiSettings.auto_execute_trades ?? false);
+        setUserRiskLevel(apiSettings.user_risk_level || 'moderate');
+        setDefaultPositionSizeDollars(apiSettings.default_position_size_dollars || 1000);
+        
+        // Team-specific settings
+        setResearchDebateRounds(apiSettings.research_debate_rounds || 2);
+        
+        // NOTE: Team provider IDs will be set after providers are loaded (see separate useEffect below)
+        
+        // News & Social analysis optimization settings
+        setNewsSocialOptimization(apiSettings.news_social_optimization || 'normal');
+        
+        // Historical data time ranges (separate from opportunity agent)
+        setAnalysisHistoryDays(apiSettings.analysis_history_days || '1M');
+        
+        // Max tokens settings
+        setAnalysisMaxTokens(apiSettings.analysis_max_tokens || 2000);
+        setResearchMaxTokens(apiSettings.research_max_tokens || 3000);
+        setTradingMaxTokens(apiSettings.trading_max_tokens || 1500);
+        setRiskMaxTokens(apiSettings.risk_max_tokens || 2000);
+        
+        // Rebalance settings
+        setRebalanceThreshold(apiSettings.rebalance_threshold || apiSettings.default_rebalance_threshold || 10);
+        setRebalanceMinPositionSize(apiSettings.rebalance_min_position_size || apiSettings.default_min_position_size || 100);
+        setRebalanceMaxPositionSize(apiSettings.rebalance_max_position_size || apiSettings.default_max_position_size || 10000);
+        setTargetStockAllocation(apiSettings.target_stock_allocation || 80);
+        setTargetCashAllocation(apiSettings.target_cash_allocation || 20);
+        
+        // Portfolio Manager settings
+        setPortfolioManagerModel(apiSettings.portfolio_manager_model || 'gpt-4');
+        setPortfolioManagerMaxTokens(apiSettings.portfolio_manager_max_tokens || 2000);
+        
+        // Opportunity Agent settings will be loaded after providers are loaded
+        setOpportunityMaxTokens(apiSettings.opportunity_max_tokens || 2000);
+        setOpportunityMarketRange(apiSettings.opportunity_market_range || '1M');
       }
-      
-      // Provider settings
-      
-      // Load provider configurations (will be done in separate useEffect)
-      
-      // Trading settings
-      setAlpacaPaperApiKey(apiSettings.alpaca_paper_api_key || '');
-      setAlpacaPaperSecretKey(apiSettings.alpaca_paper_secret_key || '');
-      setAlpacaLiveApiKey(apiSettings.alpaca_live_api_key || '');
-      setAlpacaLiveSecretKey(apiSettings.alpaca_live_secret_key || '');
-      setAlpacaPaperTrading(apiSettings.alpaca_paper_trading ?? true);
-      setAutoExecuteTrades(apiSettings.auto_execute_trades ?? false);
-      setUserRiskLevel(apiSettings.user_risk_level || 'moderate');
-      setDefaultPositionSizeDollars(apiSettings.default_position_size_dollars || 1000);
-      
-      // Team-specific settings
-      setResearchDebateRounds(apiSettings.research_debate_rounds || 2);
-      
-      // NOTE: Team provider IDs will be set after providers are loaded (see separate useEffect below)
-      
-      // News & Social analysis optimization settings
-      setNewsSocialOptimization(apiSettings.news_social_optimization || 'normal');
-      
-      // Historical data time ranges (separate from opportunity agent)
-      setAnalysisHistoryDays(apiSettings.analysis_history_days || '1M');
-      
-      // Max tokens settings
-      setAnalysisMaxTokens(apiSettings.analysis_max_tokens || 2000);
-      setResearchMaxTokens(apiSettings.research_max_tokens || 3000);
-      setTradingMaxTokens(apiSettings.trading_max_tokens || 1500);
-      setRiskMaxTokens(apiSettings.risk_max_tokens || 2000);
-      
-      // Rebalance settings
-      setRebalanceThreshold(apiSettings.rebalance_threshold || apiSettings.default_rebalance_threshold || 10);
-      setRebalanceMinPositionSize(apiSettings.rebalance_min_position_size || apiSettings.default_min_position_size || 100);
-      setRebalanceMaxPositionSize(apiSettings.rebalance_max_position_size || apiSettings.default_max_position_size || 10000);
-      setTargetStockAllocation(apiSettings.target_stock_allocation || 80);
-      setTargetCashAllocation(apiSettings.target_cash_allocation || 20);
-      
-      // Portfolio Manager settings
-      setPortfolioManagerModel(apiSettings.portfolio_manager_model || 'gpt-4');
-      setPortfolioManagerMaxTokens(apiSettings.portfolio_manager_max_tokens || 2000);
-      
-      // Opportunity Agent settings will be loaded after providers are loaded
-      setOpportunityMaxTokens(apiSettings.opportunity_max_tokens || 2000);
-      setOpportunityMarketRange(apiSettings.opportunity_market_range || '1M');
-      
-      // Trade execution settings
-      setAutoExecuteTrades(apiSettings.auto_execute_trades || false);
       
       // Mark initial load as complete and reset team settings loaded flag
       setInitialLoadComplete(true);
       setTeamSettingsLoaded(false); // Reset so team settings can be loaded
     }
-  }, [apiSettings?.id]); // Only re-run if we get a different apiSettings object
+  }, [apiSettings?.id, isAuthenticated]); // Re-run when apiSettings or auth state changes
 
 
   const handleSaveTab = async (tab: string) => {
@@ -280,7 +274,7 @@ export default function SettingsPage() {
         if (providerId === '1' || providerId === defaultProviderId) {
           // Return the default provider info from api_settings
           return { 
-            provider: apiSettings?.ai_provider || 'openai',
+            provider: apiSettings?.ai_provider || 'openrouter',
             apiKey: apiSettings?.ai_api_key || ''
           };
         }
@@ -297,6 +291,20 @@ export default function SettingsPage() {
         // Save provider settings
         const newErrors: Record<string, string> = {};
         
+        // Validate that all providers have required fields
+        for (const provider of aiProviders) {
+          if (!provider.provider) {
+            newErrors[`provider_${provider.id}`] = 'Provider selection is required';
+          }
+          if (!provider.apiKey) {
+            newErrors[`provider_${provider.id}`] = 'API key is required';
+          }
+        }
+        
+        // Validate default provider's custom model if selected
+        if (defaultAiModel === 'custom' && !defaultCustomModel) {
+          newErrors.default_custom_model = 'Custom model name is required for default provider';
+        }
 
         if (Object.keys(newErrors).length > 0) {
           setErrors(newErrors);
@@ -322,38 +330,64 @@ export default function SettingsPage() {
             }
             
             if (isValid) {
-              // Always save the Default AI provider (ID '1') to api_settings
+              // Always save the Default AI provider (ID '1') to api_settings via settings-proxy
               if (provider.id === '1') {
                 settingsToSave.ai_provider = provider.provider as any;
-                // Update API key
+                // Update API key via settings-proxy
                 if (provider.apiKey) {
                   settingsToSave.ai_api_key = provider.apiKey;
                 }
                 settingsToSave.ai_model = defaultAiModel === 'custom' ? defaultCustomModel : (defaultAiModel || getModelOptions(provider.provider)[0]);
               } else {
-                // Save additional providers to provider_configurations table
-                if (provider.apiKey) {
+                // Save additional providers via settings-proxy for masking support
+                try {
+                  const { data: saveData, error: saveError } = await supabase.functions.invoke('settings-proxy', {
+                    body: {
+                      action: 'save_provider_configuration',
+                      provider: {
+                        id: provider.id !== '1' ? provider.id : undefined, // Don't pass ID for new providers
+                        nickname: provider.nickname,
+                        provider: provider.provider,
+                        api_key: provider.apiKey,
+                        is_default: false
+                      }
+                    }
+                  });
+                  
+                  if (saveError || !saveData.success) {
+                    console.error('Error saving provider via proxy:', saveError);
+                    // Fallback to direct save
+                    const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
+                      nickname: provider.nickname,
+                      provider: provider.provider,
+                      api_key: provider.apiKey,
+                      is_default: false
+                    });
+                    
+                    if (!saved) {
+                      settingsToSave[`${provider.provider}_api_key`] = provider.apiKey;
+                      console.warn(`Note: Nickname "${provider.nickname}" for ${provider.provider} cannot be saved without the provider_configurations table`);
+                    }
+                  } else {
+                    // Update local provider state with masked API key
+                    setAiProviders(prev => prev.map(p => 
+                      p.id === provider.id ? { ...p, apiKey: saveData.configuration.api_key } : p
+                    ));
+                  }
+                } catch (saveError) {
+                  console.error('Error saving provider configuration via proxy:', saveError);
+                  // Fallback to direct save
                   const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
                     nickname: provider.nickname,
                     provider: provider.provider,
                     api_key: provider.apiKey,
                     is_default: false
                   });
-                } else {
-                  // For existing providers without new API key, we need to save again with existing data
-                  // Note: The saveProviderConfiguration method handles updates internally
-                  const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
-                    nickname: provider.nickname,
-                    provider: provider.provider,
-                    api_key: provider.apiKey || '', // Keep existing masked key
-                    is_default: false
-                  });
-                }
-                
-                // Fallback: save to provider-specific columns if table doesn't exist
-                if (!saved) {
-                  settingsToSave[`${provider.provider}_api_key`] = provider.apiKey;
-                  console.warn(`Note: Nickname "${provider.nickname}" for ${provider.provider} cannot be saved without the provider_configurations table`);
+                  
+                  if (!saved) {
+                    settingsToSave[`${provider.provider}_api_key`] = provider.apiKey;
+                    console.warn(`Note: Nickname "${provider.nickname}" for ${provider.provider} cannot be saved without the provider_configurations table`);
+                  }
                 }
               }
             }
@@ -385,8 +419,71 @@ export default function SettingsPage() {
             migration: 'Note: Additional providers saved with limited functionality. To enable custom nicknames and multiple providers of the same type, run: npx supabase db push --project-ref lnvjsqyvhczgxvygbqer' 
           });
         }
+
+        // Use settings-proxy to save provider credentials with masking
+        try {
+          const { data, error } = await supabase.functions.invoke('settings-proxy', {
+            body: {
+              action: 'update_settings',
+              settings: settingsToSave
+            }
+          });
+          
+          if (error) throw error;
+          
+          if (data.success) {
+            // Update the local state with the masked values returned from the proxy
+            if (data.settings) {
+              // Update the first provider (Default AI) with masked credentials
+              if (aiProviders.length > 0 && aiProviders[0].id === '1') {
+                setAiProviders(prev => prev.map(p => 
+                  p.id === '1' ? { ...p, apiKey: data.settings.ai_api_key || '' } : p
+                ));
+              }
+            }
+            
+            toast({
+              title: "Success",
+              description: "Provider settings saved successfully!",
+              variant: "default",
+            });
+            setErrors({});
+            console.log('Provider settings saved successfully via proxy');
+            return; // Exit early since we handled the save
+          } else {
+            throw new Error(data.error || 'Failed to save settings');
+          }
+        } catch (proxyError) {
+          console.error('Error saving provider via settings-proxy:', proxyError);
+          // Fall back to direct save if proxy fails
+          console.log('Falling back to direct save for providers...');
+        }
       } else if (tab === 'agents') {
         // Save agent configuration
+        // Validate custom model names are provided when 'custom' is selected
+        const newErrors: Record<string, string> = {};
+        
+        if (analysisTeamModel === 'custom' && !analysisCustomModel) {
+          newErrors.analysis_custom_model = 'Custom model name is required';
+        }
+        if (researchTeamModel === 'custom' && !researchCustomModel) {
+          newErrors.research_custom_model = 'Custom model name is required';
+        }
+        if (tradingTeamModel === 'custom' && !tradingCustomModel) {
+          newErrors.trading_custom_model = 'Custom model name is required';
+        }
+        if (riskTeamModel === 'custom' && !riskCustomModel) {
+          newErrors.risk_custom_model = 'Custom model name is required';
+        }
+        if (portfolioManagerModel === 'custom' && !portfolioManagerCustomModel) {
+          newErrors.portfolio_custom_model = 'Custom model name is required';
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+          setErrors(newErrors);
+          return;
+        }
+        
         // For now, we'll map provider IDs back to provider names for backward compatibility
         // In a future update, we'll modify the Edge Functions to use provider configurations
         
@@ -475,7 +572,7 @@ export default function SettingsPage() {
           settingsToSave[`${portfolioManagerProvider.provider}_api_key`] = portfolioManagerProvider.apiKey;
         }
       } else if (tab === 'trading') {
-        // Trading settings
+        // Trading settings - use settings-proxy for credential masking
         settingsToSave = {
           alpaca_paper_api_key: alpacaPaperApiKey,
           alpaca_paper_secret_key: alpacaPaperSecretKey,
@@ -486,8 +583,57 @@ export default function SettingsPage() {
           user_risk_level: userRiskLevel,
           default_position_size_dollars: defaultPositionSizeDollars
         };
+
+        // Use settings-proxy to save with credential masking
+        try {
+          const { data, error } = await supabase.functions.invoke('settings-proxy', {
+            body: {
+              action: 'update_settings',
+              settings: settingsToSave
+            }
+          });
+          
+          if (error) throw error;
+          
+          if (data.success) {
+            // Update the local state with the masked values returned from the proxy
+            if (data.settings) {
+              setAlpacaPaperApiKey(data.settings.alpaca_paper_api_key || '');
+              setAlpacaPaperSecretKey(data.settings.alpaca_paper_secret_key || '');
+              setAlpacaLiveApiKey(data.settings.alpaca_live_api_key || '');
+              setAlpacaLiveSecretKey(data.settings.alpaca_live_secret_key || '');
+            }
+            
+            toast({
+              title: "Success",
+              description: "Trading settings saved successfully!",
+              variant: "default",
+            });
+            setErrors({});
+            console.log('Trading settings saved successfully via proxy');
+            return; // Exit early since we handled the save
+          } else {
+            throw new Error(data.error || 'Failed to save settings');
+          }
+        } catch (proxyError) {
+          console.error('Error saving via settings-proxy:', proxyError);
+          // Fall back to direct save if proxy fails
+          console.log('Falling back to direct save...');
+        }
       } else if (tab === 'rebalance') {
         // Rebalance settings - use same logic as agent config tab
+        // Validate custom model name if 'custom' is selected
+        const newErrors: Record<string, string> = {};
+        
+        if (opportunityAgentModel === 'custom' && !opportunityCustomModel) {
+          newErrors.opportunity_custom_model = 'Custom model name is required';
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+          setErrors(newErrors);
+          return;
+        }
+        
         const opportunityAgentProvider = getProviderInfo(opportunityAgentProviderId);
         
         
@@ -558,9 +704,25 @@ export default function SettingsPage() {
       // Use updateApiSettings from auth store which handles all the complexity
       await updateApiSettings(settingsToSave);
 
-      setSaved(true);
+      // Show success toast based on tab
+      let successMessage = 'Settings saved successfully!';
+      switch (tab) {
+        case 'agents':
+          successMessage = 'Agent configuration saved successfully!';
+          break;
+        case 'rebalance':
+          successMessage = 'Rebalance configuration saved successfully!';
+          break;
+        default:
+          successMessage = 'Settings saved successfully!';
+      }
+      
+      toast({
+        title: "Success",
+        description: successMessage,
+        variant: "default",
+      });
       setErrors({});
-      setTimeout(() => setSaved(false), 3000);
       
       console.log('Settings saved successfully');
       
@@ -569,6 +731,13 @@ export default function SettingsPage() {
     } catch (error) {
       console.error(`Error saving ${tab} settings:`, error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      toast({
+        title: "Error",
+        description: `Failed to save ${tab} settings: ${errorMessage}`,
+        variant: "destructive",
+      });
+      
       setErrors({ save: `Failed to save ${tab} settings: ${errorMessage}` });
     }
   };
@@ -620,7 +789,7 @@ export default function SettingsPage() {
     // Count total providers (excluding the default one at index 0) and add 1
     const providerNumber = aiProviders.length;
     const defaultNickname = `Provider ${providerNumber}`;
-    setAiProviders([...aiProviders, { id: newId, nickname: defaultNickname, provider: 'openai', apiKey: '' }]);
+    setAiProviders([...aiProviders, { id: newId, nickname: defaultNickname, provider: 'openrouter', apiKey: '' }]);
   };
   
   const updateAiProvider = (id: string, field: 'nickname' | 'provider' | 'apiKey', value: string) => {
@@ -679,34 +848,87 @@ export default function SettingsPage() {
   const defaultProviderId = aiProviders.length > 0 ? aiProviders[0].id : '1';
 
   const loadProviderConfigurations = async () => {
-    if (!user?.id || !apiSettings) return;
+    if (!user?.id) return;
     
     try {
       const providers: AiProvider[] = [];
       
-      // Always add the default provider first from api_settings
-      if (apiSettings.ai_provider && apiSettings.ai_api_key) {
+      // Get masked settings from settings-proxy
+      let maskedSettings = null;
+      try {
+        const { data, error } = await supabase.functions.invoke('settings-proxy', {
+          body: {
+            action: 'get_settings'
+          }
+        });
+        
+        if (!error && data.settings) {
+          maskedSettings = data.settings;
+        }
+      } catch (proxyError) {
+        console.error('Error loading masked settings:', proxyError);
+      }
+      
+      // Always add the default provider first - use masked settings as source of truth
+      if (maskedSettings?.ai_provider || apiSettings?.ai_provider) {
         providers.push({
           id: '1',
           nickname: 'Default AI',
-          provider: apiSettings.ai_provider,
-          apiKey: apiSettings.ai_api_key
+          provider: maskedSettings?.ai_provider || apiSettings?.ai_provider || 'openrouter',
+          apiKey: maskedSettings?.ai_api_key || ''
         });
       } else {
         // Empty default provider
         providers.push({
           id: '1',
           nickname: 'Default AI',
-          provider: 'openai',
+          provider: 'openrouter',
           apiKey: ''
         });
       }
+
+      // Load default model information from masked settings
+      if (maskedSettings?.ai_model) {
+        const savedDefaultModel = maskedSettings.ai_model;
+        const providerType = maskedSettings.ai_provider || 'openrouter';
+        const availableModels = getModelOptions(providerType);
+        
+        console.log('Loading default model from masked settings:', {
+          savedModel: savedDefaultModel,
+          provider: providerType,
+          availableModels: availableModels,
+          isCustom: !availableModels.includes(savedDefaultModel)
+        });
+        
+        if (savedDefaultModel && !availableModels.includes(savedDefaultModel)) {
+          setDefaultAiModel('custom');
+          setDefaultCustomModel(savedDefaultModel);
+        } else {
+          setDefaultAiModel(savedDefaultModel);
+          setDefaultCustomModel(''); // Clear custom model if using preset
+        }
+      }
       
-      // Fetch additional provider configurations from database
-      const configurations = await supabaseHelpers.getProviderConfigurations(user.id);
+      // Fetch additional provider configurations from settings-proxy (with masking)
+      let configurations = [];
+      try {
+        const { data: configData, error: configError } = await supabase.functions.invoke('settings-proxy', {
+          body: {
+            action: 'get_provider_configurations'
+          }
+        });
+        
+        if (!configError && configData.configurations) {
+          configurations = configData.configurations;
+        }
+      } catch (configError) {
+        console.error('Error loading provider configurations via proxy:', configError);
+        // Fallback to direct database access
+        configurations = await supabaseHelpers.getProviderConfigurations(user.id);
+      }
       
       if (configurations.length > 0) {
-        // Add configurations from database (excluding default)
+        // Add configurations (excluding default) with masked API keys
         configurations
           .filter(config => !config.is_default)
           .forEach((config) => {
@@ -714,7 +936,7 @@ export default function SettingsPage() {
               id: config.id,
               nickname: config.nickname,
               provider: config.provider,
-              apiKey: config.api_key
+              apiKey: config.api_key // Already masked by settings-proxy
             });
           });
       } else {
@@ -741,6 +963,28 @@ export default function SettingsPage() {
       console.error('Error loading provider configurations:', error);
       // Fall back to empty default provider
       setAiProviders([{ id: '1', nickname: 'Default AI', provider: 'openai', apiKey: '' }]);
+    }
+  };
+
+  const loadMaskedTradingCredentials = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('settings-proxy', {
+        body: {
+          action: 'get_settings'
+        }
+      });
+      
+      if (!error && data.settings) {
+        // Update trading credentials with masked values
+        setAlpacaPaperApiKey(data.settings.alpaca_paper_api_key || '');
+        setAlpacaPaperSecretKey(data.settings.alpaca_paper_secret_key || '');
+        setAlpacaLiveApiKey(data.settings.alpaca_live_api_key || '');
+        setAlpacaLiveSecretKey(data.settings.alpaca_live_secret_key || '');
+      }
+    } catch (error) {
+      console.error('Error loading masked trading credentials:', error);
     }
   };
 
@@ -984,11 +1228,17 @@ export default function SettingsPage() {
     setTeamSettingsLoaded(true);
   }, [apiSettings, aiProviders, teamSettingsLoaded]); // Run when either apiSettings or aiProviders changes
 
-  // Load provider configurations after initial load
+  // Load provider configurations after authentication
   useEffect(() => {
-    if (!user?.id || !apiSettings || !initialLoadComplete) return;
+    if (!user?.id || !isAuthenticated) return;
     loadProviderConfigurations();
-  }, [user?.id, apiSettings?.id, initialLoadComplete]);
+  }, [user?.id, isAuthenticated]);
+
+  // Load masked trading credentials after authentication
+  useEffect(() => {
+    if (!user?.id || !isAuthenticated) return;
+    loadMaskedTradingCredentials();
+  }, [user?.id, isAuthenticated]);
 
   // Helper to get the actual default model value
   const getDefaultModelValue = () => {

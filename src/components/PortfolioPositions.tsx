@@ -56,25 +56,29 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   };
 
   const fetchPositions = async () => {
-    // Check if Alpaca API is configured
-    const isPaper = apiSettings?.alpaca_paper_trading ?? true;
-    const hasAlpacaConfig = isPaper
-      ? (apiSettings?.alpaca_paper_api_key && apiSettings?.alpaca_paper_secret_key)
-      : (apiSettings?.alpaca_live_api_key && apiSettings?.alpaca_live_secret_key);
-
-    if (!hasAlpacaConfig) {
-      // Don't show error, just keep positions empty when API is not configured
-      setPositions([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      const alpacaPositions = await alpacaAPI.getPositions();
+      // Try to fetch positions via edge function
+      // The edge function will handle checking if Alpaca is configured
+      const alpacaPositions = await alpacaAPI.getPositions().catch(err => {
+        console.warn("Failed to get positions:", err);
+        // Check if it's a configuration error
+        if (err.message?.includes('API settings not found') || err.message?.includes('not configured')) {
+          console.log("Alpaca API not configured, showing empty positions");
+          setError(null);
+          return [];
+        }
+        throw err;
+      });
+
+      // If we got an empty array due to configuration, just return
+      if (!alpacaPositions || alpacaPositions.length === 0) {
+        setPositions([]);
+        setError(null);
+        return;
+      }
 
       // Get batch data for all positions to get today's open prices
       const symbols = alpacaPositions.map(pos => pos.symbol);
@@ -125,12 +129,16 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       setLastRefresh(new Date());
     } catch (err) {
       console.error('Error fetching positions:', err);
-      // Only show error if it's not a configuration issue
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch positions';
-      if (!errorMessage.includes('Edge Function returned')) {
+      
+      if (errorMessage.includes('Internal Server Error') || errorMessage.includes('500')) {
+        setError('Database access error. Please check your configuration and try refreshing the page.');
+      } else if (errorMessage.includes('Edge Function returned') || errorMessage.includes('API settings not found')) {
+        setError('API configuration not found. Please configure your Alpaca API in Settings.');
+      } else {
         setError(errorMessage);
       }
-      // Keep positions empty if API fails
+      
       setPositions([]);
     } finally {
       setLoading(false);
@@ -160,7 +168,13 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
           .order('created_at', { ascending: false })
           .limit(1);
 
-        if (!error && data && data.length > 0) {
+        if (error) {
+          console.warn('Error checking rebalance requests:', error);
+          // Don't set error state, just skip rebalance checking
+          return;
+        }
+
+        if (data && data.length > 0) {
           const activeRebalance = data[0];
           setRunningRebalance(activeRebalance.id);
 
@@ -292,8 +306,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-4">
                       {loading ? "Loading positions..." :
-                        !apiSettings?.alpaca_paper_api_key && !apiSettings?.alpaca_live_api_key ?
-                          "Configure Alpaca API in Settings to view positions" :
+                        error ? error :
                           "No positions found"}
                     </TableCell>
                   </TableRow>

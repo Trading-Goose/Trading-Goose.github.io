@@ -48,24 +48,36 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
   }, [apiSettings, selectedStock]);
   
   const fetchData = async () => {
-    if (!apiSettings) {
-      console.log("API settings not loaded");
-      return;
-    }
-    
     setLoading(true);
     setError(null);
     
     try {
-      // Fetch metrics, portfolio data, and positions in parallel
-      const [metricsData, portfolioHistoryData, positionsData] = await Promise.all([
-        alpacaAPI.calculateMetrics(),
-        fetchPortfolioData(),
-        alpacaAPI.getPositions()
+      // First try to fetch portfolio data (doesn't require Alpaca API)
+      const portfolioHistoryData = await fetchPortfolioData();
+      setPortfolioData(portfolioHistoryData);
+
+      // Try to fetch metrics and positions via edge functions
+      // The edge functions will handle checking if Alpaca is configured
+      const [metricsData, positionsData] = await Promise.all([
+        alpacaAPI.calculateMetrics().catch(err => {
+          console.warn("Failed to calculate metrics:", err);
+          // Check if it's a configuration error
+          if (err.message?.includes('API settings not found') || err.message?.includes('not configured')) {
+            console.log("Alpaca API not configured");
+          }
+          return null;
+        }),
+        alpacaAPI.getPositions().catch(err => {
+          console.warn("Failed to get positions:", err);
+          // Check if it's a configuration error
+          if (err.message?.includes('API settings not found') || err.message?.includes('not configured')) {
+            console.log("Alpaca API not configured");
+          }
+          return [];
+        })
       ]);
       
       setMetrics(metricsData);
-      setPortfolioData(portfolioHistoryData);
       setPositions(positionsData || []);
       
       // If a stock is selected, fetch its data (uses Alpaca API)
@@ -117,10 +129,16 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
       }
     } catch (err) {
       console.error('Error fetching data:', err);
-      if (err instanceof Error && err.message.includes('CORS')) {
-        setError('Cannot access Alpaca API directly from browser. Please ensure backend proxy is configured.');
+      if (err instanceof Error) {
+        if (err.message.includes('CORS')) {
+          setError('Cannot access Alpaca API directly from browser. Please ensure backend proxy is configured.');
+        } else if (err.message.includes('Internal Server Error') || err.message.includes('500')) {
+          setError('Database access error. Please check your configuration and try refreshing the page.');
+        } else {
+          setError(err.message);
+        }
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to fetch data');
+        setError('Failed to fetch data');
       }
     } finally {
       setLoading(false);

@@ -154,29 +154,44 @@ export const useAuth = create<AuthState>()(
             created_at: new Date().toISOString()
           };
 
-          // Load API settings
-          const { data: settingsData } = await supabase
-            .from('api_settings')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single();
+          // Load API settings via settings-proxy (with masking)
+          let apiSettings = null;
+          try {
+            const { data: proxyData, error: proxyError } = await supabase.functions.invoke('settings-proxy', {
+              body: {
+                action: 'get_settings'
+              }
+            });
+            
+            if (!proxyError && proxyData.settings) {
+              apiSettings = proxyData.settings;
+            } else {
+              console.log('No settings found via proxy, will create defaults');
+            }
+          } catch (proxyError) {
+            console.error('Error loading settings via proxy:', proxyError);
+          }
 
-          let apiSettings = settingsData;
-
-          // Create default settings if none exist
+          // Create default settings if none exist (via settings-proxy)
           if (!apiSettings) {
-            const { data: newSettings } = await supabase
-              .from('api_settings')
-              .insert({
-                user_id: session.user.id,
-                ai_provider: 'openai',
-                ai_api_key: '',
-                ai_model: 'gpt-4'
-              })
-              .select()
-              .single();
-
-            apiSettings = newSettings;
+            try {
+              const { data: createData, error: createError } = await supabase.functions.invoke('settings-proxy', {
+                body: {
+                  action: 'update_settings',
+                  settings: {
+                    ai_provider: 'openai',
+                    ai_api_key: '',
+                    ai_model: 'gpt-4'
+                  }
+                }
+              });
+              
+              if (!createError && createData.success) {
+                apiSettings = createData.settings;
+              }
+            } catch (createError) {
+              console.error('Error creating default settings:', createError);
+            }
           }
 
           // Check admin status using RPC function to avoid 500 errors
@@ -397,25 +412,27 @@ export const useAuth = create<AuthState>()(
         }
       },
 
-      // Update API settings
+      // Update API settings via settings-proxy
       updateApiSettings: async (settings: Partial<ApiSettings>) => {
         const state = get();
-        if (!state.user || !state.apiSettings) {
+        if (!state.user) {
           throw new Error('Not authenticated');
         }
 
         try {
-          const { data, error } = await supabase
-            .from('api_settings')
-            .update(settings)
-            .eq('user_id', state.user.id)
-            .select()
-            .single();
+          const { data, error } = await supabase.functions.invoke('settings-proxy', {
+            body: {
+              action: 'update_settings',
+              settings: settings
+            }
+          });
 
           if (error) throw error;
 
-          if (data) {
-            set({ apiSettings: data });
+          if (data.success && data.settings) {
+            set({ apiSettings: data.settings });
+          } else {
+            throw new Error(data.error || 'Failed to update settings');
           }
         } catch (error) {
           console.error('Update settings error:', error);

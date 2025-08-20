@@ -12,6 +12,12 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -32,6 +38,7 @@ import {
   Loader2,
   Settings,
   Eye,
+  Info,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
@@ -56,7 +63,7 @@ interface Schedule {
   include_watchlist: boolean;
   include_all_positions: boolean;
   last_executed_at?: string;
-  next_scheduled_at?: string;
+  next_scheduled_at?: string; // Deprecated - calculated dynamically from last_executed_at + interval
   execution_count: number;
   last_execution_status?: string;
   created_at: string;
@@ -189,11 +196,81 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
     return days.map(d => dayNames[d]).join(', ');
   };
 
-  const formatNextRun = (nextRun?: string) => {
-    if (!nextRun) return 'Not scheduled';
-    const date = new Date(nextRun);
+  const calculateNextRun = (schedule: Schedule): Date | null => {
     const now = new Date();
-    const diffMs = date.getTime() - now.getTime();
+    const [hours, minutes] = schedule.time_of_day.split(':').map(Number);
+    
+    // If never executed, calculate from current date
+    if (!schedule.last_executed_at) {
+      // Create a date in the schedule's timezone
+      const nextRun = new Date(now);
+      nextRun.setHours(hours, minutes, 0, 0);
+      
+      // If that time has already passed today, add the interval
+      if (nextRun <= now) {
+        switch (schedule.interval_unit) {
+          case 'days':
+            nextRun.setDate(nextRun.getDate() + schedule.interval_value);
+            break;
+          case 'weeks':
+            nextRun.setDate(nextRun.getDate() + (schedule.interval_value * 7));
+            break;
+          case 'months':
+            nextRun.setMonth(nextRun.getMonth() + schedule.interval_value);
+            break;
+        }
+      }
+      
+      return nextRun;
+    }
+    
+    // Calculate from last execution
+    const lastRun = new Date(schedule.last_executed_at);
+    let nextRun = new Date(lastRun);
+    
+    // Add the interval
+    switch (schedule.interval_unit) {
+      case 'days':
+        nextRun.setDate(nextRun.getDate() + schedule.interval_value);
+        break;
+      case 'weeks':
+        nextRun.setDate(nextRun.getDate() + (schedule.interval_value * 7));
+        break;
+      case 'months':
+        nextRun.setMonth(nextRun.getMonth() + schedule.interval_value);
+        break;
+    }
+    
+    // Set the proper time
+    nextRun.setHours(hours, minutes, 0, 0);
+    
+    // IMPORTANT: If the calculated next run is in the past (e.g., schedule was paused),
+    // advance it to the next valid future time
+    while (nextRun <= now) {
+      switch (schedule.interval_unit) {
+        case 'days':
+          nextRun.setDate(nextRun.getDate() + schedule.interval_value);
+          break;
+        case 'weeks':
+          nextRun.setDate(nextRun.getDate() + (schedule.interval_value * 7));
+          break;
+        case 'months':
+          nextRun.setMonth(nextRun.getMonth() + schedule.interval_value);
+          break;
+      }
+    }
+    
+    return nextRun;
+  };
+
+  const formatNextRun = (schedule: Schedule) => {
+    if (!schedule.enabled) return 'Paused';
+    
+    const nextRun = calculateNextRun(schedule);
+    if (!nextRun) return 'Not scheduled';
+    
+    const now = new Date();
+    const diffMs = nextRun.getTime() - now.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
     
@@ -202,7 +279,7 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
     if (diffHours < 24) return `In ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
     if (diffDays < 7) return `In ${diffDays} day${diffDays > 1 ? 's' : ''}`;
     
-    return date.toLocaleDateString('en-US', { 
+    return nextRun.toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric',
       hour: 'numeric',
@@ -365,9 +442,26 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
                         {/* Execution Status */}
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div>
-                            <p className="text-muted-foreground mb-1">Next Run</p>
+                            <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                              <span>Next Run</span>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="w-3 h-3 cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-xs">
+                                      Calculated based on: {schedule.last_executed_at ? 'last execution' : 'schedule start'} + {schedule.interval_value} {schedule.interval_unit}
+                                    </p>
+                                    <p className="text-xs mt-1 text-muted-foreground">
+                                      If a schedule was paused, the next run will automatically advance to the next future occurrence.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
                             <p className="font-medium text-xs">
-                              {schedule.enabled ? formatNextRun(schedule.next_scheduled_at) : 'Paused'}
+                              {formatNextRun(schedule)}
                             </p>
                           </div>
                           <div>

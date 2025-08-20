@@ -544,9 +544,11 @@ export default function RecentTrades() {
                                     <span className="text-xs text-muted-foreground">
                                       {decision.alpacaFilledQty && decision.alpacaFilledPrice
                                         ? `${Number(decision.alpacaFilledQty).toFixed(2)} shares @ $${decision.alpacaFilledPrice.toFixed(2)}`
-                                        : decision.quantity > 0
-                                          ? `${Number(decision.quantity).toFixed(2)} shares ${decision.price > 0 ? `@ $${decision.price.toFixed(2)}` : '(market price)'}`
-                                          : 'Order details pending'
+                                        : decision.dollarAmount && decision.dollarAmount > 0
+                                          ? `$${Number(decision.dollarAmount).toLocaleString()} order`
+                                          : decision.quantity > 0
+                                            ? `${Number(decision.quantity).toFixed(2)} shares ${decision.price > 0 ? `@ $${decision.price.toFixed(2)}` : '(market price)'}`
+                                            : 'Order details pending'
                                       }
                                     </span>
                                     {decision.alpacaFilledQty > 0 && decision.alpacaFilledPrice && (
@@ -554,7 +556,12 @@ export default function RecentTrades() {
                                         ${(decision.alpacaFilledQty * decision.alpacaFilledPrice).toLocaleString()}
                                       </span>
                                     )}
-                                    {!decision.alpacaFilledQty && decision.price > 0 && (
+                                    {!decision.alpacaFilledQty && !decision.alpacaFilledPrice && decision.dollarAmount && decision.dollarAmount > 0 && (
+                                      <span className="text-xs font-medium">
+                                        ${Number(decision.dollarAmount).toLocaleString()}
+                                      </span>
+                                    )}
+                                    {!decision.alpacaFilledQty && !decision.dollarAmount && decision.price > 0 && (
                                       <span className="text-xs font-medium">
                                         ${decision.totalValue.toLocaleString()}
                                       </span>
@@ -729,9 +736,11 @@ export default function RecentTrades() {
                                     <span className="text-xs text-muted-foreground">
                                       {decision.alpacaFilledQty && decision.alpacaFilledPrice
                                         ? `${Number(decision.alpacaFilledQty).toFixed(2)} shares @ $${decision.alpacaFilledPrice.toFixed(2)}`
-                                        : decision.quantity > 0
-                                          ? `${Number(decision.quantity).toFixed(2)} shares ${decision.price > 0 ? `@ $${decision.price.toFixed(2)}` : '(market price)'}`
-                                          : 'Order details pending'
+                                        : decision.dollarAmount && decision.dollarAmount > 0
+                                          ? `$${Number(decision.dollarAmount).toLocaleString()} order`
+                                          : decision.quantity > 0
+                                            ? `${Number(decision.quantity).toFixed(2)} shares ${decision.price > 0 ? `@ $${decision.price.toFixed(2)}` : '(market price)'}`
+                                            : 'Order details pending'
                                       }
                                     </span>
                                     {decision.alpacaFilledQty > 0 && decision.alpacaFilledPrice && (
@@ -739,7 +748,12 @@ export default function RecentTrades() {
                                         ${(decision.alpacaFilledQty * decision.alpacaFilledPrice).toLocaleString()}
                                       </span>
                                     )}
-                                    {!decision.alpacaFilledQty && decision.price > 0 && (
+                                    {!decision.alpacaFilledQty && !decision.alpacaFilledPrice && decision.dollarAmount && decision.dollarAmount > 0 && (
+                                      <span className="text-xs font-medium">
+                                        ${Number(decision.dollarAmount).toLocaleString()}
+                                      </span>
+                                    )}
+                                    {!decision.alpacaFilledQty && !decision.dollarAmount && decision.price > 0 && (
                                       <span className="text-xs font-medium">
                                         ${decision.totalValue.toLocaleString()}
                                       </span>
@@ -933,9 +947,11 @@ export default function RecentTrades() {
                                     <span className="text-xs text-muted-foreground">
                                       {decision.alpacaFilledQty && decision.alpacaFilledPrice
                                         ? `${Number(decision.alpacaFilledQty).toFixed(2)} shares @ $${decision.alpacaFilledPrice.toFixed(2)}`
-                                        : decision.quantity > 0
-                                          ? `${Number(decision.quantity).toFixed(2)} shares ${decision.price > 0 ? `@ $${decision.price.toFixed(2)}` : '(market price)'}`
-                                          : 'Order details pending'
+                                        : decision.dollarAmount && decision.dollarAmount > 0
+                                          ? `$${Number(decision.dollarAmount).toLocaleString()} order`
+                                          : decision.quantity > 0
+                                            ? `${Number(decision.quantity).toFixed(2)} shares ${decision.price > 0 ? `@ $${decision.price.toFixed(2)}` : '(market price)'}`
+                                            : 'Order details pending'
                                       }
                                     </span>
                                     {decision.alpacaFilledQty > 0 && decision.alpacaFilledPrice && (
@@ -943,7 +959,12 @@ export default function RecentTrades() {
                                         ${(decision.alpacaFilledQty * decision.alpacaFilledPrice).toLocaleString()}
                                       </span>
                                     )}
-                                    {!decision.alpacaFilledQty && decision.price > 0 && (
+                                    {!decision.alpacaFilledQty && !decision.alpacaFilledPrice && decision.dollarAmount && decision.dollarAmount > 0 && (
+                                      <span className="text-xs font-medium">
+                                        ${Number(decision.dollarAmount).toLocaleString()}
+                                      </span>
+                                    )}
+                                    {!decision.alpacaFilledQty && !decision.dollarAmount && decision.price > 0 && (
                                       <span className="text-xs font-medium">
                                         ${decision.totalValue.toLocaleString()}
                                       </span>

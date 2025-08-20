@@ -320,12 +320,12 @@ export default function WorkflowStepsLayout({
             <div className="space-y-4">
               {/* Step Header */}
               <div className={`rounded-lg border p-4 transition-all ${isCompleted
-                ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
+                ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
                 : hasErrors
-                  ? 'bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10'
+                  ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5'
                   : isActive
-                    ? 'bg-primary/5 border-primary/20'
-                    : 'bg-card border-border'
+                    ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5'
+                    : 'border-border'
                 }`}>
 
                 <div className="relative">
@@ -333,11 +333,11 @@ export default function WorkflowStepsLayout({
                     <div className="flex items-start gap-4 flex-1">
                       {/* Step Icon */}
                       <div className={`p-3 rounded-lg ${isCompleted
-                        ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
+                        ? 'bg-green-500/10 dark:bg-green-500/5 text-green-600 dark:text-green-400'
                         : hasErrors
-                          ? 'bg-red-500/20 dark:bg-red-500/10 text-red-600 dark:text-red-400'
+                          ? 'bg-red-500/10 dark:bg-red-500/5 text-red-600 dark:text-red-400'
                           : isActive
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-yellow-500/10 dark:bg-yellow-500/5 text-yellow-600 dark:text-yellow-400'
                             : 'bg-muted text-muted-foreground'
                         }`}>
                         <Icon className="w-6 h-6" />
@@ -348,19 +348,19 @@ export default function WorkflowStepsLayout({
                         <div className="flex items-center gap-3">
                           <h3 className="text-lg font-semibold">{step.title}</h3>
                           {isCompleted && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="completed" className="text-xs">
                               <CheckCircle className="w-3 h-3 mr-1" />
                               Complete
                             </Badge>
                           )}
                           {hasErrors && (
-                            <Badge variant="destructive" className="text-xs">
+                            <Badge variant="error" className="text-xs">
                               <AlertTriangle className="w-3 h-3 mr-1" />
                               {errorAgents} Error{errorAgents !== 1 ? 's' : ''}
                             </Badge>
                           )}
                           {isActive && !isCompleted && !hasErrors && (
-                            <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                            <Badge variant="running" className="text-xs">
                               <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                               In Progress
                             </Badge>
@@ -405,7 +405,7 @@ export default function WorkflowStepsLayout({
                               className={`h-full rounded-full transition-all duration-500 ${isCompleted
                                 ? 'bg-green-500'
                                 : isActive
-                                  ? 'bg-primary'
+                                  ? 'bg-yellow-500'
                                   : 'bg-muted-foreground/30'
                                 }`}
                               style={{ width: `${progressPercentage}%` }}
@@ -442,23 +442,23 @@ export default function WorkflowStepsLayout({
                       <div
                         key={agent.key}
                         className={`relative rounded-lg border p-4 transition-all ${status === 'completed'
-                          ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
+                          ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
                           : status === 'error'
-                            ? 'bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10'
+                            ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5'
                             : status === 'running'
-                              ? 'bg-primary/5 border-primary/30 shadow-sm'
-                              : 'bg-card border-border'
+                              ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5 shadow-sm'
+                              : 'border-border'
                           }`}
                         title={status === 'error' && agentError ? `Error: ${agentError.error || 'Unknown error'}` : undefined}
                       >
                         <div className="flex flex-col items-center text-center space-y-2">
                           {/* Agent Icon */}
                           <div className={`p-2 rounded-lg ${status === 'completed'
-                            ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
+                            ? 'bg-green-500/10 dark:bg-green-500/5 text-green-600 dark:text-green-400'
                             : status === 'error'
-                              ? 'bg-red-500/20 dark:bg-red-500/10 text-red-600 dark:text-red-400'
+                              ? 'bg-red-500/10 dark:bg-red-500/5 text-red-600 dark:text-red-400'
                               : status === 'running'
-                                ? 'bg-primary/10 text-primary'
+                                ? 'bg-yellow-500/10 dark:bg-yellow-500/5 text-yellow-600 dark:text-yellow-400'
                                 : 'bg-muted text-muted-foreground'
                             }`}>
                             <AgentIcon className="w-5 h-5" />
@@ -469,7 +469,12 @@ export default function WorkflowStepsLayout({
 
                           {/* Status Badge */}
                           <Badge
-                            variant={status === 'completed' ? 'secondary' : status === 'error' ? 'destructive' : 'outline'}
+                            variant={
+                              status === 'completed' ? 'completed' :
+                              status === 'error' ? 'error' :
+                              status === 'running' ? 'running' :
+                              'pending' as any
+                            }
                             className="text-xs"
                           >
                             {status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
@@ -505,19 +510,19 @@ export default function WorkflowStepsLayout({
           </div>
           <div>
             {analysisData.status === 'completed' && (
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="completed" className="text-sm">
                 <CheckCircle className="w-3 h-3 mr-1" />
                 Complete
               </Badge>
             )}
             {analysisData.status === 'running' && (
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="running" className="text-sm">
                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                 In Progress
               </Badge>
             )}
             {analysisData.status === 'error' && (
-              <Badge variant="destructive" className="text-sm">
+              <Badge variant="error" className="text-sm">
                 <XCircle className="w-3 h-3 mr-1" />
                 Error
               </Badge>

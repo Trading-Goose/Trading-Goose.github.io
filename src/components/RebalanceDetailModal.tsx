@@ -23,6 +23,8 @@ import {
   DollarSign,
   Activity,
   ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
   Zap,
   PieChart,
   Target,
@@ -33,7 +35,8 @@ import {
   BarChart3,
   CheckSquare,
   Users,
-  XCircle
+  XCircle,
+  ExternalLink
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
@@ -66,7 +69,7 @@ interface RebalancePosition {
 }
 
 // Helper functions for analysis card rendering
-const getDecisionVariant = (decision: string): "default" | "secondary" | "destructive" | "outline" | "buy" | "sell" | "hold" => {
+const getDecisionVariant = (decision: string): "default" | "secondary" | "destructive" | "outline" | "buy" | "sell" | "hold" | "completed" | "running" | "error" | "pending" => {
   switch (decision) {
     case 'BUY': return 'buy';
     case 'SELL': return 'sell';
@@ -135,23 +138,23 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
             <div className="space-y-4">
               {/* Step Header */}
               <div className={`rounded-lg border p-4 transition-all ${isCompleted
-                ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
+                ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
                 : isError
-                  ? 'bg-destructive/10 dark:bg-destructive/5 border-destructive/20 dark:border-destructive/10'
+                  ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5'
                   : isRunning
-                    ? 'bg-primary/5 border-primary/20'
-                    : 'bg-card border-border'
+                    ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5'
+                    : 'border-border'
                 }`}>
                 <div className="relative">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4 flex-1">
                       {/* Step Icon */}
                       <div className={`p-3 rounded-lg ${isCompleted
-                        ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
+                        ? 'bg-green-500/10 dark:bg-green-500/5 text-green-600 dark:text-green-400'
                         : isError
-                          ? 'bg-destructive/20 dark:bg-destructive/10 text-destructive'
+                          ? 'bg-red-500/10 dark:bg-red-500/5 text-red-600 dark:text-red-400'
                           : isRunning
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-yellow-500/10 dark:bg-yellow-500/5 text-yellow-600 dark:text-yellow-400'
                             : 'bg-muted text-muted-foreground'
                         }`}>
                         <Icon className="w-6 h-6" />
@@ -162,25 +165,25 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                         <div className="flex items-center gap-3">
                           <h3 className="text-lg font-semibold">{step.title}</h3>
                           {isCompleted && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge variant="completed" className="text-xs">
                               <CheckCircle className="w-3 h-3 mr-1" />
                               Complete
                             </Badge>
                           )}
                           {isRunning && (
-                            <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                            <Badge variant="running" className="text-xs">
                               <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                               In Progress
                             </Badge>
                           )}
                           {isPending && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="pending" className="text-xs">
                               <Clock className="w-3 h-3 mr-1" />
                               Pending
                             </Badge>
                           )}
                           {isError && (
-                            <Badge variant="destructive" className="text-xs">
+                            <Badge variant="error" className="text-xs">
                               <AlertCircle className="w-3 h-3 mr-1" />
                               Failed
                             </Badge>
@@ -239,7 +242,7 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                                 className={`h-full rounded-full transition-all duration-500 ${isCompleted
                                   ? 'bg-green-500'
                                   : isRunning
-                                    ? 'bg-primary'
+                                    ? 'bg-yellow-500'
                                     : 'bg-muted-foreground/30'
                                   }`}
                                 style={{
@@ -345,9 +348,9 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                           {stockAnalysis.decision && stockAnalysis.decision !== 'PENDING' && (
                             <Badge
                               variant={
-                                stockAnalysis.decision === 'BUY' ? 'default' :
-                                  stockAnalysis.decision === 'SELL' ? 'destructive' :
-                                    'secondary'
+                                stockAnalysis.decision === 'BUY' ? 'buy' :
+                                  stockAnalysis.decision === 'SELL' ? 'sell' :
+                                    'hold'
                               }
                               className="text-xs"
                             >
@@ -373,17 +376,17 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                               <div
                                 key={step.key}
                                 className={`relative rounded-lg border p-3 transition-all ${stepStatus === 'completed'
-                                  ? 'bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10'
+                                  ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
                                   : stepStatus === 'running'
-                                    ? 'bg-primary/5 border-primary/30 shadow-sm'
-                                    : 'bg-card border-border'
+                                    ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5 shadow-sm'
+                                    : 'border-border'
                                   }`}
                               >
                                 <div className="flex flex-col items-center text-center space-y-2">
                                   <div className={`p-2 rounded-lg ${stepStatus === 'completed'
-                                    ? 'bg-green-500/20 dark:bg-green-500/10 text-green-600 dark:text-green-400'
+                                    ? 'bg-green-500/10 dark:bg-green-500/5 text-green-600 dark:text-green-400'
                                     : stepStatus === 'running'
-                                      ? 'bg-primary/10 text-primary'
+                                      ? 'bg-yellow-500/10 dark:bg-yellow-500/5 text-yellow-600 dark:text-yellow-400'
                                       : 'bg-muted text-muted-foreground'
                                     }`}>
                                     <StepIcon className="w-4 h-4" />
@@ -392,7 +395,12 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                                   <h4 className="font-medium text-xs">{step.name}</h4>
 
                                   <Badge
-                                    variant={stepStatus === 'completed' ? 'secondary' : 'outline'}
+                                    variant={
+                                      stepStatus === 'completed' ? 'completed' :
+                                      stepStatus === 'running' ? 'running' :
+                                      stepStatus === 'error' ? 'error' :
+                                      'pending' as any
+                                    }
                                     className="text-xs"
                                   >
                                     {stepStatus === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
@@ -429,19 +437,19 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
           </div>
           <div>
             {(workflowData.status === 'completed' || workflowData.status === 'pending_approval') && (
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="completed" className="text-sm">
                 <CheckCircle className="w-3 h-3 mr-1" />
                 Complete
               </Badge>
             )}
             {workflowData.status === 'running' && (
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="running" className="text-sm">
                 <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                 In Progress
               </Badge>
             )}
             {workflowData.status === 'error' && (
-              <Badge variant="destructive" className="text-sm">
+              <Badge variant="error" className="text-sm">
                 <XCircle className="w-3 h-3 mr-1" />
                 Error
               </Badge>
@@ -453,144 +461,207 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
   );
 }
 
-function RebalancePositionCard({ position, onApprove, onReject, isExecuted, orderStatus }: {
+function RebalancePositionCard({ position, onApprove, onReject, isExecuted, orderStatus, isExecuting }: {
   position: RebalancePosition;
   onApprove: () => void;
   onReject: () => void;
   isExecuted: boolean;
-  orderStatus?: { status: string; alpacaOrderId?: string };
+  orderStatus?: { status: string; alpacaOrderId?: string; alpacaStatus?: string };
+  isExecuting?: boolean;
 }) {
   const pricePerShare = position.currentShares > 0
     ? position.currentValue / position.currentShares
     : 200; // Default price for new positions
 
   const isPending = orderStatus?.status === 'pending' && position.shareChange !== 0;
+  const isApproved = orderStatus?.status === 'approved';
+  const isRejected = orderStatus?.status === 'rejected';
   const isHold = position.shareChange === 0;
 
+  // Determine card background based on status and action
+  const getCardClasses = () => {
+    if (isPending) {
+      return 'bg-yellow-500/5 border-yellow-500/20 hover:bg-yellow-500/10';
+    } else if (isExecuted) {
+      if (position.action === 'BUY') {
+        return 'bg-green-500/5 border-green-500/20';
+      } else if (position.action === 'SELL') {
+        return 'bg-red-500/5 border-red-500/20';
+      }
+    } else if (isApproved) {
+      if (position.action === 'BUY') {
+        return 'bg-green-500/5 border-green-500/20';
+      } else if (position.action === 'SELL') {
+        return 'bg-red-500/5 border-red-500/20';
+      }
+    } else if (isRejected || isHold) {
+      return 'bg-gray-500/5 border-gray-500/20';
+    }
+    return 'bg-gray-500/5 border-gray-500/20';
+  };
+
   return (
-    <div
-      className={`p-4 rounded-lg border transition-all ${
-        isExecuted 
-          ? (position.action === 'BUY' ? 'bg-green-500/5 border-green-500/20' : 
-             position.action === 'SELL' ? 'bg-red-500/5 border-red-500/20' : 
-             'bg-gray-500/5 border-gray-500/20')
-          : isPending
-          ? (position.action === 'BUY' ? 'bg-green-500/5 border-green-500/20' : 
-             position.action === 'SELL' ? 'bg-red-500/5 border-red-500/20' : 
-             'bg-gray-500/5 border-gray-500/20')
-          : isHold
-          ? 'bg-gray-500/5 border-gray-500/20'
-          : 'bg-muted/20 border-muted opacity-60'
-        }`}
-    >
-      <div className="space-y-3">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="font-semibold text-lg">{position.ticker}</span>
-            <Badge variant={getDecisionVariant(position.action)}>
-              {getDecisionIcon(position.action)}
-              {position.action}
-            </Badge>
-            {position.shareChange !== 0 && (
-              <span className={`text-sm font-medium ${position.shareChange > 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                {position.shareChange > 0 ? '+' : ''}{position.shareChange} shares
-              </span>
-            )}
-            {orderStatus && (
-              <Badge
-                variant={
-                  orderStatus.status === 'executed' || orderStatus.status === 'approved' ? 'success' :
-                    orderStatus.status === 'rejected' ? 'destructive' :
-                      'secondary'
-                }
-                className="text-xs"
-              >
-                {(orderStatus.status === 'executed' || orderStatus.status === 'approved') && <CheckCircle className="w-3 h-3 mr-1" />}
-                {orderStatus.status === 'rejected' && <XCircle className="w-3 h-3 mr-1" />}
-                {orderStatus.status.charAt(0).toUpperCase() + orderStatus.status.slice(1)}
-              </Badge>
-            )}
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-medium">
-              ${Math.abs(position.shareChange * pricePerShare).toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              @ ${pricePerShare.toFixed(2)}/share
-            </p>
-          </div>
-        </div>
+    <div className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${getCardClasses()}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex gap-3 flex-1">
+            <div className={`p-2 rounded-full h-fit ${position.action === 'BUY' ? 'bg-green-500/10' : position.action === 'SELL' ? 'bg-red-500/10' : 'bg-gray-500/10'}`}>
+              {position.action === 'BUY' ? (
+                <ArrowUpRight className="h-4 w-4 text-green-500" />
+              ) : position.action === 'SELL' ? (
+                <ArrowDownRight className="h-4 w-4 text-red-500" />
+              ) : (
+                <Activity className="h-4 w-4 text-gray-500" />
+              )}
+            </div>
 
-        {/* Allocation Bars - Before and After */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-muted-foreground w-16">Before:</span>
-            <Progress value={position.currentAllocation} className="flex-1 h-2" />
-            <span className="text-xs font-medium w-12 text-right">
-              {position.currentAllocation.toFixed(1)}%
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-muted-foreground w-16">After:</span>
-            <Progress value={position.targetAllocation} className="flex-1 h-2" />
-            <span className="text-xs font-medium w-12 text-right">
-              {position.targetAllocation.toFixed(1)}%
-            </span>
-          </div>
-        </div>
-
-        {/* Position Changes */}
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">
-              {position.currentShares} shares
-            </span>
-            {position.shareChange !== 0 && (
-              <>
-                <ArrowRight className="w-4 h-4" />
-                <span className="font-medium">
-                  {position.recommendedShares} shares
+            <div className="space-y-1 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-sm">{position.ticker}</span>
+                <Badge 
+                  variant={position.action === 'BUY' ? 'buy' : position.action === 'SELL' ? 'sell' : 'hold'} 
+                  className="text-xs"
+                >
+                  {position.action}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {position.shareChange !== 0
+                    ? `${Math.abs(position.shareChange)} shares ${position.shareChange > 0 ? 'buy' : 'sell'} @ $${pricePerShare.toFixed(2)}`
+                    : 'No change needed'
+                  }
                 </span>
+                {position.shareChange !== 0 && (
+                  <span className="text-xs font-medium">
+                    ${Math.abs(position.shareChange * pricePerShare).toLocaleString()}
+                  </span>
+                )}
+                {isRejected && (
+                  <Badge variant="outline" className="text-xs">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    rejected
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-2">
+                {position.reasoning}
+              </p>
+            </div>
+          </div>
+
+          {/* Action buttons and details */}
+          <div className="flex flex-col gap-1">
+            {/* Alpaca Order Status Badge */}
+            {orderStatus?.alpacaOrderId && orderStatus?.alpacaStatus && (
+              <div className="flex items-center justify-center">
+                {(() => {
+                  const status = (orderStatus.alpacaStatus || '').toLowerCase();
+                  let variant: any = "outline";
+                  let icon = null;
+                  let displayText = orderStatus.alpacaStatus;
+                  let customClasses = "";
+
+                  if (status === 'filled') {
+                    variant = "success";
+                    icon = <CheckCircle className="h-3 w-3 mr-1" />;
+                    displayText = "filled";
+                  } else if (status === 'partially_filled') {
+                    variant = "default";
+                    icon = <Clock className="h-3 w-3 mr-1" />;
+                    displayText = "partial filled";
+                    customClasses = "bg-blue-500 text-white border-blue-500";
+                  } else if (['new', 'pending_new', 'accepted'].includes(status)) {
+                    variant = "warning";
+                    icon = <Clock className="h-3 w-3 mr-1" />;
+                    displayText = "placed";
+                  } else if (['canceled', 'cancelled'].includes(status)) {
+                    variant = "destructive";
+                    icon = <XCircle className="h-3 w-3 mr-1" />;
+                    displayText = "failed";
+                  } else if (status === 'rejected') {
+                    variant = "destructive";
+                    icon = <XCircle className="h-3 w-3 mr-1" />;
+                    displayText = "rejected";
+                  }
+
+                  return (
+                    <Badge
+                      variant={variant}
+                      className={`text-xs ${customClasses}`}
+                    >
+                      {icon}
+                      {displayText}
+                    </Badge>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Only show action buttons for pending decisions */}
+            {isPending && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-3 text-xs border-green-500/50 text-green-600 hover:bg-green-500/10 hover:border-green-500"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApprove();
+                  }}
+                  disabled={isExecuting}
+                >
+                  {isExecuting ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                  )}
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-3 text-xs border-red-500/50 text-red-600 hover:bg-red-500/10 hover:border-red-500"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReject();
+                  }}
+                  disabled={isExecuting}
+                >
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Reject
+                </Button>
               </>
             )}
           </div>
         </div>
 
-        {/* Reasoning */}
-        <MarkdownRenderer content={position.reasoning} className="text-xs text-muted-foreground italic" />
-
-        {/* Action Buttons */}
-        {isPending && (
-          <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 h-8 text-xs border-green-500/50 text-green-600 hover:bg-green-500/10 hover:border-green-500"
-              onClick={(e) => {
-                e.stopPropagation();
-                onApprove();
-              }}
-            >
-              <CheckCircle className="w-3 h-3 mr-1" />
-              Execute Order
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 h-8 text-xs border-red-500/50 text-red-600 hover:bg-red-500/10 hover:border-red-500"
-              onClick={(e) => {
-                e.stopPropagation();
-                onReject();
-              }}
-            >
-              <XCircle className="w-3 h-3 mr-1" />
-              Skip
-            </Button>
+        
+        {/* Additional Details - Portfolio Allocation */}
+        {position.shareChange !== 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-muted-foreground w-16">Current:</span>
+              <Progress value={position.currentAllocation} className="flex-1 h-2" />
+              <span className="text-xs font-medium w-12 text-right">
+                {position.currentAllocation.toFixed(2)}%
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-muted-foreground w-16">Target:</span>
+              <Progress value={position.targetAllocation} className="flex-1 h-2" />
+              <span className="text-xs font-medium w-12 text-right">
+                {position.targetAllocation.toFixed(2)}%
+              </span>
+            </div>
           </div>
         )}
-      </div>
+        
+        {/* Metadata - at bottom of card */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
+          <span>Portfolio Manager</span>
+          <span>•</span>
+          <span className="capitalize">rebalance</span>
+          <span>•</span>
+          <span>{position.currentShares} → {position.recommendedShares} shares</span>
+        </div>
     </div>
   );
 }
@@ -612,7 +683,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
   const [executedTickers, setExecutedTickers] = useState<Set<string>>(new Set());
   const [rejectedTickers, setRejectedTickers] = useState<Set<string>>(new Set());
-  const [orderStatuses, setOrderStatuses] = useState<Map<string, { status: string, alpacaOrderId?: string }>>(new Map());
+  const [orderStatuses, setOrderStatuses] = useState<Map<string, { status: string, alpacaOrderId?: string, alpacaStatus?: string }>>(new Map());
+  const [executingTicker, setExecutingTicker] = useState<string | null>(null);
 
   // Load rebalance data
   useEffect(() => {
@@ -1185,6 +1257,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
       return;
     }
 
+    setExecutingTicker(ticker);
     try {
       toast({
         title: "Executing Order",
@@ -1240,6 +1313,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         description: error.message || "Failed to execute order on Alpaca",
         variant: "destructive",
       });
+    } finally {
+      setExecutingTicker(null);
     }
   };
 
@@ -1253,6 +1328,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
       return;
     }
 
+    setExecutingTicker(ticker);
     try {
       // Call edge function to reject the trade
       const position = rebalanceData.recommendedPositions.find((p: RebalancePosition) => p.ticker === ticker);
@@ -1282,8 +1358,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         }
 
         toast({
-          title: "Order Skipped",
-          description: `Order for ${ticker} has been skipped`,
+          title: "Order Rejected",
+          description: `Order for ${ticker} has been rejected`,
         });
       }
     } catch (error: any) {
@@ -1293,6 +1369,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         description: error.message || "Failed to reject order",
         variant: "destructive",
       });
+    } finally {
+      setExecutingTicker(null);
     }
   };
 
@@ -1412,31 +1490,31 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                   Portfolio Rebalance Detail
                 </DialogTitle>
                 {rebalanceData?.status === 'running' && (
-                  <Badge variant="outline" className="text-sm">
+                  <Badge variant="running" className="text-sm">
                     <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                     Running
                   </Badge>
                 )}
                 {rebalanceData?.status === 'pending_approval' && (
-                  <Badge variant="default" className="text-sm">
+                  <Badge variant="pending" className="text-sm">
                     <Clock className="w-3 h-3 mr-1" />
                     Pending Approval
                   </Badge>
                 )}
                 {rebalanceData?.status === 'completed' && (
-                  <Badge variant="secondary" className="text-sm">
+                  <Badge variant="completed" className="text-sm">
                     <CheckCircle className="w-3 h-3 mr-1" />
                     Completed
                   </Badge>
                 )}
                 {(rebalanceData?.status === 'error' || rebalanceData?.status === 'failed') && (
-                  <Badge variant="destructive" className="text-sm">
+                  <Badge variant="error" className="text-sm">
                     <XCircle className="w-3 h-3 mr-1" />
                     {rebalanceData?.status === 'failed' ? 'Failed' : 'Error'}
                   </Badge>
                 )}
                 {rebalanceData?.status === 'canceled' && (
-                  <Badge variant="outline" className="text-sm">
+                  <Badge variant="pending" className="text-sm">
                     <XCircle className="w-3 h-3 mr-1" />
                     Canceled
                   </Badge>
@@ -1734,7 +1812,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                       {executedTickers.size} executed
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                      {rejectedTickers.size} skipped
+                                      {rejectedTickers.size} rejected
                                     </p>
                                   </div>
                                 </div>
@@ -1812,6 +1890,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                         position={position}
                                         isExecuted={isExecuted}
                                         orderStatus={orderStatus}
+                                        isExecuting={false}
                                         onApprove={() => { }} // No action needed for executed orders
                                         onReject={() => { }} // No action needed for executed orders
                                       />
@@ -1863,11 +1942,50 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                       position={position}
                                       isExecuted={isExecuted}
                                       orderStatus={orderStatus}
+                                      isExecuting={executingTicker === position.ticker}
                                       onApprove={() => handleApproveOrder(position.ticker)}
                                       onReject={() => handleRejectOrder(position.ticker)}
                                     />
                                   );
                                 })}
+                              </div>
+                            )}
+
+                            {/* Rejected Orders Section */}
+                            {rejectedTickers.size > 0 && (
+                              <div className="mb-6">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div>
+                                    <h3 className="font-medium">Rejected Orders</h3>
+                                    <p className="text-xs text-muted-foreground">
+                                      Orders that were rejected
+                                    </p>
+                                  </div>
+                                  <Badge variant="outline" className="text-gray-600 border-gray-500/20">
+                                    <XCircle className="w-3 h-3 mr-1" />
+                                    {rejectedTickers.size} rejected
+                                  </Badge>
+                                </div>
+                                <div className="space-y-3">
+                                  {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
+                                    const orderStatus = orderStatuses.get(position.ticker);
+                                    const isRejected = orderStatus?.status === 'rejected' || rejectedTickers.has(position.ticker);
+
+                                    if (!isRejected) return null;
+
+                                    return (
+                                      <RebalancePositionCard
+                                        key={`rejected-${position.ticker}`}
+                                        position={position}
+                                        isExecuted={false}
+                                        orderStatus={{ ...orderStatus, status: 'rejected' }}
+                                        isExecuting={false}
+                                        onApprove={() => { }} // No action needed for rejected orders
+                                        onReject={() => { }} // No action needed for rejected orders
+                                      />
+                                    );
+                                  })}
+                                </div>
                               </div>
                             )}
                           </>
@@ -1915,7 +2033,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                                   <div className="flex items-center gap-2 mt-1">
                                     <XCircle className="w-4 h-4 text-orange-600" />
                                     <span className="text-orange-600 font-medium">
-                                      {rejectedTickers.size} order{rejectedTickers.size !== 1 ? 's' : ''} skipped
+                                      {rejectedTickers.size} order{rejectedTickers.size !== 1 ? 's' : ''} rejected
                                     </span>
                                   </div>
                                 )}

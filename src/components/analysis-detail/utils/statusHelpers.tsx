@@ -38,7 +38,7 @@ export const getMessageIcon = (type: string) => {
   }
 };
 
-export const getDecisionVariant = (decision: string): "default" | "secondary" | "destructive" | "outline" | "buy" | "sell" | "hold" => {
+export const getDecisionVariant = (decision: string): "default" | "secondary" | "destructive" | "outline" | "buy" | "sell" | "hold" | "completed" | "running" | "error" | "pending" => {
   switch (decision) {
     case 'BUY': return 'buy';
     case 'SELL': return 'sell';

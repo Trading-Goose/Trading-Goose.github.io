@@ -70,7 +70,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
     isOpen
   });
   
-  const { isOrderExecuted, handleApproveOrder, handleRejectOrder } = useOrderActions({
+  const { isOrderExecuted, isExecuting, handleApproveOrder, handleRejectOrder } = useOrderActions({
     analysisData,
     updateAnalysisData
   });
@@ -263,6 +263,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                         handleApproveOrder={handleApproveOrder}
                         handleRejectOrder={handleRejectOrder}
                         isOrderExecuted={isOrderExecuted}
+                        isExecuting={isExecuting}
                         getConfidenceColor={getConfidenceColor}
                       />
                     </TabsContent>

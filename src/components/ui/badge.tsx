@@ -28,6 +28,15 @@ const badgeVariants = cva(
           "border border-red-500/30 bg-red-500/10 text-red-600 font-semibold hover:bg-red-500/20",
         hold:
           "border border-gray-500/30 bg-gray-500/10 text-gray-600 font-semibold hover:bg-gray-500/20",
+        // Workflow status badges
+        completed:
+          "border border-green-500/30 bg-green-500/10 text-green-600 font-semibold hover:bg-green-500/20",
+        running:
+          "border border-yellow-500/30 bg-yellow-500/10 text-yellow-600 font-semibold hover:bg-yellow-500/20",
+        error:
+          "border border-red-500/30 bg-red-500/10 text-red-600 font-semibold hover:bg-red-500/20",
+        pending:
+          "border border-gray-500/30 bg-gray-500/10 text-gray-600 font-semibold hover:bg-gray-500/20",
       },
     },
     defaultVariants: {

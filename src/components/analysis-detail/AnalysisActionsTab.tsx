@@ -13,6 +13,7 @@ interface AnalysisActionsTabProps {
   handleApproveOrder: () => void;
   handleRejectOrder: () => void;
   isOrderExecuted: boolean;
+  isExecuting?: boolean;
   getConfidenceColor: (confidence: number) => string;
 }
 
@@ -21,6 +22,7 @@ export default function AnalysisActionsTab({
   handleApproveOrder,
   handleRejectOrder,
   isOrderExecuted,
+  isExecuting = false,
   getConfidenceColor
 }: AnalysisActionsTabProps) {
   // For rebalance analyses, show a message that actions are handled at rebalance level
@@ -87,6 +89,7 @@ export default function AnalysisActionsTab({
           onApprove={handleApproveOrder}
           onReject={handleRejectOrder}
           isExecuted={isOrderExecuted}
+          isExecuting={isExecuting}
         />
       </div>
 

@@ -12,6 +12,7 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
   const { user } = useAuth();
   const { toast } = useToast();
   const [isOrderExecuted, setIsOrderExecuted] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   // Poll Alpaca order status
   const pollAlpacaOrderStatus = async (alpacaOrderId: string) => {
@@ -85,6 +86,7 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
       return;
     }
 
+    setIsExecuting(true);
     try {
       console.log('Approving order with data:', {
         tradeActionId: analysisData.tradeOrder.id,
@@ -164,6 +166,8 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
         description: error.message || "Failed to execute order on Alpaca",
         variant: "destructive",
       });
+    } finally {
+      setIsExecuting(false);
     }
   };
 
@@ -178,6 +182,7 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
       return;
     }
 
+    setIsExecuting(true);
     try {
 
       // Call the edge function to reject the trade
@@ -232,11 +237,14 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
         description: error.message || "Failed to reject order",
         variant: "destructive",
       });
+    } finally {
+      setIsExecuting(false);
     }
   };
 
   return {
     isOrderExecuted,
+    isExecuting,
     handleApproveOrder,
     handleRejectOrder,
     pollAlpacaOrderStatus

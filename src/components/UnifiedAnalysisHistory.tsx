@@ -637,10 +637,10 @@ export default function UnifiedAnalysisHistory() {
                       return (
                         <div key={`rebalance-${group.id}`} className="space-y-3">
                           {/* Rebalance Group Header */}
-                          <div className="p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
+                          <div className="p-4 rounded-lg border border-border bg-card/50">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2">
-                                <Package className="h-5 w-5 text-primary" />
+                                <Package className="h-5 w-5 text-muted-foreground" />
                                 <span className="font-semibold">Rebalance Analysis Session</span>
                                 <Badge variant="outline" className="text-xs">
                                   {group.analyses.length} analysis{group.analyses.length !== 1 ? 'es' : ''}
@@ -839,10 +839,10 @@ export default function UnifiedAnalysisHistory() {
                       return (
                         <div key={`rebalance-${group.id}`} className="space-y-3">
                           {/* Rebalance Group Header */}
-                          <div className="p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
+                          <div className="p-4 rounded-lg border border-border bg-card/50">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2">
-                                <Package className="h-5 w-5 text-primary" />
+                                <Package className="h-5 w-5 text-muted-foreground" />
                                 <span className="font-semibold">Rebalance Analysis Session</span>
                                 <Badge variant="outline" className="text-xs">
                                   {group.analyses.length} analysis{group.analyses.length !== 1 ? 'es' : ''}

@@ -1,11 +1,14 @@
 import {
   AlertCircle,
+  ArrowUpRight,
+  ArrowDownRight,
   CheckCircle,
   Clock,
   DollarSign,
   TrendingUp,
   TrendingDown,
-  XCircle
+  XCircle,
+  Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +19,7 @@ interface TradeOrderCardProps {
   onApprove: () => void;
   onReject: () => void;
   isExecuted?: boolean;
+  isExecuting?: boolean;
 }
 
 // Trade Order Card Component - similar to RebalancePositionCard
@@ -23,7 +27,8 @@ export default function TradeOrderCard({
   analysisData,
   onApprove,
   onReject,
-  isExecuted = false
+  isExecuted = false,
+  isExecuting = false
 }: TradeOrderCardProps) {
   const decision = analysisData.decision;
   const confidence = analysisData.confidence;
@@ -152,124 +157,162 @@ export default function TradeOrderCard({
   const isRejected = orderStatus === 'rejected';
   const isOrderExecuted = orderStatus === 'executed' || isExecuted;
 
+  // Determine card background based on status and action
+  const getCardClasses = () => {
+    if (isPending) {
+      return 'bg-yellow-500/5 border-yellow-500/20 hover:bg-yellow-500/10';
+    } else if (isOrderExecuted) {
+      if (decision === 'BUY') {
+        return 'bg-green-500/5 border-green-500/20';
+      } else if (decision === 'SELL') {
+        return 'bg-red-500/5 border-red-500/20';
+      }
+    } else if (isApproved) {
+      if (decision === 'BUY') {
+        return 'bg-green-500/5 border-green-500/20';
+      } else if (decision === 'SELL') {
+        return 'bg-red-500/5 border-red-500/20';
+      }
+    } else if (isRejected) {
+      return 'bg-gray-500/5 border-gray-500/20';
+    }
+    return 'bg-gray-500/5 border-gray-500/20';
+  };
+
   return (
-    <div className={`rounded-lg border transition-all ${isOrderExecuted
-      ? (decision === 'BUY' ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20')
-      : isApproved
-        ? (decision === 'BUY' ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20')
-        : isRejected
-          ? 'bg-gray-500/5 border-gray-500/20'
-          : isPending
-            ? (decision === 'BUY' ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20')
-            : 'bg-muted/20 border-muted opacity-60'
-      }`}>
-      <div className="p-4 space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${decision === 'BUY'
-              ? 'bg-green-500/10'
-              : decision === 'SELL'
-                ? 'bg-red-500/10'
-                : 'bg-primary/10'
-              }`}>
+    <div className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${getCardClasses()}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex gap-3 flex-1">
+            <div className={`p-2 rounded-full h-fit ${decision === 'BUY' ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
               {decision === 'BUY' ? (
-                <TrendingUp className="w-5 h-5 text-green-600" />
-              ) : decision === 'SELL' ? (
-                <TrendingDown className="w-5 h-5 text-red-600" />
+                <ArrowUpRight className="h-4 w-4 text-green-500" />
               ) : (
-                <DollarSign className="w-5 h-5 text-primary" />
+                <ArrowDownRight className="h-4 w-4 text-red-500" />
               )}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="font-semibold text-lg">{ticker}</h4>
-                <Badge variant={decision === 'BUY' ? 'buy' : decision === 'SELL' ? 'sell' : 'hold'}>
-                  {decision === 'BUY' ? (
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                  ) : decision === 'SELL' ? (
-                    <TrendingDown className="w-3 h-3 mr-1" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3 mr-1" />
-                  )}
+
+            <div className="space-y-1 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-sm">{ticker}</span>
+                <Badge 
+                  variant={decision === 'BUY' ? 'buy' : decision === 'SELL' ? 'sell' : 'hold'} 
+                  className="text-xs"
+                >
                   {decision}
                 </Badge>
-                {/* Show actual order status */}
-                {orderStatus && (
-                  <Badge
-                    variant={
-                      orderStatus === 'executed' ? 'success' :
-                        orderStatus === 'approved' ? 'outline' :
-                          orderStatus === 'rejected' ? 'destructive' :
-                            orderStatus === 'pending' ? 'outline' : 'outline'
-                    }
-                    className={`text-xs ${orderStatus === 'executed' ? 'text-green-600' :
-                      orderStatus === 'approved' ? 'text-green-600' :
-                        orderStatus === 'rejected' ? 'text-white-600' :
-                          orderStatus === 'pending' ? 'tex-white-600' : ''
-                      }`}
-                  >
-                    {orderStatus === 'executed' && <CheckCircle className="w-3 h-3 mr-1" />}
-                    {orderStatus === 'rejected' && <XCircle className="w-3 h-3 mr-1" />}
-                    {orderStatus === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                    {orderStatus === 'approved' && <Clock className="w-3 h-3 mr-1" />}
-                    {orderStatus.charAt(0).toUpperCase() + orderStatus.slice(1)}
+                <span className="text-xs text-muted-foreground">
+                  {orderDollarAmount && orderDollarAmount > 0
+                    ? `$${Number(orderDollarAmount).toLocaleString()} order`
+                    : orderShares
+                      ? `${Number(orderShares).toFixed(2)} shares`
+                      : 'Order details pending'
+                  }
+                </span>
+                {orderDollarAmount && orderDollarAmount > 0 && (
+                  <span className="text-xs font-medium">
+                    ${Number(orderDollarAmount).toLocaleString()}
+                  </span>
+                )}
+                {isRejected && (
+                  <Badge variant="outline" className="text-xs">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    rejected
                   </Badge>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Trade order ready for execution</p>
+              <p className="text-xs text-muted-foreground line-clamp-2">
+                {portfolioManagerInsight?.rationale || 'Trade order ready for execution'}
+              </p>
             </div>
           </div>
-          <div className="text-right">
-            {(tradeOrder || finalDecision) && (
+
+          {/* Action buttons and details */}
+          <div className="flex flex-col gap-1">
+            {/* Alpaca Order Status Badge */}
+            {tradeOrder?.alpacaOrderId && tradeOrder?.alpacaOrderStatus && (
+              <div className="flex items-center justify-center">
+                {(() => {
+                  const status = tradeOrder.alpacaOrderStatus.toLowerCase();
+                  let variant: any = "outline";
+                  let icon = null;
+                  let displayText = tradeOrder.alpacaOrderStatus;
+                  let customClasses = "";
+
+                  if (status === 'filled') {
+                    variant = "success";
+                    icon = <CheckCircle className="h-3 w-3 mr-1" />;
+                    displayText = "filled";
+                  } else if (status === 'partially_filled') {
+                    variant = "default";
+                    icon = <Clock className="h-3 w-3 mr-1" />;
+                    displayText = "partial filled";
+                    customClasses = "bg-blue-500 text-white border-blue-500";
+                  } else if (['new', 'pending_new', 'accepted'].includes(status)) {
+                    variant = "warning";
+                    icon = <Clock className="h-3 w-3 mr-1" />;
+                    displayText = "placed";
+                  } else if (['canceled', 'cancelled'].includes(status)) {
+                    variant = "destructive";
+                    icon = <XCircle className="h-3 w-3 mr-1" />;
+                    displayText = "failed";
+                  } else if (status === 'rejected') {
+                    variant = "destructive";
+                    icon = <XCircle className="h-3 w-3 mr-1" />;
+                    displayText = "rejected";
+                  }
+
+                  return (
+                    <Badge
+                      variant={variant}
+                      className={`text-xs ${customClasses}`}
+                    >
+                      {icon}
+                      {displayText}
+                    </Badge>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Only show action buttons for pending decisions */}
+            {isPending && (
               <>
-                <p className="text-sm font-semibold">
-                  {orderDollarAmount && orderDollarAmount > 0 ? (
-                    `$${Math.abs(orderDollarAmount).toLocaleString()}`
-                  ) : orderShares ? (
-                    `${orderShares} shares`
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-3 text-xs border-green-500/50 text-green-600 hover:bg-green-500/10 hover:border-green-500"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApprove();
+                  }}
+                  disabled={isExecuting}
+                >
+                  {isExecuting ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                   ) : (
-                    'Order details pending'
+                    <CheckCircle className="h-3 w-3 mr-1" />
                   )}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {orderDollarAmount && orderDollarAmount > 0 ? 'Dollar-based order' :
-                    orderShares ? 'Share-based order' : 'Pending'}
-                </p>
-                {/* Show Alpaca order details if available */}
-                {tradeOrder?.alpacaOrderId && (
-                  <div className="mt-1">
-                    <p className="text-xs text-muted-foreground">
-                      Order: {tradeOrder.alpacaOrderId.substring(0, 8)}...
-                    </p>
-                    {tradeOrder.alpacaOrderStatus && (
-                      <Badge
-                        variant={
-                          tradeOrder.alpacaOrderStatus === 'filled' ? 'success' :
-                            tradeOrder.alpacaOrderStatus === 'partially_filled' ? 'secondary' :
-                              ['new', 'pending_new', 'accepted'].includes(tradeOrder.alpacaOrderStatus) ? 'outline' :
-                                'destructive'
-                        }
-                        className={`text-xs mt-1 ${tradeOrder.alpacaOrderStatus === 'filled' ? 'text-green-600' :
-                          tradeOrder.alpacaOrderStatus === 'partially_filled' ? 'text-blue-600' :
-                            ['new', 'pending_new', 'accepted'].includes(tradeOrder.alpacaOrderStatus) ? 'text-green-600' :
-                              'text-red-600'
-                          }`}
-                      >
-                        {tradeOrder.alpacaOrderStatus === 'filled' ? 'Filled' :
-                          tradeOrder.alpacaOrderStatus === 'partially_filled' ? 'Partial' :
-                            ['new', 'pending_new', 'accepted'].includes(tradeOrder.alpacaOrderStatus) ? 'Placed' :
-                              tradeOrder.alpacaOrderStatus}
-                      </Badge>
-                    )}
-                  </div>
-                )}
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-3 text-xs border-red-500/50 text-red-600 hover:bg-red-500/10 hover:border-red-500"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReject();
+                  }}
+                  disabled={isExecuting}
+                >
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Reject
+                </Button>
               </>
             )}
           </div>
         </div>
-
-        {/* Confidence and Portfolio Impact */}
+        
+        {/* Additional Details - Confidence and Portfolio Impact */}
         <div className="space-y-3">
           {/* Confidence Level */}
           <div className="space-y-2">
@@ -312,47 +355,20 @@ export default function TradeOrderCard({
           )}
         </div>
 
-        {/* Risk Assessment Summary */}
-        {analysisData.agent_insights?.riskManager && (
-          <div className="pt-3 border-t border-border/50">
-            <p className="text-xs text-muted-foreground italic">
-              {analysisData.agent_insights.riskManager.recommendation ||
-                analysisData.agent_insights.riskManager.assessment ||
-                'Risk assessment completed'}
-            </p>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        {isPending && (
-          <div className="flex gap-2 pt-3 border-t border-border/50">
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 h-9 text-xs border-green-500/50 text-green-600 hover:bg-green-500/10 hover:border-green-500 hover:text-green-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                onApprove();
-              }}
-            >
-              <CheckCircle className="w-3 h-3 mr-1" />
-              Approve & Execute
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 h-9 text-xs border-red-500/50 text-red-600 hover:bg-red-500/10 hover:border-red-500 hover:text-red-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                onReject();
-              }}
-            >
-              <XCircle className="w-3 h-3 mr-1" />
-              Reject Order
-            </Button>
-          </div>
-        )}
-      </div>
+        {/* Metadata - at bottom of card */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
+          <span>Portfolio Manager</span>
+          <span>•</span>
+          <span className="capitalize">individual analysis</span>
+          <span>•</span>
+          <span>Confidence: {confidence}%</span>
+          {tradeOrder?.createdAt && (
+            <>
+              <span>•</span>
+              <span>{new Date(tradeOrder.createdAt).toLocaleDateString()}</span>
+            </>
+          )}
+        </div>
     </div>
   );
 }

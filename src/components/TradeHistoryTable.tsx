@@ -172,7 +172,7 @@ export default function TradeHistoryTable() {
   };
 
   useEffect(() => {
-    const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
+    const hasCredentials = apiSettings?.alpaca_api_key;
 
     // Always fetch trades from database
     fetchAllTrades();
@@ -185,7 +185,7 @@ export default function TradeHistoryTable() {
 
   // Periodically update Alpaca order status
   useEffect(() => {
-    const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
+    const hasCredentials = apiSettings?.alpaca_api_key;
 
     if (!hasCredentials) return;
 
@@ -269,7 +269,7 @@ export default function TradeHistoryTable() {
   const handleRejectDecision = async (decision: TradeDecision) => {
     try {
       // Call the edge function to reject the trade
-      const { data, error } = await supabase.functions.invoke('execute-trade', {
+      const { error } = await supabase.functions.invoke('execute-trade', {
         body: {
           tradeActionId: decision.id,
           action: 'reject'
@@ -323,7 +323,6 @@ export default function TradeHistoryTable() {
     });
 
     // Convert to array and sort chronologically (mixing both types)
-    const result: (TradeDecision | RebalanceGroup)[] = [];
     
     // Sort trades within each rebalance group
     Array.from(rebalanceGroups.values()).forEach(group => {
@@ -350,19 +349,35 @@ export default function TradeHistoryTable() {
     const isApproved = decision.status === 'approved';
     const isRejected = decision.status === 'rejected';
 
+    // Determine card background based on status and action
+    const getCardClasses = () => {
+      if (isPending) {
+        return 'bg-yellow-500/5 border-yellow-500/20 hover:bg-yellow-500/10';
+      } else if (isExecuted) {
+        if (decision.action === 'BUY') {
+          return 'bg-green-500/5 border-green-500/20';
+        } else if (decision.action === 'SELL') {
+          return 'bg-red-500/5 border-red-500/20';
+        }
+      } else if (isApproved) {
+        if (decision.action === 'BUY') {
+          return 'bg-green-500/5 border-green-500/20';
+        } else if (decision.action === 'SELL') {
+          return 'bg-red-500/5 border-red-500/20';
+        }
+        return 'bg-gray-500/5 border-gray-500/20';
+      } else if (isRejected) {
+        return 'bg-gray-500/5 border-gray-500/20';
+      }
+      return 'bg-gray-500/5 border-gray-500/20';
+    };
+
     return (
       <div
         key={decision.id}
         className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${
-          isInGroup ? 'border-l-4 border-l-primary/20 ml-4' : ''
-        } ${isPending
-          ? 'bg-blue-500/5 border-blue-500/20 hover:bg-blue-500/10'
-          : isExecuted
-            ? 'bg-green-500/5 border-green-500/20'
-            : isApproved
-              ? 'bg-yellow-500/5 border-yellow-500/20'
-              : 'bg-gray-500/5 border-gray-500/20'
-          }`}
+          isInGroup ? 'border-l-2 border-l-border ml-4' : ''
+        } ${getCardClasses()}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex gap-3 flex-1">
@@ -377,68 +392,41 @@ export default function TradeHistoryTable() {
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-sm">{decision.symbol}</span>
-                <Badge variant={decision.action === 'BUY' ? 'secondary' : 'destructive'} className="text-xs">
+                <Badge 
+                  variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'} 
+                  className="text-xs"
+                >
                   {decision.action}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  {decision.dollarAmount && decision.dollarAmount > 0
-                    ? `$${decision.dollarAmount.toFixed(2)} order`
-                    : decision.quantity > 0
-                      ? `${decision.quantity} shares ${decision.price > 0 ? `@ $${decision.price}` : '(market price)'}`
-                      : 'Order details pending'
+                  {decision.alpacaFilledQty && decision.alpacaFilledPrice
+                    ? `${Number(decision.alpacaFilledQty).toFixed(2)} shares @ $${decision.alpacaFilledPrice.toFixed(2)}`
+                    : decision.dollarAmount && decision.dollarAmount > 0
+                      ? `$${Number(decision.dollarAmount).toLocaleString()} order`
+                      : decision.quantity > 0
+                        ? `${Number(decision.quantity).toFixed(2)} shares ${decision.price > 0 ? `@ $${decision.price.toFixed(2)}` : '(market price)'}`
+                        : 'Order details pending'
                   }
                 </span>
-                {decision.price > 0 && (
+                {decision.alpacaFilledQty > 0 && decision.alpacaFilledPrice && (
+                  <span className="text-xs font-medium">
+                    ${(decision.alpacaFilledQty * decision.alpacaFilledPrice).toLocaleString()}
+                  </span>
+                )}
+                {!decision.alpacaFilledQty && !decision.alpacaFilledPrice && decision.dollarAmount && decision.dollarAmount > 0 && (
+                  <span className="text-xs font-medium">
+                    ${Number(decision.dollarAmount).toLocaleString()}
+                  </span>
+                )}
+                {!decision.alpacaFilledQty && !decision.dollarAmount && decision.price > 0 && (
                   <span className="text-xs font-medium">
                     ${decision.totalValue.toLocaleString()}
                   </span>
                 )}
-                
-                {/* Status Badges */}
-                {isExecuted && (
-                  <Badge variant="default" className="text-xs">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Executed
-                  </Badge>
-                )}
-                {isApproved && (
-                  <>
-                    <Badge variant="outline" className="text-xs text-yellow-600">
-                      <Clock className="h-3 w-3 mr-1" />
-                      Approved
-                    </Badge>
-                    {decision.alpacaOrderStatus && (
-                      <Badge
-                        variant={decision.alpacaOrderStatus === 'filled' ? 'default' :
-                          decision.alpacaOrderStatus === 'rejected' || decision.alpacaOrderStatus === 'canceled' ? 'destructive' :
-                            'outline'}
-                        className="text-xs"
-                      >
-                        {decision.alpacaOrderStatus === 'filled' ? (
-                          <><CheckCircle className="h-3 w-3 mr-1" />Filled</>
-                        ) : decision.alpacaOrderStatus === 'pending_new' || decision.alpacaOrderStatus === 'new' ? (
-                          <><Clock className="h-3 w-3 mr-1" />Placed</>
-                        ) : decision.alpacaOrderStatus === 'partially_filled' ? (
-                          <><Clock className="h-3 w-3 mr-1" />Partial</>
-                        ) : decision.alpacaOrderStatus === 'canceled' || decision.alpacaOrderStatus === 'rejected' ? (
-                          <><XCircle className="h-3 w-3 mr-1" />{decision.alpacaOrderStatus}</>
-                        ) : (
-                          decision.alpacaOrderStatus
-                        )}
-                      </Badge>
-                    )}
-                  </>
-                )}
                 {isRejected && (
-                  <Badge variant="outline" className="text-xs text-gray-600">
+                  <Badge variant="outline" className="text-xs">
                     <XCircle className="h-3 w-3 mr-1" />
-                    Rejected
-                  </Badge>
-                )}
-                {isPending && (
-                  <Badge variant="outline" className="text-xs text-blue-600">
-                    <Clock className="h-3 w-3 mr-1" />
-                    Pending
+                    rejected
                   </Badge>
                 )}
               </div>
@@ -476,23 +464,81 @@ export default function TradeHistoryTable() {
               </Button>
             )}
 
-            {/* Alpaca Order Link */}
+            {/* Alpaca Order Link and Status */}
             {decision.alpacaOrderId && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2 text-xs border-slate-700"
-                onClick={() => {
-                  const isPaper = apiSettings?.alpaca_paper_trading ?? true;
-                  const baseUrl = isPaper
-                    ? 'https://paper.alpaca.markets'
-                    : 'https://app.alpaca.markets';
-                  window.open(`${baseUrl}/dashboard/order/${decision.alpacaOrderId}`, '_blank');
-                }}
-              >
-                <ExternalLink className="h-3 w-3 mr-1" />
-                Alpaca
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs border-slate-700"
+                  onClick={() => {
+                    const isPaper = true; // Default to paper trading
+                    const baseUrl = isPaper
+                      ? 'https://paper.alpaca.markets'
+                      : 'https://app.alpaca.markets';
+                    window.open(`${baseUrl}/dashboard/order/${decision.alpacaOrderId}`, '_blank');
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Alpaca
+                </Button>
+
+                {/* Alpaca Order Status Badge */}
+                {decision.alpacaOrderStatus && (
+                  <div className="flex items-center justify-center">
+                    {(() => {
+                      const status = decision.alpacaOrderStatus.toLowerCase();
+                      let variant: any = "outline";
+                      let icon = null;
+                      let displayText = decision.alpacaOrderStatus;
+                      let customClasses = "";
+
+                      if (status === 'filled') {
+                        variant = "success";
+                        icon = <CheckCircle className="h-3 w-3 mr-1" />;
+                        displayText = "filled";
+                      } else if (status === 'partially_filled') {
+                        variant = "default";
+                        icon = <Clock className="h-3 w-3 mr-1" />;
+                        displayText = "partial filled";
+                        customClasses = "bg-blue-500 text-white border-blue-500";
+                      } else if (['new', 'pending_new', 'accepted'].includes(status)) {
+                        variant = "warning";
+                        icon = <Clock className="h-3 w-3 mr-1" />;
+                        displayText = "placed";
+                      } else if (['canceled', 'cancelled'].includes(status)) {
+                        variant = "destructive";
+                        icon = <XCircle className="h-3 w-3 mr-1" />;
+                        displayText = "failed";
+                      } else if (status === 'rejected') {
+                        variant = "destructive";
+                        icon = <XCircle className="h-3 w-3 mr-1" />;
+                        displayText = "rejected";
+                      }
+
+                      return (
+                        <Badge
+                          variant={variant}
+                          className={`text-xs ${customClasses}`}
+                        >
+                          {icon}
+                          {displayText}
+                          {decision.alpacaFilledQty > 0 && status === 'partially_filled' && (
+                            <span className="ml-1">({decision.alpacaFilledQty}/{decision.quantity})</span>
+                          )}
+                        </Badge>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Show filled details if available */}
+                {decision.alpacaFilledQty > 0 && decision.alpacaFilledPrice && (
+                  <div className="text-xs text-muted-foreground text-center">
+                    {Number(decision.alpacaFilledQty).toFixed(2)} @ ${Number(decision.alpacaFilledPrice || 0).toFixed(2)}
+                  </div>
+                )}
+              </>
             )}
 
             {/* Only show action buttons for pending decisions */}
@@ -541,7 +587,7 @@ export default function TradeHistoryTable() {
               <span>•</span>
             </>
           )}
-          <span>{formatFullDate(decision.createdAt)}</span>
+          <span>{decision.timestamp}</span>
           {decision.executedAt && (
             <>
               <span>•</span>
@@ -552,7 +598,7 @@ export default function TradeHistoryTable() {
             <>
               <span>•</span>
               <span className="text-green-600">
-                Filled: {decision.alpacaFilledQty} @ ${Number(decision.alpacaFilledPrice || 0).toFixed(2)}
+                Filled: {Number(decision.alpacaFilledQty).toFixed(2)} @ ${Number(decision.alpacaFilledPrice || 0).toFixed(2)}
               </span>
             </>
           )}
@@ -583,17 +629,17 @@ export default function TradeHistoryTable() {
 
     return (
       <div className="space-y-4">
-        {groupedItems.map((item, index) => {
+        {groupedItems.map((item) => {
           // Check if it's a rebalance group
           if ('trades' in item) {
             const group = item as RebalanceGroup;
             return (
               <div key={`rebalance-${group.id}`} className="space-y-3">
                 {/* Rebalance Group Header */}
-                <div className="p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
+                <div className="p-4 rounded-lg border border-border bg-card/50">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Package className="h-5 w-5 text-primary" />
+                      <Package className="h-5 w-5 text-muted-foreground" />
                       <span className="font-semibold">Rebalance Session</span>
                       <Badge variant="outline" className="text-xs">
                         {group.trades.length} trade{group.trades.length !== 1 ? 's' : ''}

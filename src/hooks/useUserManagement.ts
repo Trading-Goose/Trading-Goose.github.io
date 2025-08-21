@@ -16,7 +16,9 @@ export interface UserDetails {
   user_metadata: any;
   current_role_id: string | null;
   current_role_name: string | null;
+  current_role_expires_at?: string | null;
   pending_role_id?: string | null;
+  pending_expires_at?: string | null;
 }
 
 export interface UserFilter {
@@ -52,7 +54,7 @@ export function useUserManagement() {
     totalCount: 0,
     totalPages: 0
   });
-  const [pendingChanges, setPendingChanges] = useState<Map<string, string>>(new Map());
+  const [pendingChanges, setPendingChanges] = useState<Map<string, { roleId: string | null; expiresAt?: string | null }>>(new Map());
   const [isSaving, setIsSaving] = useState(false);
 
   const canManageUsers = hasPermission('users.update') || hasPermission('roles.assign');
@@ -87,7 +89,7 @@ export function useUserManagement() {
       const { data: usersWithAuth, error: authError } = await supabase
         .rpc('get_users_with_auth_details');
 
-      if (!authError && usersWithAuth) {
+      if (!authError && usersWithAuth && usersWithAuth.length > 0) {
         // Successfully got users with auth details
         const mappedUsers: UserDetails[] = usersWithAuth.map((user: any) => ({
           id: user.id,
@@ -102,7 +104,8 @@ export function useUserManagement() {
           app_metadata: user.app_metadata || {},
           user_metadata: user.user_metadata || {},
           current_role_id: user.current_role_id,
-          current_role_name: user.current_role_name
+          current_role_name: user.current_role_name,
+          current_role_expires_at: user.current_role_expires_at
         }));
 
         setUsers(mappedUsers);
@@ -247,10 +250,14 @@ export function useUserManagement() {
     const startIndex = (pagination.page - 1) * pagination.pageSize;
     const endIndex = startIndex + pagination.pageSize;
     
-    return filteredUsers.slice(startIndex, endIndex).map(user => ({
-      ...user,
-      pending_role_id: pendingChanges.get(user.id) || user.current_role_id
-    }));
+    return filteredUsers.slice(startIndex, endIndex).map(user => {
+      const pending = pendingChanges.get(user.id);
+      return {
+        ...user,
+        pending_role_id: pending?.roleId ?? user.current_role_id,
+        pending_expires_at: pending?.expiresAt ?? user.current_role_expires_at
+      };
+    });
   }, [filteredUsers, pagination.page, pagination.pageSize, pendingChanges]);
 
   // Update filter
@@ -285,13 +292,15 @@ export function useUserManagement() {
   }, []);
 
   // Update user role (pending)
-  const updateUserRole = useCallback((userId: string, roleId: string | null) => {
+  const updateUserRole = useCallback((userId: string, roleId: string | null, expiresAt?: string | null) => {
     setPendingChanges(prev => {
       const newChanges = new Map(prev);
-      if (roleId === null || roleId === users.find(u => u.id === userId)?.current_role_id) {
+      const user = users.find(u => u.id === userId);
+      
+      if (roleId === null || (roleId === user?.current_role_id && expiresAt === user?.current_role_expires_at)) {
         newChanges.delete(userId);
       } else {
-        newChanges.set(userId, roleId);
+        newChanges.set(userId, { roleId, expiresAt: expiresAt || null });
       }
       return newChanges;
     });
@@ -322,70 +331,32 @@ export function useUserManagement() {
       const promises: Promise<any>[] = [];
       let successCount = 0;
 
-      for (const [userId, newRoleId] of pageChanges) {
+      for (const [userId, changeData] of pageChanges) {
         const user = users.find(u => u.id === userId);
         if (!user) continue;
 
         // Process role change for this user
         const processUserRole = async () => {
-          // Direct update approach (RPC function not available)
-          // If user has a current role, deactivate it first
-          if (user.current_role_id) {
-            await supabase
-              .from('user_roles')
-              .update({ is_active: false })
-              .match({ user_id: userId, role_id: user.current_role_id });
+          const { roleId: newRoleId, expiresAt } = changeData;
+          
+          // Use the new RPC function with expiration support
+          const { data, error } = await supabase
+            .rpc('assign_user_role_with_expiration', {
+              p_user_id: userId,
+              p_role_id: newRoleId,
+              p_expires_at: expiresAt || null
+            });
+
+          if (error) {
+            throw error;
           }
 
-          // Assign new role
-          if (newRoleId) {
-            // Try to insert, if it fails due to duplicate, update instead
-            const { error: insertError } = await supabase
-              .from('user_roles')
-              .insert({
-                user_id: userId,
-                role_id: newRoleId,
-                is_active: true,
-                granted_by: currentUserId
-              });
-
-            if (insertError && insertError.code === '23505') {
-              // Duplicate key error, update instead
-              await supabase
-                .from('user_roles')
-                .update({
-                  is_active: true,
-                  granted_by: currentUserId,
-                  updated_at: new Date().toISOString()
-                  })
-                  .eq('user_id', userId)
-                  .eq('role_id', newRoleId);
-            } else if (insertError) {
-              throw insertError;
-            }
+          if (!data?.success) {
+            throw new Error(data?.error || 'Failed to assign role');
           }
         };
 
         promises.push(processUserRole());
-
-        // Log the change if assigning a new role
-        if (newRoleId) {
-          promises.push(
-            supabase
-              .from('role_audit_log')
-              .insert({
-                user_id: currentUserId,
-                target_user_id: userId,
-                action: 'grant',
-                role_id: newRoleId,
-                details: { 
-                  previous_role: user.current_role_name,
-                  bulk_update: true,
-                  page: pagination.page 
-                }
-              })
-          );
-        }
         successCount++;
       }
 

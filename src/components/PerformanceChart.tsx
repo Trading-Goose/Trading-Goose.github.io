@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { TrendingUp, TrendingDown, X, RefreshCw, Loader2 } from "lucide-react";
+import { TrendingUp, TrendingDown, X, RefreshCw, Loader2, AlertCircle, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { alpacaAPI } from "@/lib/alpaca";
 import { useAuth } from "@/lib/auth";
 import { fetchPortfolioData, fetchStockData, type PortfolioData, type StockData } from "@/lib/portfolio-data";
+import { useNavigate } from "react-router-dom";
 
 interface PerformanceChartProps {
   selectedStock?: string;
@@ -32,6 +34,7 @@ const periods: Array<{ value: TimePeriod; label: string }> = [
 // Remove the old hardcoded function - we'll create a dynamic one in the component
 
 const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartProps) => {
+  const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("1D");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +43,7 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
   const [stockData, setStockData] = useState<StockData>({});
   const [positions, setPositions] = useState<any[]>([]);
   const [stockDailyChanges, setStockDailyChanges] = useState<Record<string, { change: number; changePercent: number }>>({});
+  const [hasAlpacaConfig, setHasAlpacaConfig] = useState(true); // Assume configured initially
   const { apiSettings } = useAuth();
   
   // Fetch data on component mount and when selectedStock changes
@@ -62,16 +66,24 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
         alpacaAPI.calculateMetrics().catch(err => {
           console.warn("Failed to calculate metrics:", err);
           // Check if it's a configuration error
-          if (err.message?.includes('API settings not found') || err.message?.includes('not configured')) {
+          if (err.message?.includes('API settings not found') || 
+              err.message?.includes('not configured') ||
+              err.message?.includes('Edge Function returned a non-2xx status code')) {
             console.log("Alpaca API not configured");
+            setHasAlpacaConfig(false);
+            setError(null); // Clear error for missing API config
           }
           return null;
         }),
         alpacaAPI.getPositions().catch(err => {
           console.warn("Failed to get positions:", err);
           // Check if it's a configuration error
-          if (err.message?.includes('API settings not found') || err.message?.includes('not configured')) {
+          if (err.message?.includes('API settings not found') || 
+              err.message?.includes('not configured') ||
+              err.message?.includes('Edge Function returned a non-2xx status code')) {
             console.log("Alpaca API not configured");
+            setHasAlpacaConfig(false);
+            setError(null); // Clear error for missing API config
           }
           return [];
         })
@@ -124,7 +136,16 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
           }
         } catch (err) {
           console.error(`Error fetching data for ${selectedStock}:`, err);
-          setError(`Failed to fetch data for ${selectedStock}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          // Check if it's an API configuration error for stock data
+          if (err instanceof Error && 
+              (err.message.includes('API settings not found') || 
+               err.message.includes('not configured') ||
+               err.message.includes('Edge Function returned a non-2xx status code'))) {
+            setHasAlpacaConfig(false);
+            setError(null); // Don't show error for missing API config
+          } else {
+            setError(`Failed to fetch data for ${selectedStock}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          }
         }
       }
     } catch (err) {
@@ -134,6 +155,12 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
           setError('Cannot access Alpaca API directly from browser. Please ensure backend proxy is configured.');
         } else if (err.message.includes('Internal Server Error') || err.message.includes('500')) {
           setError('Database access error. Please check your configuration and try refreshing the page.');
+        } else if (err.message.includes('API settings not found') || 
+                   err.message.includes('not configured') ||
+                   err.message.includes('Edge Function returned a non-2xx status code')) {
+          // Don't show error for missing API config
+          setHasAlpacaConfig(false);
+          setError(null);
         } else {
           setError(err.message);
         }
@@ -363,6 +390,23 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
         </div>
       </CardHeader>
       <CardContent>
+        {!hasAlpacaConfig && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>Connect your Alpaca account to view live performance data</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/settings')}
+                className="ml-4"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Configure API
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)} className="space-y-4">
           <TabsList className="grid w-full grid-cols-8 max-w-5xl mx-auto">
             {periods.map((period) => (
@@ -439,7 +483,7 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
                 </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-muted-foreground">
-                    {error || "No data available for this period"}
+                    {error ? error : (hasAlpacaConfig ? "No data available for this period" : "Configure Alpaca API to view performance data")}
                   </div>
                 )}
               </div>
@@ -507,7 +551,7 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
                       </p>
                     </div>
                   </div>
-                  {error && (
+                  {error && hasAlpacaConfig && (
                     <div className="text-sm text-red-500 text-center pt-2">
                       {error}
                     </div>

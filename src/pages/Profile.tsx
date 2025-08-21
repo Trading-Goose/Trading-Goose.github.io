@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -15,11 +16,17 @@ import {
   TrendingUp,
   AlertCircle,
   LogOut,
-  Lock
+  Lock,
+  Clock,
+  Edit2,
+  Check,
+  X
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useRBAC } from "@/hooks/useRBAC";
+import { format } from "date-fns";
 import Header from "@/components/Header";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 
@@ -27,6 +34,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, profile, apiSettings, logout, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { getPrimaryRole } = useRBAC();
   const [activityStats, setActivityStats] = useState({
     totalAnalyses: 0,
     executedTrades: 0,
@@ -34,6 +42,10 @@ export default function ProfilePage() {
   });
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
+  const [roleExpiration, setRoleExpiration] = useState<string | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(profile?.name || '');
+  const [isSavingName, setIsSavingName] = useState(false);
 
   const handleSendResetEmail = async () => {
     if (!user?.email) return;
@@ -142,20 +154,97 @@ export default function ProfilePage() {
     fetchActivityStats();
   }, [user]);
 
+  useEffect(() => {
+    const fetchRoleExpiration = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('expires_at')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .single();
+
+        if (!error && data) {
+          setRoleExpiration(data.expires_at);
+        }
+      } catch (error) {
+        console.error('Error fetching role expiration:', error);
+      }
+    };
+
+    fetchRoleExpiration();
+  }, [user]);
+
+  // Update edited name when profile changes
+  useEffect(() => {
+    setEditedName(profile?.name || '');
+  }, [profile]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/');
+  };
+
+  const handleSaveName = async () => {
+    if (!user?.id || !editedName.trim()) return;
+
+    setIsSavingName(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ name: editedName.trim() })
+        .eq('id', user.id);
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to update name. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Your name has been updated successfully.",
+        });
+        setIsEditingName(false);
+        // Trigger a profile refresh
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error updating name:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditedName(profile?.name || '');
+    setIsEditingName(false);
   };
 
   if (!user) {
     return null;
   }
 
-  const tradingMode = apiSettings?.alpaca_paper_trading ? 'Paper Trading' : 'Live Trading';
   const hasAIConfig = !!apiSettings?.ai_api_key;
   const hasAlpacaConfig = apiSettings?.alpaca_paper_trading
     ? !!apiSettings?.alpaca_paper_api_key
     : !!apiSettings?.alpaca_live_api_key;
+  
+  // Only determine trading mode if Alpaca is actually configured
+  const tradingMode = hasAlpacaConfig 
+    ? (apiSettings?.alpaca_paper_trading ? 'Paper Trading' : 'Live Trading')
+    : 'Not Configured';
+
+  // Get primary role display name using the same method as Header
+  const primaryRole = getPrimaryRole();
 
   return (
     <div className="min-h-screen bg-background">
@@ -191,7 +280,44 @@ export default function ProfilePage() {
                     <User className="h-4 w-4" />
                     Name
                   </div>
-                  <p className="font-medium">{profile?.name || profile?.full_name || 'Not set'}</p>
+                  {isEditingName ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={editedName}
+                        onChange={(e) => setEditedName(e.target.value)}
+                        placeholder="Enter your name"
+                        className="max-w-[200px]"
+                        disabled={isSavingName}
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleSaveName}
+                        disabled={isSavingName || !editedName.trim()}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleCancelEdit}
+                        disabled={isSavingName}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{profile?.name || profile?.full_name || 'Not set'}</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setIsEditingName(true)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -219,11 +345,24 @@ export default function ProfilePage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Shield className="h-4 w-4" />
-                    Account Role
+                    Account Membership
                   </div>
-                  <Badge variant={profile?.role?.name === 'admin' ? 'default' : 'secondary'}>
-                    {profile?.role?.display_name}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {primaryRole ? (
+                      <Badge variant={primaryRole.name === 'admin' ? 'default' : 'secondary'}>
+                        {primaryRole.display_name}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">No Role</Badge>
+                    )}
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {roleExpiration ? 
+                        `Expires: ${format(new Date(roleExpiration), 'MMM dd, yyyy')}` : 
+                        'Never expires'
+                      }
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -266,12 +405,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    To update other profile information, please contact support.
-                  </AlertDescription>
-                </Alert>
               </div>
             </CardContent>
           </Card>
@@ -309,7 +442,10 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Trading Mode</span>
                   <Badge
-                    variant={apiSettings?.alpaca_paper_trading ? "secondary" : "destructive"}
+                    variant={
+                      !hasAlpacaConfig ? "outline" :
+                      apiSettings?.alpaca_paper_trading ? "secondary" : "destructive"
+                    }
                     className="flex items-center gap-1"
                   >
                     <TrendingUp className="h-3 w-3" />

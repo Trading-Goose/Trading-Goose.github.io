@@ -130,15 +130,15 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
     } catch (err) {
       console.error('Error fetching positions:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch positions';
-      
+
       if (errorMessage.includes('Internal Server Error') || errorMessage.includes('500')) {
         setError('Database access error. Please check your configuration and try refreshing the page.');
       } else if (errorMessage.includes('Edge Function returned') || errorMessage.includes('API settings not found')) {
-        setError('API configuration not found. Please configure your Alpaca API in Settings.');
+        //setError('API configuration not found. Please configure your Alpaca API in Settings.');
       } else {
         setError(errorMessage);
       }
-      
+
       setPositions([]);
     } finally {
       setLoading(false);
@@ -194,8 +194,8 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               .eq('id', previousRunningRef.current)
               .single();
 
-            if (completedRebalance?.status === 'completed' && 
-                completedRebalance?.rebalance_plan?.trades?.length > 0) {
+            if (completedRebalance?.status === 'completed' &&
+              completedRebalance?.rebalance_plan?.trades?.length > 0) {
               // Only show toast if portfolio manager actually ran and created trades
               console.log('Rebalance completed with trades:', previousRunningRef.current);
               toast({
@@ -205,7 +205,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               // Refresh positions to show updated holdings
               fetchPositions();
             } else if (completedRebalance?.status === 'completed' &&
-                       completedRebalance?.rebalance_plan?.recommendation === 'no_action_needed') {
+              completedRebalance?.rebalance_plan?.recommendation === 'no_action_needed') {
               // Show different message when no opportunities were found
               console.log('Rebalance completed with no action needed:', previousRunningRef.current);
               toast({
@@ -302,60 +302,60 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
             <div className="max-h-[210px] overflow-y-auto">
               <Table>
                 <TableBody>
-                {positions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-4">
-                      {loading ? "Loading positions..." :
-                        error ? error :
-                          "No positions found"}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  positions.map((position) => (
-                    <TableRow
-                      key={position.symbol}
-                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${selectedStock === position.symbol ? 'bg-muted' : ''
-                        }`}
-                      onClick={() => onSelectStock?.(position.symbol)}
-                    >
-                      <TableCell className="font-medium w-[60px]">
-                        <Badge variant={selectedStock === position.symbol ? 'default' : 'outline'}>
-                          {position.symbol}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-sm px-2">{position.shares}</TableCell>
-                      <TableCell className="text-right font-medium text-sm px-2">
-                        ${(position.marketValue / 1000).toFixed(1)}k
-                      </TableCell>
-                      <TableCell className="text-right px-2">
-                        <div className={`flex items-center justify-end gap-1 ${position.dayChange >= 0 ? 'text-success' : 'text-danger'
-                          }`}>
-                          {position.dayChange >= 0 ? (
-                            <TrendingUp className="w-3 h-3" />
-                          ) : (
-                            <TrendingDown className="w-3 h-3" />
-                          )}
-                          <span className="text-xs font-medium">
-                            {position.dayChange >= 0 ? '+' : ''}{position.dayChange.toFixed(1)}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right px-2">
-                        <div className={`flex items-center justify-end gap-1 ${position.unrealizedPL >= 0 ? 'text-success' : 'text-danger'
-                          }`}>
-                          {position.unrealizedPL >= 0 ? (
-                            <TrendingUp className="w-3 h-3" />
-                          ) : (
-                            <TrendingDown className="w-3 h-3" />
-                          )}
-                          <span className="text-xs font-medium">
-                            {position.unrealizedPLPct >= 0 ? '+' : ''}{position.unrealizedPLPct.toFixed(1)}%
-                          </span>
-                        </div>
+                  {positions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-4">
+                        {loading ? "Loading positions..." :
+                          error ? error :
+                            "No positions found"}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
+                  ) : (
+                    positions.map((position) => (
+                      <TableRow
+                        key={position.symbol}
+                        className={`cursor-pointer hover:bg-muted/50 transition-colors ${selectedStock === position.symbol ? 'bg-muted' : ''
+                          }`}
+                        onClick={() => onSelectStock?.(position.symbol)}
+                      >
+                        <TableCell className="font-medium w-[60px]">
+                          <Badge variant={selectedStock === position.symbol ? 'default' : 'outline'}>
+                            {position.symbol}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-sm px-2">{position.shares}</TableCell>
+                        <TableCell className="text-right font-medium text-sm px-2">
+                          ${(position.marketValue / 1000).toFixed(1)}k
+                        </TableCell>
+                        <TableCell className="text-right px-2">
+                          <div className={`flex items-center justify-end gap-1 ${position.dayChange >= 0 ? 'text-success' : 'text-danger'
+                            }`}>
+                            {position.dayChange >= 0 ? (
+                              <TrendingUp className="w-3 h-3" />
+                            ) : (
+                              <TrendingDown className="w-3 h-3" />
+                            )}
+                            <span className="text-xs font-medium">
+                              {position.dayChange >= 0 ? '+' : ''}{position.dayChange.toFixed(1)}%
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right px-2">
+                          <div className={`flex items-center justify-end gap-1 ${position.unrealizedPL >= 0 ? 'text-success' : 'text-danger'
+                            }`}>
+                            {position.unrealizedPL >= 0 ? (
+                              <TrendingUp className="w-3 h-3" />
+                            ) : (
+                              <TrendingDown className="w-3 h-3" />
+                            )}
+                            <span className="text-xs font-medium">
+                              {position.unrealizedPLPct >= 0 ? '+' : ''}{position.unrealizedPLPct.toFixed(1)}%
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

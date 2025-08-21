@@ -27,6 +27,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Table,
   TableBody,
   TableCell,
@@ -43,10 +48,10 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { 
-  Users, 
+import {
+  Users,
   Search,
-  Save, 
+  Save,
   X,
   AlertCircle,
   Loader2,
@@ -63,7 +68,7 @@ import {
   Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, addDays, addMonths, addYears } from "date-fns";
 import { supabase } from "@/lib/supabase";
 
 export default function AdminUserManager() {
@@ -99,6 +104,7 @@ export default function AdminUserManager() {
   const [userToDelete, setUserToDelete] = useState<{ id: string; email: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [roleExpirations, setRoleExpirations] = useState<Map<string, string | null>>(new Map());
 
   // Get current user ID on mount
   useEffect(() => {
@@ -108,6 +114,7 @@ export default function AdminUserManager() {
       }
     });
   }, []);
+
 
   // Get unique providers from users
   const uniqueProviders = Array.from(new Set(users.map(u => u.provider).filter(Boolean)));
@@ -130,6 +137,44 @@ export default function AdminUserManager() {
   const handleDeleteClick = (user: { id: string; email: string; name: string }) => {
     setUserToDelete(user);
     setDeleteConfirmOpen(true);
+  };
+
+  const handleRoleChange = (userId: string, roleId: string | null) => {
+    const expiresAt = roleExpirations.get(userId) || null;
+    updateUserRole(userId, roleId === 'none' ? null : roleId, expiresAt);
+  };
+
+  const handleExpirationChange = (userId: string, expiresAt: string | null) => {
+    setRoleExpirations(prev => {
+      const newMap = new Map(prev);
+      if (expiresAt) {
+        newMap.set(userId, expiresAt);
+      } else {
+        newMap.delete(userId);
+      }
+      return newMap;
+    });
+
+    // Update the pending change with new expiration
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      // Get the current role (either pending or existing)
+      const roleId = pendingChanges.get(userId)?.roleId || user.current_role_id;
+      // Always update user role when expiration changes to trigger save button
+      updateUserRole(userId, roleId, expiresAt);
+    }
+  };
+
+  const formatExpiration = (dateString: string | null | undefined) => {
+    if (!dateString) return null;
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      if (date < now) return 'Expired';
+      return format(date, 'MMM dd, yyyy HH:mm');
+    } catch {
+      return null;
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -165,14 +210,14 @@ export default function AdminUserManager() {
 
   // Calculate pending changes on current page
   const currentPageUserIds = new Set(users.map(u => u.id));
-  const currentPageChanges = Array.from(pendingChanges).filter(([userId]) => 
+  const currentPageChanges = Array.from(pendingChanges).filter(([userId]) =>
     currentPageUserIds.has(userId)
   ).length;
 
   const getSortIcon = (field: string) => {
     if (sortField !== field) return null;
-    return sortDirection === 'asc' ? 
-      <ChevronUp className="h-4 w-4" /> : 
+    return sortDirection === 'asc' ?
+      <ChevronUp className="h-4 w-4" /> :
       <ChevronDown className="h-4 w-4" />;
   };
 
@@ -188,7 +233,12 @@ export default function AdminUserManager() {
   const formatLastLogin = (dateString: string | null) => {
     if (!dateString) return 'Never';
     try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Never';
+      }
+      return formatDistanceToNow(date, { addSuffix: true });
     } catch {
       return 'Never';
     }
@@ -237,7 +287,7 @@ export default function AdminUserManager() {
             <AlertTitle>Unsaved Changes on This Page</AlertTitle>
             <AlertDescription>
               You have {currentPageChanges} pending role change(s) on this page.
-              {pendingChanges.size > currentPageChanges && 
+              {pendingChanges.size > currentPageChanges &&
                 ` (${pendingChanges.size - currentPageChanges} changes on other pages)`
               }
             </AlertDescription>
@@ -250,7 +300,7 @@ export default function AdminUserManager() {
               <div>
                 <CardTitle>Users</CardTitle>
                 <CardDescription>
-                  Page {pagination.page} of {pagination.totalPages} • 
+                  Page {pagination.page} of {pagination.totalPages} •
                   Showing {Math.min(pagination.pageSize, pagination.totalCount)} of {pagination.totalCount} users
                 </CardDescription>
               </div>
@@ -436,7 +486,8 @@ export default function AdminUserManager() {
                         </Button>
                       </TableHead>
                       <TableHead>Role</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead >Expiration</TableHead>
+                      <TableHead >Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -444,7 +495,7 @@ export default function AdminUserManager() {
                       const globalIndex = (pagination.page - 1) * pagination.pageSize + index + 1;
                       const hasChanged = pendingChanges.has(user.id);
                       const isCurrentUser = user.id === currentUserId;
-                      
+
                       return (
                         <TableRow key={user.id} className={hasChanged ? 'bg-muted/50' : ''}>
                           <TableCell className="font-mono text-xs">
@@ -495,11 +546,11 @@ export default function AdminUserManager() {
                           <TableCell>
                             <Select
                               value={user.pending_role_id || 'none'}
-                              onValueChange={(v) => updateUserRole(user.id, v === 'none' ? null : v)}
+                              onValueChange={(v) => handleRoleChange(user.id, v)}
                             >
                               <SelectTrigger className={`w-[150px] ${hasChanged ? 'border-yellow-500' : ''}`}>
                                 <SelectValue>
-                                  {user.pending_role_id ? 
+                                  {user.pending_role_id ?
                                     availableRoles.find(r => r.id === user.pending_role_id)?.display_name || 'Select Role' :
                                     'No Role'
                                   }
@@ -518,13 +569,13 @@ export default function AdminUserManager() {
                                     return bPriority - aPriority;
                                   })
                                   .map(role => (
-                                  <SelectItem key={role.id} value={role.id}>
-                                    <div className="flex items-center gap-2">
-                                      <Shield className="h-3 w-3" />
-                                      {role.display_name}
-                                    </div>
-                                  </SelectItem>
-                                ))}
+                                    <SelectItem key={role.id} value={role.id}>
+                                      <div className="flex items-center gap-2">
+                                        <Shield className="h-3 w-3" />
+                                        {role.display_name}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
                               </SelectContent>
                             </Select>
                             {hasChanged && (
@@ -533,14 +584,99 @@ export default function AdminUserManager() {
                               </Badge>
                             )}
                           </TableCell>
+                          <TableCell>
+                            {/* Show expiration controls for non-admin/default roles */}
+                            {user.pending_role_id &&
+                              availableRoles.find(r => r.id === user.pending_role_id)?.name !== 'admin' &&
+                              availableRoles.find(r => r.id === user.pending_role_id)?.name !== 'default' ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="datetime-local"
+                                    className="w-[200px] text-xs"
+                                    value={(() => {
+                                      const expiration = roleExpirations.get(user.id) || user.pending_expires_at;
+                                      if (!expiration) return '';
+                                      // Convert to local datetime format (remove timezone)
+                                      return expiration.slice(0, 16);
+                                    })()}
+                                    min={new Date().toISOString().slice(0, 16)}
+                                    onChange={(e) => handleExpirationChange(user.id, e.target.value || null)}
+                                  />
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => {
+                                      const expires = addDays(new Date(), 7).toISOString().slice(0, 16);
+                                      handleExpirationChange(user.id, expires);
+                                    }}
+                                  >
+                                    +7d
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => {
+                                      const expires = addDays(new Date(), 30).toISOString().slice(0, 16);
+                                      handleExpirationChange(user.id, expires);
+                                    }}
+                                  >
+                                    +30d
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => {
+                                      const expires = addMonths(new Date(), 3).toISOString().slice(0, 16);
+                                      handleExpirationChange(user.id, expires);
+                                    }}
+                                  >
+                                    +3m
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs"
+                                    onClick={() => {
+                                      const expires = addYears(new Date(), 1).toISOString().slice(0, 16);
+                                      handleExpirationChange(user.id, expires);
+                                    }}
+                                  >
+                                    +1y
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {/* Show current expiration if exists */}
+                                {user.current_role_expires_at ? (
+                                  <div className="text-sm">
+                                    {formatExpiration(user.current_role_expires_at)}
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">
+                                    {user.pending_role_id && (
+                                      availableRoles.find(r => r.id === user.pending_role_id)?.name === 'admin' ||
+                                      availableRoles.find(r => r.id === user.pending_role_id)?.name === 'default'
+                                    ) ? 'Never' : '-'}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteClick({ 
-                                id: user.id, 
-                                email: user.email, 
-                                name: user.name || 'Unnamed User' 
+                              onClick={() => handleDeleteClick({
+                                id: user.id,
+                                email: user.email,
+                                name: user.name || 'Unnamed User'
                               })}
                               disabled={isCurrentUser}
                               title={isCurrentUser ? "Cannot delete your own account" : "Delete user"}
@@ -562,12 +698,12 @@ export default function AdminUserManager() {
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
-                    <PaginationPrevious 
+                    <PaginationPrevious
                       onClick={() => changePage(pagination.page - 1)}
                       className={pagination.page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />
                   </PaginationItem>
-                  
+
                   {/* Page numbers */}
                   {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                     let pageNum: number;
@@ -580,9 +716,9 @@ export default function AdminUserManager() {
                     } else {
                       pageNum = pagination.page - 2 + i;
                     }
-                    
+
                     if (pageNum < 1 || pageNum > pagination.totalPages) return null;
-                    
+
                     return (
                       <PaginationItem key={pageNum}>
                         <PaginationLink
@@ -595,7 +731,7 @@ export default function AdminUserManager() {
                       </PaginationItem>
                     );
                   })}
-                  
+
                   {pagination.totalPages > 5 && pagination.page < pagination.totalPages - 2 && (
                     <>
                       <PaginationItem>
@@ -611,9 +747,9 @@ export default function AdminUserManager() {
                       </PaginationItem>
                     </>
                   )}
-                  
+
                   <PaginationItem>
-                    <PaginationNext 
+                    <PaginationNext
                       onClick={() => changePage(pagination.page + 1)}
                       className={pagination.page === pagination.totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />

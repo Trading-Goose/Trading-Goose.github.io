@@ -10,6 +10,22 @@ const Index = () => {
   const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
+    // Load Google AdSense script
+    const script = document.createElement('script');
+    script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9651663494022087';
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    document.head.appendChild(script);
+
+    return () => {
+      // Cleanup: remove script when component unmounts
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     // Check if this is a password recovery redirect
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
@@ -116,12 +132,8 @@ const Index = () => {
             </div>
 
             {/* Analysis Workflow */}
-            <div className="space-y-6 p-6">
+            <div className="space-y-6 ">
               <div className="text-center space-y-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-500/20 rounded-full text-yellow-700 dark:text-yellow-300 font-medium text-xs">
-                  <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
-                  Stock Analysis
-                </div>
                 <h3 className="text-xl font-bold">Multi-Agent Analysis Pipeline</h3>
                 <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
                   When you analyze a stock, our AI agents work through a structured 5-phase process
@@ -162,12 +174,8 @@ const Index = () => {
             </div>
 
             {/* Rebalance Workflow */}
-            <div className="space-y-6 p-6">
+            <div className="py-12  space-y-6">
               <div className="text-center space-y-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-500/20 rounded-full text-orange-700 dark:text-orange-300 font-medium text-xs">
-                  <span className="w-1.5 h-1.5 bg-orange-500 rounded-full"></span>
-                  Portfolio Rebalancing
-                </div>
                 <h3 className="text-xl font-bold">Intelligent Rebalancing System</h3>
                 <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
                   Automated portfolio rebalancing with intelligent opportunity detection and risk management

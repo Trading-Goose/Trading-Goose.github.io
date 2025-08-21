@@ -10,22 +10,6 @@ const Index = () => {
   const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    // Load Google AdSense script
-    const script = document.createElement('script');
-    script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9651663494022087';
-    script.async = true;
-    script.crossOrigin = 'anonymous';
-    document.head.appendChild(script);
-
-    return () => {
-      // Cleanup: remove script when component unmounts
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     // Check if this is a password recovery redirect
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');

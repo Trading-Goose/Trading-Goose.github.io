@@ -51,7 +51,9 @@
       "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-fundamentals-analyst --project-ref lnvjsqyvhczgxvygbqer)",
       "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy agent-trader --project-ref lnvjsqyvhczgxvygbqer)",
       "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions deploy $agent --project-ref lnvjsqyvhczgxvygbqer)",
-      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions logs agent-risky-analyst --project-ref lnvjsqyvhczgxvygbqer --tail 20)"
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase functions logs agent-risky-analyst --project-ref lnvjsqyvhczgxvygbqer --tail 20)",
+      "mcp__ide__getDiagnostics",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_72e308dcfc7de7eb83f03ab8fbea9366e3ffe6d6\" npx supabase db run --project-ref lnvjsqyvhczgxvygbqer --sql \"SELECT table_name FROM information_schema.tables WHERE table_schema = ''public'' ORDER BY table_name;\")"
     ],
     "deny": [],
     "additionalDirectories": [

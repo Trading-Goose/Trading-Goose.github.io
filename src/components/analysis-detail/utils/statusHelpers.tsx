@@ -1,4 +1,4 @@
-import { 
+import {
   AlertCircle,
   CheckCircle,
   Clock,
@@ -9,17 +9,33 @@ import {
   TrendingDown,
   XCircle
 } from "lucide-react";
+import {
+  type AnalysisStatus,
+  type RebalanceStatus,
+  ANALYSIS_STATUS,
+  REBALANCE_STATUS
+} from "@/lib/statusTypes";
 
-export const getStatusIcon = (status: string) => {
+export const getStatusIcon = (status: AnalysisStatus | RebalanceStatus | string) => {
   switch (status) {
-    case 'completed':
+    case ANALYSIS_STATUS.COMPLETED:
+    case REBALANCE_STATUS.COMPLETED:
       return <CheckCircle className="w-4 h-4 text-green-500" />;
-    case 'running':
+    case ANALYSIS_STATUS.RUNNING:
+    case REBALANCE_STATUS.RUNNING:
       return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
-    case 'canceled':
+    case ANALYSIS_STATUS.CANCELLED:
+    case REBALANCE_STATUS.CANCELLED:
       return <XCircle className="w-4 h-4 text-orange-500" />;
-    case 'error':
+    case ANALYSIS_STATUS.ERROR:
+    case REBALANCE_STATUS.ERROR:
       return <XCircle className="w-4 h-4 text-red-500" />;
+    case ANALYSIS_STATUS.PENDING:
+    case REBALANCE_STATUS.PENDING:
+      return <Clock className="w-4 h-4 text-gray-400" />;
+    case ANALYSIS_STATUS.AWAITING_APPROVAL:
+    case REBALANCE_STATUS.AWAITING_APPROVAL:
+      return <Clock className="w-4 h-4 text-yellow-500" />;
     default:
       return <Clock className="w-4 h-4 text-gray-400" />;
   }

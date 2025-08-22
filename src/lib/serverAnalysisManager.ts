@@ -34,11 +34,11 @@ export class ServerAnalysisManager {
   ): Promise<string> {
     try {
       // Don't send any credentials from frontend - coordinator will fetch from database
-      const { data, error } = await supabase.functions.invoke('analyze-stock-coordinator', {
+      const { data, error } = await supabase.functions.invoke('analysis-coordinator', {
         body: {
           ticker,
           userId,
-          // No phase/agent/action - indicates new analysis request
+          // No phase/agent - indicates new analysis request
         }
       });
 
@@ -74,7 +74,7 @@ export class ServerAnalysisManager {
 
       console.log(`📊 Analysis status for ${analysisId}:`, {
         ticker: data.ticker,
-        status: data.full_analysis.status,
+        status: data.analysis_status,
         messageCount: data.full_analysis.messages?.length || 0,
         stepCount: data.full_analysis.workflowSteps?.length || 0
       });
@@ -84,7 +84,7 @@ export class ServerAnalysisManager {
       const hasAgentInsights = data.agent_insights && Object.keys(data.agent_insights).length > 0;
       
       // Determine actual status based on data
-      let actualStatus = data.full_analysis.status || 'running';
+      let actualStatus = data.analysis_status || 'running';
       if (actualStatus === 'running' && hasValidDecision && hasAgentInsights) {
         console.log(`📊 Analysis appears complete based on decision/confidence for ${data.ticker}`);
         actualStatus = 'completed';
@@ -272,7 +272,7 @@ export class ServerAnalysisManager {
         .from('analysis_history')
         .select('id, ticker')
         .eq('user_id', userId)
-        .eq('full_analysis->>status', 'running');
+        .eq('analysis_status', 'running');
 
       if (error) throw error;
       return data || [];

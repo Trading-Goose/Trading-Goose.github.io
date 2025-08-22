@@ -9,6 +9,18 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import AnalysisDetailModal from "@/components/AnalysisDetailModal";
 import RebalanceDetailModal from "@/components/RebalanceDetailModal";
+import {
+  type TradeOrderStatus,
+  type AlpacaOrderStatus,
+  TRADE_ORDER_STATUS,
+  ALPACA_ORDER_STATUS,
+  isTradeOrderPending,
+  isTradeOrderRejected,
+  isAlpacaOrderTerminal,
+  isAlpacaOrderFilled,
+  getTradeOrderStatusDisplayText,
+  getAlpacaStatusDisplayText
+} from "@/lib/statusTypes";
 
 interface AIDecision {
   id: string;
@@ -21,13 +33,13 @@ interface AIDecision {
   timestamp: string;
   reasoning: string;
   totalValue: number;
-  status: 'pending' | 'approved' | 'rejected' | 'executed';
+  status: TradeOrderStatus | 'executed'; // Include 'executed' for legacy compatibility with Alpaca orders
   executedAt: string | null;
   sourceType: string;
   analysisId?: string;
   rebalanceRequestId?: string;
   alpacaOrderId?: string;
-  alpacaOrderStatus?: string;
+  alpacaOrderStatus?: AlpacaOrderStatus;
   alpacaFilledQty?: number;
   alpacaFilledPrice?: number;
 }
@@ -84,12 +96,12 @@ export default function RecentTrades() {
         .limit(50);
 
       console.log('Trading actions query result:', { tradingActions, tradingActionsError });
-      console.log('Current user context:', { 
-        userId: user?.id, 
+      console.log('Current user context:', {
+        userId: user?.id,
         userEmail: user?.email,
         supabaseSession: (await supabase.auth.getSession()).data.session?.user?.id
       });
-      
+
       if (tradingActionsError) {
         console.error('Error fetching trading actions:', tradingActionsError);
         console.log('Error details:', {
@@ -100,7 +112,7 @@ export default function RecentTrades() {
         });
         console.log('Will proceed without trading actions data');
       }
-      
+
       if (tradingActions) {
         console.log('All trading actions with alpaca_order_id:', tradingActions.filter(a => a.alpaca_order_id));
         console.log('All trading actions with analysis_id:', tradingActions.filter(a => a.analysis_id));
@@ -112,11 +124,11 @@ export default function RecentTrades() {
         tradingActions.forEach(action => {
           // Try both alpaca_order_id field and metadata->alpaca_order->id
           const alpacaOrderId = action.alpaca_order_id || action.metadata?.alpaca_order?.id;
-          console.log('Processing trading action:', { 
-            action, 
-            alpacaOrderId, 
+          console.log('Processing trading action:', {
+            action,
+            alpacaOrderId,
             alpaca_order_id_field: action.alpaca_order_id,
-            metadata_alpaca_id: action.metadata?.alpaca_order?.id 
+            metadata_alpaca_id: action.metadata?.alpaca_order?.id
           });
           if (alpacaOrderId) {
             alpacaOrderMap.set(alpacaOrderId, action);
@@ -129,7 +141,7 @@ export default function RecentTrades() {
       const decisions: AIDecision[] = recentOrders.map(order => {
         // Use filled quantity if available, otherwise use order quantity
         const quantity = parseFloat(order.filled_qty || order.qty || '0');
-        
+
         // For price, prioritize filled price, then limit price, then 0 for market orders
         let price = 0;
         if (order.filled_avg_price && parseFloat(order.filled_avg_price) > 0) {
@@ -137,19 +149,27 @@ export default function RecentTrades() {
         } else if (order.limit_price && parseFloat(order.limit_price) > 0) {
           price = parseFloat(order.limit_price);
         }
-        
+
         const totalValue = quantity * price;
 
         // Map Alpaca status to our status
-        let status: 'pending' | 'approved' | 'rejected' | 'executed';
-        if (['new', 'pending_new', 'accepted', 'pending_cancel', 'pending_replace'].includes(order.status)) {
-          status = 'approved'; // Order is placed/active
-        } else if (['filled', 'partially_filled'].includes(order.status)) {
+        let status: TradeOrderStatus | 'executed';
+        const alpacaStatus = order.status as AlpacaOrderStatus;
+        
+        if ([
+          ALPACA_ORDER_STATUS.NEW,
+          ALPACA_ORDER_STATUS.PENDING_NEW,
+          ALPACA_ORDER_STATUS.ACCEPTED,
+          ALPACA_ORDER_STATUS.PENDING_CANCEL,
+          ALPACA_ORDER_STATUS.PENDING_REPLACE
+        ].includes(alpacaStatus)) {
+          status = TRADE_ORDER_STATUS.APPROVED; // Order is placed/active
+        } else if (isAlpacaOrderFilled(alpacaStatus)) {
           status = 'executed'; // Order was filled
-        } else if (['canceled', 'expired', 'rejected'].includes(order.status)) {
-          status = 'rejected'; // Order was cancelled/rejected
+        } else if (isAlpacaOrderTerminal(alpacaStatus)) {
+          status = TRADE_ORDER_STATUS.REJECTED; // Order was cancelled/rejected
         } else {
-          status = 'pending'; // Unknown status, default to pending
+          status = TRADE_ORDER_STATUS.PENDING; // Unknown status, default to pending
         }
 
         // Get trading action data if available
@@ -179,12 +199,12 @@ export default function RecentTrades() {
           alpacaFilledQty: parseFloat(order.filled_qty || '0'),
           alpacaFilledPrice: parseFloat(order.filled_avg_price || '0')
         };
-        
-        console.log(`Decision for ${order.id}:`, { 
-          analysisId: decision.analysisId, 
-          rebalanceRequestId: decision.rebalanceRequestId 
+
+        console.log(`Decision for ${order.id}:`, {
+          analysisId: decision.analysisId,
+          rebalanceRequestId: decision.rebalanceRequestId
         });
-        
+
         return decision;
       });
 
@@ -195,10 +215,11 @@ export default function RecentTrades() {
           // Skip if this action already has an alpaca order (it's already in the decisions list)
           const hasAlpacaOrder = action.alpaca_order_id || action.metadata?.alpaca_order?.id;
           if (hasAlpacaOrder) return;
-          
+
           // Include pending and rejected orders (rejected orders should still be visible)
-          if (!['pending', 'rejected'].includes(action.status)) return;
-          
+          if (!isTradeOrderPending(action.status as TradeOrderStatus) && 
+              !isTradeOrderRejected(action.status as TradeOrderStatus)) return;
+
           const dbDecision: AIDecision = {
             id: action.id,
             symbol: action.ticker,
@@ -210,7 +231,7 @@ export default function RecentTrades() {
             timestamp: formatTimestamp(action.created_at),
             reasoning: action.reasoning || `${action.action} order created by Portfolio Manager`,
             totalValue: parseFloat(action.dollar_amount || '0'),
-            status: action.status as 'pending' | 'approved' | 'rejected' | 'executed',
+            status: action.status as TradeOrderStatus,
             executedAt: null,
             sourceType: action.source_type || 'individual_analysis',
             analysisId: action.analysis_id || undefined,
@@ -220,23 +241,23 @@ export default function RecentTrades() {
             alpacaFilledQty: 0,
             alpacaFilledPrice: 0
           };
-          
+
           dbTradeOrders.push(dbDecision);
         });
       }
 
       // Combine Alpaca orders with database trade orders
       const allDecisions = [...decisions, ...dbTradeOrders];
-      
+
       // Sort by created date (newest first)
       allDecisions.sort((a, b) => {
         // For Alpaca orders, use the alpaca order creation time
         const aOrder = alpacaOrders.find(o => o.id === a.id);
         const bOrder = alpacaOrders.find(o => o.id === b.id);
-        
+
         let aTime: Date;
         let bTime: Date;
-        
+
         if (aOrder) {
           aTime = new Date(aOrder.created_at);
         } else {
@@ -244,7 +265,7 @@ export default function RecentTrades() {
           const aAction = tradingActions?.find(action => action.id === a.id);
           aTime = new Date(aAction?.created_at || 0);
         }
-        
+
         if (bOrder) {
           bTime = new Date(bOrder.created_at);
         } else {
@@ -252,7 +273,7 @@ export default function RecentTrades() {
           const bAction = tradingActions?.find(action => action.id === b.id);
           bTime = new Date(bAction?.created_at || 0);
         }
-        
+
         return bTime.getTime() - aTime.getTime();
       });
 
@@ -310,7 +331,7 @@ export default function RecentTrades() {
       // For pending orders from database, use the trading action ID
       // For Alpaca orders, this should already be handled differently
       const isDbOrder = decision.sourceType !== 'alpaca_order' && !decision.alpacaOrderId;
-      
+
       if (isDbOrder) {
         // Call the edge function to execute the trade using the trading_actions ID
         const { data, error } = await supabase.functions.invoke('execute-trade', {
@@ -392,18 +413,22 @@ export default function RecentTrades() {
           }));
 
           // Check if order reached terminal state
-          const alpacaStatus = tradeOrder.metadata?.alpaca_order?.status;
-          if (alpacaStatus && ['filled', 'canceled', 'rejected', 'expired'].includes(alpacaStatus)) {
+          const alpacaStatus = tradeOrder.metadata?.alpaca_order?.status as AlpacaOrderStatus;
+          if (alpacaStatus && isAlpacaOrderTerminal(alpacaStatus)) {
             clearInterval(pollInterval);
 
-            if (alpacaStatus === 'filled') {
+            if (alpacaStatus === ALPACA_ORDER_STATUS.FILLED) {
               const filledPrice = tradeOrder.metadata?.alpaca_order?.filled_avg_price;
               const filledQty = tradeOrder.metadata?.alpaca_order?.filled_qty;
               toast({
                 title: "Order Filled",
                 description: `${tradeOrder.ticker} order filled at $${Number(filledPrice || 0).toFixed(2)} for ${filledQty} shares`,
               });
-            } else if (['canceled', 'rejected', 'expired'].includes(alpacaStatus)) {
+            } else if ([
+              ALPACA_ORDER_STATUS.CANCELED,
+              ALPACA_ORDER_STATUS.REJECTED,
+              ALPACA_ORDER_STATUS.EXPIRED
+            ].includes(alpacaStatus)) {
               toast({
                 title: "Order Not Filled",
                 description: `${tradeOrder.ticker} order was ${alpacaStatus}`,
@@ -427,7 +452,7 @@ export default function RecentTrades() {
     try {
       // For pending orders from database, use the trading action ID
       const isDbOrder = decision.sourceType !== 'alpaca_order' && !decision.alpacaOrderId;
-      
+
       if (isDbOrder) {
         // Call the edge function to reject the trade using the trading_actions ID
         const { data, error } = await supabase.functions.invoke('execute-trade', {
@@ -498,8 +523,10 @@ export default function RecentTrades() {
             </div>
             {/* Group and sort decisions */}
             {(() => {
-              const pendingDecisions = aiDecisions.filter(d => d.status === 'pending');
-              const processedDecisions = aiDecisions.filter(d => d.status === 'approved' || d.status === 'rejected');
+              const pendingDecisions = aiDecisions.filter(d => d.status === TRADE_ORDER_STATUS.PENDING);
+              const processedDecisions = aiDecisions.filter(d => 
+                d.status === TRADE_ORDER_STATUS.APPROVED || d.status === TRADE_ORDER_STATUS.REJECTED
+              );
               const executedDecisions = aiDecisions.filter(d => d.status === 'executed');
 
               return (
@@ -508,10 +535,10 @@ export default function RecentTrades() {
                   {pendingDecisions.length > 0 && (
                     <>
                       {pendingDecisions.map((decision) => {
-                        const isPending = decision.status === 'pending';
+                        const isPending = decision.status === TRADE_ORDER_STATUS.PENDING;
                         const isExecuted = decision.status === 'executed';
-                        const isApproved = decision.status === 'approved';
-                        const isRejected = decision.status === 'rejected';
+                        const isApproved = decision.status === TRADE_ORDER_STATUS.APPROVED;
+                        const isRejected = decision.status === TRADE_ORDER_STATUS.REJECTED;
 
                         return (
                           <div
@@ -535,8 +562,8 @@ export default function RecentTrades() {
                                 <div className="space-y-1 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-semibold text-sm">{decision.symbol}</span>
-                                    <Badge 
-                                      variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'} 
+                                    <Badge
+                                      variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'}
                                       className="text-xs"
                                     >
                                       {decision.action}
@@ -610,7 +637,7 @@ export default function RecentTrades() {
                                     </div>
                                     {decision.alpacaOrderStatus && (
                                       <Badge variant="outline" className="text-xs mt-1">
-                                        {decision.alpacaOrderStatus}
+                                        {getAlpacaStatusDisplayText(decision.alpacaOrderStatus)}
                                       </Badge>
                                     )}
                                     {decision.alpacaFilledQty && (
@@ -652,7 +679,7 @@ export default function RecentTrades() {
                                 )}
                               </div>
                             </div>
-                            
+
                             {/* Metadata - at bottom of card */}
                             <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
                               {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
@@ -688,10 +715,10 @@ export default function RecentTrades() {
                         <div className="text-xs text-muted-foreground mt-3 mb-2">Processed</div>
                       )}
                       {processedDecisions.map((decision) => {
-                        const isPending = decision.status === 'pending';
+                        const isPending = decision.status === TRADE_ORDER_STATUS.PENDING;
                         const isExecuted = decision.status === 'executed';
-                        const isApproved = decision.status === 'approved';
-                        const isRejected = decision.status === 'rejected';
+                        const isApproved = decision.status === TRADE_ORDER_STATUS.APPROVED;
+                        const isRejected = decision.status === TRADE_ORDER_STATUS.REJECTED;
 
                         // Determine card background based on status and action
                         const getCardClasses = () => {
@@ -727,8 +754,8 @@ export default function RecentTrades() {
                                 <div className="space-y-1 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-semibold text-sm">{decision.symbol}</span>
-                                    <Badge 
-                                      variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'} 
+                                    <Badge
+                                      variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'}
                                       className="text-xs"
                                     >
                                       {decision.action}
@@ -805,11 +832,7 @@ export default function RecentTrades() {
                                     variant="outline"
                                     className="h-7 px-2 text-xs border-slate-700"
                                     onClick={() => {
-                                      // Default to paper trading if apiSettings is not available
-                                      const isPaper = apiSettings?.alpaca_paper_trading ?? true;
-                                      const baseUrl = isPaper
-                                        ? 'https://paper.alpaca.markets'
-                                        : 'https://app.alpaca.markets';
+                                      const baseUrl = 'https://app.alpaca.markets';
                                       window.open(`${baseUrl}/dashboard/order/${decision.alpacaOrderId}`, '_blank');
                                     }}
                                   >
@@ -822,30 +845,34 @@ export default function RecentTrades() {
                                 {decision.alpacaOrderId && decision.alpacaOrderStatus && (
                                   <div className="flex items-center justify-center">
                                     {(() => {
-                                      const status = decision.alpacaOrderStatus.toLowerCase();
+                                      const status = decision.alpacaOrderStatus;
                                       let variant: any = "outline";
                                       let icon = null;
-                                      let displayText = decision.alpacaOrderStatus;
+                                      let displayText = getAlpacaStatusDisplayText(status);
                                       let customClasses = "";
 
-                                      if (status === 'filled') {
+                                      if (status === ALPACA_ORDER_STATUS.FILLED) {
                                         variant = "success";
                                         icon = <CheckCircle className="h-3 w-3 mr-1" />;
                                         displayText = "filled";
-                                      } else if (status === 'partially_filled') {
+                                      } else if (status === ALPACA_ORDER_STATUS.PARTIALLY_FILLED) {
                                         variant = "default";
                                         icon = <Clock className="h-3 w-3 mr-1" />;
                                         displayText = "partial filled";
                                         customClasses = "bg-blue-500 text-white border-blue-500";
-                                      } else if (['new', 'pending_new', 'accepted'].includes(status)) {
+                                      } else if ([
+                                        ALPACA_ORDER_STATUS.NEW,
+                                        ALPACA_ORDER_STATUS.PENDING_NEW,
+                                        ALPACA_ORDER_STATUS.ACCEPTED
+                                      ].includes(status)) {
                                         variant = "warning";
                                         icon = <Clock className="h-3 w-3 mr-1" />;
                                         displayText = "placed";
-                                      } else if (['canceled', 'cancelled'].includes(status)) {
+                                      } else if (status === ALPACA_ORDER_STATUS.CANCELED) {
                                         variant = "destructive";
                                         icon = <XCircle className="h-3 w-3 mr-1" />;
                                         displayText = "failed";
-                                      } else if (status === 'rejected') {
+                                      } else if (status === ALPACA_ORDER_STATUS.REJECTED) {
                                         variant = "destructive";
                                         icon = <XCircle className="h-3 w-3 mr-1" />;
                                         displayText = "rejected";
@@ -858,7 +885,7 @@ export default function RecentTrades() {
                                         >
                                           {icon}
                                           {displayText}
-                                          {decision.alpacaFilledQty > 0 && status === 'partially_filled' && (
+                                          {decision.alpacaFilledQty > 0 && status === ALPACA_ORDER_STATUS.PARTIALLY_FILLED && (
                                             <span className="ml-1">({decision.alpacaFilledQty}/{decision.quantity})</span>
                                           )}
                                         </Badge>
@@ -875,7 +902,7 @@ export default function RecentTrades() {
                                 )}
                               </div>
                             </div>
-                            
+
                             {/* Metadata - at bottom of card */}
                             <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
                               {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
@@ -918,11 +945,10 @@ export default function RecentTrades() {
                         return (
                           <div
                             key={decision.id}
-                            className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${
-                              decision.action === 'BUY' 
-                                ? 'bg-green-500/5 border-green-500/20'
-                                : 'bg-red-500/5 border-red-500/20'
-                            }`}
+                            className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${decision.action === 'BUY'
+                              ? 'bg-green-500/5 border-green-500/20'
+                              : 'bg-red-500/5 border-red-500/20'
+                              }`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex gap-3 flex-1">
@@ -938,8 +964,8 @@ export default function RecentTrades() {
                                 <div className="space-y-1 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-semibold text-sm">{decision.symbol}</span>
-                                    <Badge 
-                                      variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'} 
+                                    <Badge
+                                      variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'}
                                       className="text-xs"
                                     >
                                       {decision.action}
@@ -1027,17 +1053,17 @@ export default function RecentTrades() {
                                 {decision.alpacaOrderId && decision.alpacaOrderStatus && (
                                   <div className="flex items-center justify-center">
                                     {(() => {
-                                      const status = decision.alpacaOrderStatus.toLowerCase();
+                                      const status = decision.alpacaOrderStatus!;
                                       let variant: any = "success";
                                       let icon = <CheckCircle className="h-3 w-3 mr-1" />;
                                       let displayText = "Filled";
 
                                       // For executed decisions, show filled status
-                                      if (status === 'filled') {
+                                      if (status === ALPACA_ORDER_STATUS.FILLED) {
                                         variant = "success";
                                         icon = <CheckCircle className="h-3 w-3 mr-1" />;
                                         displayText = "filled";
-                                      } else if (status === 'partially_filled') {
+                                      } else if (status === ALPACA_ORDER_STATUS.PARTIALLY_FILLED) {
                                         variant = "default";
                                         icon = <Clock className="h-3 w-3 mr-1" />;
                                         displayText = "partial filled";
@@ -1046,11 +1072,11 @@ export default function RecentTrades() {
                                       return (
                                         <Badge
                                           variant={variant}
-                                          className={`text-xs ${status === 'partially_filled' ? 'bg-blue-500 text-white border-blue-500' : ''}`}
+                                          className={`text-xs ${status === ALPACA_ORDER_STATUS.PARTIALLY_FILLED ? 'bg-blue-500 text-white border-blue-500' : ''}`}
                                         >
                                           {icon}
                                           {displayText}
-                                          {decision.alpacaFilledQty > 0 && status === 'partially_filled' && (
+                                          {decision.alpacaFilledQty > 0 && status === ALPACA_ORDER_STATUS.PARTIALLY_FILLED && (
                                             <span className="ml-1">({decision.alpacaFilledQty}/{decision.quantity})</span>
                                           )}
                                         </Badge>
@@ -1067,7 +1093,7 @@ export default function RecentTrades() {
                                 )}
                               </div>
                             </div>
-                            
+
                             {/* Metadata - at bottom of card */}
                             <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
                               {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (

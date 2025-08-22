@@ -9,13 +9,16 @@ export const analysisConfig = {
    * Set to true AFTER deploying the Supabase Edge Functions
    * 
    * Instructions:
-   * 1. Deploy Edge Functions: supabase functions deploy analyze-stock-coordinator
+   * 1. Deploy Edge Functions: 
+   *    - supabase functions deploy analysis-coordinator
+   *    - supabase functions deploy rebalance-coordinator
    * 2. Set environment variables in Supabase dashboard
    * 3. Change this to true
    * 4. Analyses will continue running even after page refresh!
    * 
-   * Note: The analyze-stock function now redirects to analyze-stock-coordinator
-   * which handles both single stock analysis and portfolio rebalancing
+   * Note: The system now uses separate coordinators:
+   * - analysis-coordinator: handles individual stock analysis
+   * - rebalance-coordinator: handles portfolio rebalancing with parallel execution
    */
   useServerExecution: true,
 

@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { 
+import {
   Activity,
   MessageSquare,
   TrendingUp,
@@ -42,6 +42,16 @@ import MarkdownRenderer from "./MarkdownRenderer";
 import MessageRenderer from "./MessageRenderer";
 import { formatDistanceToNow } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+// Import centralized status system
+import {
+  type AnalysisStatus,
+  type RebalanceStatus,
+  ANALYSIS_STATUS,
+  REBALANCE_STATUS,
+  getStatusDisplayText,
+  isAnalysisFinished,
+  isRebalanceFinished
+} from "@/lib/statusTypes";
 
 interface AnalysisDetailModalProps {
   ticker?: string;
@@ -69,7 +79,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
     analysisDate,
     isOpen
   });
-  
+
   const { isOrderExecuted, isExecuting, handleApproveOrder, handleRejectOrder } = useOrderActions({
     analysisData,
     updateAnalysisData
@@ -118,13 +128,13 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
       .join(' ');
   };
 
-  const dialogTitle = analysisData?.ticker 
-    ? (analysisDate 
-        ? `${analysisData.ticker} - ${new Date(analysisDate).toLocaleDateString()}`
-        : analysisData.ticker)
-    : (analysisDate 
-        ? `${ticker} - ${new Date(analysisDate).toLocaleDateString()}`
-        : ticker || 'Analysis Details');
+  const dialogTitle = analysisData?.ticker
+    ? (analysisDate
+      ? `${analysisData.ticker} - ${new Date(analysisDate).toLocaleDateString()}`
+      : analysisData.ticker)
+    : (analysisDate
+      ? `${ticker} - ${new Date(analysisDate).toLocaleDateString()}`
+      : ticker || 'Analysis Details');
 
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
@@ -139,14 +149,15 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
               {analysisData && (
                 <div className="flex items-center gap-2">
                   {getStatusIcon(analysisData.status)}
-                  <span className={`text-sm capitalize ${
-                    analysisData.status === 'canceled' 
-                      ? 'text-orange-600 dark:text-orange-400' 
-                      : 'text-muted-foreground'
-                  }`}>
-                    {analysisData.status === 'canceled' ? 'Canceled by User' : analysisData.status}
+                  <span className={`text-sm capitalize ${analysisData.status === ANALYSIS_STATUS.CANCELLED || analysisData.status === REBALANCE_STATUS.CANCELLED
+                    ? 'text-orange-600 dark:text-orange-400'
+                    : 'text-muted-foreground'
+                    }`}>
+                    {analysisData.status === ANALYSIS_STATUS.CANCELLED || analysisData.status === REBALANCE_STATUS.CANCELLED
+                      ? 'Cancelled by User'
+                      : getStatusDisplayText(analysisData.status)}
                   </span>
-                  {analysisData.status === 'canceled' && analysisData.full_analysis?.canceledAt && (
+                  {(analysisData.status === ANALYSIS_STATUS.CANCELLED || analysisData.status === REBALANCE_STATUS.CANCELLED) && analysisData.full_analysis?.canceledAt && (
                     <span className="text-xs text-muted-foreground">
                       • {formatDistanceToNow(new Date(analysisData.full_analysis.canceledAt))} ago
                     </span>
@@ -159,8 +170,8 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
             {isLiveAnalysis
               ? "Real-time analysis progress and agent insights"
               : analysisDate
-              ? `Historical analysis from ${new Date(analysisDate).toLocaleDateString()}`
-              : "Analysis details and agent insights"}
+                ? `Historical analysis from ${new Date(analysisDate).toLocaleDateString()}`
+                : "Analysis details and agent insights"}
           </DialogDescription>
         </DialogHeader>
 
@@ -181,12 +192,12 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
               {(() => {
                 // Determine which decision to display based on analysis type
                 const isRebalanceAnalysis = !!analysisData.rebalance_request_id;
-                const displayDecision = isRebalanceAnalysis 
-                  ? analysisData.decision 
+                const displayDecision = isRebalanceAnalysis
+                  ? analysisData.decision
                   : (analysisData.agent_insights?.portfolioManager?.finalDecision?.action || analysisData.decision);
-                
+
                 const shouldShow = displayDecision || analysisData.confidence !== undefined || analysisData.startedAt;
-                
+
                 return shouldShow && (
                   <div className="px-6 py-4 bg-muted/50 border-b">
                     <div className="flex items-center justify-between">
@@ -213,40 +224,40 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                           Completed in {Math.round((new Date(analysisData.completedAt).getTime() - new Date(analysisData.startedAt).getTime()) / 1000)}s
                         </span>
                       )}
-                      
-                        {(displayDecision || analysisData?.status === 'canceled') && (
-                          <Badge 
-                            variant={getDecisionVariant(analysisData.status === 'canceled' ? 'CANCELED' : displayDecision)} 
-                            className="text-sm px-3 py-1 flex items-center gap-1"
-                          >
-                            {getDecisionIcon(analysisData.status === 'canceled' ? 'CANCELED' : displayDecision)}
-                            {analysisData.status === 'canceled' ? 'CANCELED' : displayDecision}
-                          </Badge>
+
+                      {(displayDecision || analysisData?.status === ANALYSIS_STATUS.CANCELLED || analysisData?.status === REBALANCE_STATUS.CANCELLED) && (
+                        <Badge
+                          variant={getDecisionVariant((analysisData.status === ANALYSIS_STATUS.CANCELLED || analysisData.status === REBALANCE_STATUS.CANCELLED) ? 'CANCELED' : displayDecision)}
+                          className="text-sm px-3 py-1 flex items-center gap-1"
+                        >
+                          {getDecisionIcon((analysisData.status === ANALYSIS_STATUS.CANCELLED || analysisData.status === REBALANCE_STATUS.CANCELLED) ? 'CANCELED' : displayDecision)}
+                          {(analysisData.status === ANALYSIS_STATUS.CANCELLED || analysisData.status === REBALANCE_STATUS.CANCELLED) ? 'CANCELED' : displayDecision}
+                        </Badge>
                       )}
+                    </div>
                   </div>
-                </div>
                 );
               })()}
 
               <Tabs defaultValue={isLiveAnalysis ? "actions" : "insights"} className="flex-1">
                 <div className="px-6 pt-4 pb-4">
                   <TabsList className="grid w-full grid-cols-3 max-w-3xl mx-auto">
-                    <TabsTrigger 
-                      value="actions" 
+                    <TabsTrigger
+                      value="actions"
                       className="flex items-center gap-2"
                     >
                       <CheckSquare className="w-4 h-4" />
                       Actions
                     </TabsTrigger>
-                    <TabsTrigger 
-                      value="workflow" 
+                    <TabsTrigger
+                      value="workflow"
                       className="flex items-center gap-2"
                     >
                       <Activity className="w-4 h-4" />
                       Workflow
                     </TabsTrigger>
-                    <TabsTrigger 
-                      value="insights" 
+                    <TabsTrigger
+                      value="insights"
                       className="flex items-center gap-2"
                     >
                       <Brain className="w-4 h-4" />
@@ -258,7 +269,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                 <ScrollArea className="h-[calc(90vh-280px)]">
                   <div className="px-6 pb-6">
                     <TabsContent value="actions" className="mt-6 space-y-4">
-                      <AnalysisActionsTab 
+                      <AnalysisActionsTab
                         analysisData={analysisData}
                         handleApproveOrder={handleApproveOrder}
                         handleRejectOrder={handleRejectOrder}
@@ -270,7 +281,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
 
                     <TabsContent value="workflow" className="mt-6">
                       {(analysisData.workflowSteps?.length > 0 || analysisData.full_analysis) ? (
-                        <WorkflowStepsLayout 
+                        <WorkflowStepsLayout
                           analysisData={analysisData}
                           onApproveOrder={handleApproveOrder}
                           onRejectOrder={handleRejectOrder}
@@ -285,7 +296,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                     </TabsContent>
 
                     <TabsContent value="insights" className="mt-6 space-y-4">
-                      <AnalysisInsightsTab 
+                      <AnalysisInsightsTab
                         analysisData={analysisData}
                         getMessageIcon={getMessageIcon}
                         getAgentIcon={getAgentIcon}

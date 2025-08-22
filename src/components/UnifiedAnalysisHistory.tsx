@@ -34,6 +34,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  type AnalysisStatus,
+  ANALYSIS_STATUS,
+  convertLegacyAnalysisStatus,
+  isAnalysisActive,
+  isAnalysisFinished,
+  getStatusDisplayText
+} from "@/lib/statusTypes";
 
 interface AnalysisHistoryItem {
   id: string;
@@ -51,6 +59,7 @@ interface AnalysisHistoryItem {
   };
   full_analysis?: any;
   created_at: string;
+  analysis_status?: AnalysisStatus | number; // Support both new and legacy formats
 }
 
 interface RunningAnalysisItem {
@@ -107,29 +116,31 @@ export default function UnifiedAnalysisHistory() {
       for (const item of data || []) {
         // Use analysis_status field if available, otherwise fall back to old logic
         if ('analysis_status' in item) {
-          // Use the new status field: -1=error/canceled, 0=in progress, 1=complete
-          if (item.analysis_status === 0) {
+          // Convert legacy numeric status to new string format
+          const status: AnalysisStatus = typeof item.analysis_status === 'number' 
+            ? convertLegacyAnalysisStatus(item.analysis_status)
+            : item.analysis_status as AnalysisStatus;
+          
+          if (status === ANALYSIS_STATUS.RUNNING || status === ANALYSIS_STATUS.PENDING) {
             runningAnalyses.push({
               id: item.id,
               ticker: item.ticker,
               created_at: item.created_at
             });
-          } else if (item.analysis_status === 1) {
+          } else if (status === ANALYSIS_STATUS.COMPLETED) {
             completedAnalyses.push(item);
-          } else if (item.analysis_status === -1) {
+          } else if (status === ANALYSIS_STATUS.ERROR || status === ANALYSIS_STATUS.CANCELLED) {
             // Show canceled/error analyses in the canceled section
-            // Check if it was explicitly canceled or just an error
-            const isCanceled = item.is_canceled === true;
             canceledAnalyses.push({
               ...item,
-              decision: isCanceled ? 'CANCELED' : (item.decision || 'ERROR'),
+              decision: status === ANALYSIS_STATUS.CANCELLED ? 'CANCELED' : (item.decision || 'ERROR'),
               confidence: item.confidence || 0
             });
           }
         } else {
           // Fall back to old logic for backward compatibility
           const hasAgentInsights = item.agent_insights && Object.keys(item.agent_insights).length > 0;
-          const isRunning = item.full_analysis?.status === 'running' || 
+          const isRunning = item.analysis_status === ANALYSIS_STATUS.RUNNING || 
                            (item.confidence === 0 && !hasAgentInsights);
           
           if (isRunning) {
@@ -220,11 +231,9 @@ export default function UnifiedAnalysisHistory() {
       const { error } = await supabase
         .from('analysis_history')
         .update({
-          is_canceled: true,
-          analysis_status: -1, // Set to error/canceled status
+          analysis_status: ANALYSIS_STATUS.CANCELLED,
           full_analysis: {
             ...currentAnalysis?.full_analysis,
-            status: 'canceled',
             canceledAt: new Date().toISOString(),
             currentPhase: 'Canceled by user',
             messages: [

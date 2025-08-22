@@ -17,6 +17,14 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+// Import centralized status system
+import {
+  type AnalysisStatus,
+  type RebalanceStatus,
+  ANALYSIS_STATUS,
+  REBALANCE_STATUS,
+  getStatusDisplayText
+} from "@/lib/statusTypes";
 
 interface WorkflowStepsLayoutProps {
   analysisData: any;
@@ -97,54 +105,64 @@ export default function WorkflowStepsLayout({
   }
 
   const getAgentStatus = (agentKey: string, stepId?: string) => {
-    // Special handling for research phase agents
-    if (stepId === 'research') {
-      // For research phase, only mark Bull/Bear as complete when Research Manager is done
-      if (agentKey === 'bullResearcher' || agentKey === 'bearResearcher') {
-        // Check if Research Manager has completed (which means all debate rounds are done)
-        if (analysisData.agent_insights?.researchManager) {
-          return 'completed';
-        }
-        // Check if there's any debate activity
-        if (analysisData.agent_insights?.researchDebate && analysisData.agent_insights.researchDebate.length > 0) {
-          return 'running';
-        }
-        // Check if individual insights exist (first round running)
-        if (analysisData.agent_insights?.[agentKey]) {
-          return 'running';
-        }
-      } else if (agentKey === 'researchManager') {
-        // Research Manager is only complete when it has insights
-        if (analysisData.agent_insights?.researchManager) {
-          return 'completed';
-        }
-        // If debate rounds exist but no manager yet, it's pending
-        if (analysisData.agent_insights?.researchDebate && analysisData.agent_insights.researchDebate.length > 0) {
-          return 'pending';
-        }
-      }
-    }
-
-    // Default behavior for other agents
+    // Check if analysis is cancelled
+    const isAnalysisCancelled = analysisData.status === ANALYSIS_STATUS.CANCELLED || 
+        analysisData.status === REBALANCE_STATUS.CANCELLED ||
+        analysisData.is_canceled;
+    
+    // HYBRID APPROACH: Check agent_insights FIRST for completion (most reliable), then workflow steps for running status
+    
+    // First check agent_insights for completion and errors (most reliable)
     if (analysisData.agent_insights) {
       // Check for error conditions first
       if (analysisData.agent_insights[agentKey + '_error']) {
         return 'error';
       }
-      // Then check for normal completion
+      // Then check for normal completion - allow completed agents to show even if cancelled
       if (analysisData.agent_insights[agentKey]) {
         return 'completed';
       }
     }
-    // Check in workflow steps if available
+    
+    // Then check workflow steps for running status (when agents are actively working)
     if (analysisData.workflowSteps) {
       for (const step of analysisData.workflowSteps) {
-        const agent = step.agents?.find((a: any) => a.name.toLowerCase().replace(/\s+/g, '').includes(agentKey.toLowerCase().replace(/analyst|researcher|manager/g, '').trim()));
+        // Find the agent in workflow steps by matching names
+        const agent = step.agents?.find((a: any) => {
+          const agentNameLower = a.name.toLowerCase().replace(/\s+/g, '');
+          const keyLower = agentKey.toLowerCase();
+          
+          // Direct name matching patterns
+          if (agentNameLower.includes('market') && keyLower.includes('market')) return true;
+          if (agentNameLower.includes('news') && keyLower.includes('news')) return true;
+          if (agentNameLower.includes('social') && keyLower.includes('social')) return true;
+          if (agentNameLower.includes('fundamentals') && keyLower.includes('fundamentals')) return true;
+          if (agentNameLower.includes('bullresearcher') && keyLower.includes('bull')) return true;
+          if (agentNameLower.includes('bearresearcher') && keyLower.includes('bear')) return true;
+          if (agentNameLower.includes('researchmanager') && keyLower.includes('researchmanager')) return true;
+          if (agentNameLower.includes('trader') && keyLower.includes('trader')) return true;
+          if (agentNameLower.includes('risky') && keyLower.includes('risky')) return true;
+          if (agentNameLower.includes('safe') && keyLower.includes('safe')) return true;
+          if (agentNameLower.includes('neutral') && keyLower.includes('neutral')) return true;
+          if (agentNameLower.includes('riskmanager') && keyLower.includes('riskmanager')) return true;
+          if (agentNameLower.includes('portfoliomanager') && keyLower.includes('portfolio')) return true;
+          
+          return false;
+        });
+        
         if (agent) {
-          return agent.status || 'pending';
+          // If cancelled, convert 'running' or 'processing' to 'pending', but keep 'completed'
+          if (isAnalysisCancelled && (agent.status === 'running' || agent.status === 'processing')) {
+            return 'pending';
+          }
+          // Only return workflow status if it's an active state (running/processing/error)
+          if (agent.status === 'running' || agent.status === 'processing' || agent.status === 'error') {
+            return agent.status;
+          }
         }
       }
     }
+    
     return 'pending';
   };
 
@@ -175,7 +193,9 @@ export default function WorkflowStepsLayout({
           ? analysisData.decision
           : (analysisData.agent_insights?.portfolioManager?.finalDecision?.action || analysisData.decision);
 
-        const shouldShow = displayDecision && displayDecision !== 'CANCELED' && analysisData.status === 'completed';
+        const shouldShow = displayDecision && displayDecision !== 'CANCELED' && 
+          (analysisData.status === ANALYSIS_STATUS.COMPLETED || analysisData.status === REBALANCE_STATUS.COMPLETED) &&
+          analysisData.status !== ANALYSIS_STATUS.CANCELLED && analysisData.status !== REBALANCE_STATUS.CANCELLED;
 
         return shouldShow && (
           <div className={`rounded-lg border p-6 ${displayDecision === 'BUY'
@@ -304,14 +324,24 @@ export default function WorkflowStepsLayout({
 
       {workflowSteps.map((step, stepIndex) => {
         const Icon = step.icon;
-        const completedAgents = step.agents.filter(agent => getAgentStatus(agent.key, step.id) === 'completed').length;
-        const runningAgents = step.agents.filter(agent => getAgentStatus(agent.key, step.id) === 'running').length;
-        const errorAgents = step.agents.filter(agent => getAgentStatus(agent.key, step.id) === 'error').length;
+        
+        // Check if overall analysis is cancelled first
+        const isAnalysisCancelled = analysisData.status === ANALYSIS_STATUS.CANCELLED || 
+                                   analysisData.status === REBALANCE_STATUS.CANCELLED ||
+                                   analysisData.is_canceled;
+        
+        // Use unified agent status checking for all step-level calculations
+        const agentStatuses = step.agents.map(agent => getAgentStatus(agent.key, step.id));
+        const completedAgents = agentStatuses.filter(status => status === 'completed').length;
+        const runningAgents = agentStatuses.filter(status => status === 'running' || status === 'processing').length;
+        const errorAgents = agentStatuses.filter(status => status === 'error').length;
         const totalAgents = step.agents.length;
+        
+        // Step status with cancellation awareness
         const isCompleted = completedAgents === totalAgents;
         const hasErrors = errorAgents > 0;
-        const isActive = completedAgents > 0 || runningAgents > 0 || hasErrors;
-        const isPending = !isActive && !isCompleted;
+        // If cancelled, don't show active state unless agents are actually completed
+        const isActive = !isAnalysisCancelled && (runningAgents > 0 || (completedAgents > 0 && !isCompleted));
         const progressPercentage = Math.round((completedAgents / totalAgents) * 100);
         const timestamp = getStepTimestamp(step.id);
 
@@ -368,17 +398,12 @@ export default function WorkflowStepsLayout({
                         </div>
                         <p className="text-sm text-muted-foreground">{step.description}</p>
 
-                        {/* Special handling for Research phase - show debate rounds */}
+                        {/* Research phase debate rounds info */}
                         {step.id === 'research' && analysisData.agent_insights?.researchDebate && (
                           <div className="flex items-center gap-2 text-sm">
                             <Badge variant="outline" className="text-xs">
                               {analysisData.agent_insights.researchDebate.length} Debate Round{analysisData.agent_insights.researchDebate.length !== 1 ? 's' : ''}
                             </Badge>
-                            {!analysisData.agent_insights?.researchManager && (
-                              <span className="text-muted-foreground">
-                                (Running debate rounds...)
-                              </span>
-                            )}
                           </div>
                         )}
 
@@ -386,15 +411,7 @@ export default function WorkflowStepsLayout({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">
-                              {step.id === 'research' && !isCompleted ? (
-                                <>
-                                  {analysisData.agent_insights?.researchManager ? '3/3 agents' :
-                                    analysisData.agent_insights?.researchDebate ? 'Debating...' :
-                                      `${completedAgents}/${totalAgents} agents`}
-                                </>
-                              ) : (
-                                `${completedAgents}/${totalAgents} agents`
-                              )}
+                              {completedAgents}/{totalAgents} agents
                             </span>
                             <span className={isCompleted ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
                               {progressPercentage}%
@@ -471,9 +488,9 @@ export default function WorkflowStepsLayout({
                           <Badge
                             variant={
                               status === 'completed' ? 'completed' :
-                              status === 'error' ? 'error' :
-                              status === 'running' ? 'running' :
-                              'pending' as any
+                                status === 'error' ? 'error' :
+                                  status === 'running' ? 'running' :
+                                    'pending' as any
                             }
                             className="text-xs"
                           >
@@ -481,7 +498,7 @@ export default function WorkflowStepsLayout({
                             {status === 'error' && <XCircle className="w-3 h-3 mr-1" />}
                             {status === 'running' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
                             {status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                            {status === 'error' ? 'Failed' : status.charAt(0).toUpperCase() + status.slice(1)}
+                            {status === 'error' ? 'Failed' : (status.charAt(0).toUpperCase() + status.slice(1))}
                           </Badge>
                         </div>
                       </div>
@@ -509,30 +526,39 @@ export default function WorkflowStepsLayout({
             </p>
           </div>
           <div>
-            {analysisData.status === 'completed' && (
-              <Badge variant="completed" className="text-sm">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Complete
-              </Badge>
-            )}
-            {analysisData.status === 'running' && (
-              <Badge variant="running" className="text-sm">
-                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                In Progress
-              </Badge>
-            )}
-            {analysisData.status === 'error' && (
-              <Badge variant="error" className="text-sm">
-                <XCircle className="w-3 h-3 mr-1" />
-                Error
-              </Badge>
-            )}
-            {analysisData.status === 'canceled' && (
-              <Badge variant="outline" className="text-sm">
-                <XCircle className="w-3 h-3 mr-1" />
-                Canceled
-              </Badge>
-            )}
+            {(() => {
+              const status = analysisData.status;
+              if (status === ANALYSIS_STATUS.COMPLETED || status === REBALANCE_STATUS.COMPLETED) {
+                return (
+                  <Badge variant="completed" className="text-sm">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Complete
+                  </Badge>
+                );
+              } else if (status === ANALYSIS_STATUS.RUNNING || status === REBALANCE_STATUS.RUNNING) {
+                return (
+                  <Badge variant="running" className="text-sm">
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    In Progress
+                  </Badge>
+                );
+              } else if (status === ANALYSIS_STATUS.ERROR || status === REBALANCE_STATUS.ERROR) {
+                return (
+                  <Badge variant="error" className="text-sm">
+                    <XCircle className="w-3 h-3 mr-1" />
+                    Error
+                  </Badge>
+                );
+              } else if (status === ANALYSIS_STATUS.CANCELLED || status === REBALANCE_STATUS.CANCELLED) {
+                return (
+                  <Badge variant="outline" className="text-sm">
+                    <XCircle className="w-3 h-3 mr-1" />
+                    Canceled
+                  </Badge>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
       </div>

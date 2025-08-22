@@ -39,6 +39,14 @@ import {
   TrendingDown
 } from 'lucide-react';
 import RebalanceDetailModal from './RebalanceDetailModal';
+import {
+  type RebalanceStatus,
+  REBALANCE_STATUS,
+  convertLegacyRebalanceStatus,
+  isRebalanceActive,
+  isRebalanceFinished,
+  getStatusDisplayText
+} from "@/lib/statusTypes";
 
 interface RebalanceAnalysis {
   id: string;
@@ -51,7 +59,7 @@ interface RebalanceAnalysis {
 interface RebalanceRequest {
   id: string;
   user_id: string;
-  status: 'initializing' | 'analyzing' | 'planning' | 'pending_approval' | 'executing' | 'completed' | 'cancelled' | 'failed' | 'pending_trades' | 'portfolio_management_started';
+  status: RebalanceStatus | string; // Support both new RebalanceStatus and legacy strings
   created_at: string;
   total_stocks: number;
   stocks_analyzed: number;
@@ -136,21 +144,20 @@ export default function RebalanceHistoryTable() {
       const cancelled: RebalanceRequest[] = [];
 
       for (const item of data || []) {
-        // Handle failed status explicitly - show in cancelled/failed section
-        if (item.status === 'failed') {
+        // Convert legacy status to new format
+        const status: RebalanceStatus = convertLegacyRebalanceStatus(item.status);
+        
+        if (status === REBALANCE_STATUS.ERROR || status === REBALANCE_STATUS.CANCELLED) {
           cancelled.push(item);
-        } else if (item.status === 'cancelled') {
-          cancelled.push(item);
-        } else if ((item.status === 'pending_approval' || item.status === 'pending_trades') && item.rebalance_plan) {
-          // If status is pending_approval or pending_trades with a rebalance plan, treat as completed
+        } else if (status === REBALANCE_STATUS.AWAITING_APPROVAL && item.rebalance_plan) {
+          // If status is awaiting approval with a rebalance plan, treat as completed
           completed.push(item);
-        } else if (['initializing', 'analyzing', 'planning', 'executing', 'portfolio_management_started'].includes(item.status)) {
+        } else if (status === REBALANCE_STATUS.RUNNING || 
+                   (status === REBALANCE_STATUS.AWAITING_APPROVAL && !item.rebalance_plan)) {
+          // Running or awaiting approval without plan (still analyzing)
           running.push(item);
-        } else if (item.status === 'completed' || item.status === 'no_action_needed') {
+        } else if (status === REBALANCE_STATUS.COMPLETED) {
           completed.push(item);
-        } else if (item.status === 'pending_approval' || item.status === 'pending_trades') {
-          // If we're here, there's no rebalance plan yet, so it's still running
-          running.push(item);
         }
       }
 
@@ -234,7 +241,7 @@ export default function RebalanceHistoryTable() {
       }
 
       // Only cancel if it's in a cancellable state
-      if (['cancelled', 'completed', 'failed'].includes(checkData.status)) {
+      if (isRebalanceFinished(convertLegacyRebalanceStatus(checkData.status))) {
         toast({
           title: 'Info',
           description: `Rebalance is already ${checkData.status}`,
@@ -254,8 +261,7 @@ export default function RebalanceHistoryTable() {
         const { error: updateError } = await supabase
           .from('rebalance_requests')
           .update({
-            status: 'cancelled',
-            is_canceled: true  // Set the boolean flag for coordinator to check
+            status: REBALANCE_STATUS.CANCELLED
           })
           .eq('id', selectedRebalanceId)
           .eq('user_id', user.id);
@@ -286,21 +292,20 @@ export default function RebalanceHistoryTable() {
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
+    // Convert legacy status to new format for consistent icon display
+    const normalizedStatus = convertLegacyRebalanceStatus(status);
+    
+    switch (normalizedStatus) {
+      case REBALANCE_STATUS.COMPLETED:
         return <CheckCircle className="h-3 w-3" />;
-      case 'cancelled':
+      case REBALANCE_STATUS.CANCELLED:
         return <XCircle className="h-3 w-3" />;
-      case 'failed':
+      case REBALANCE_STATUS.ERROR:
         return <AlertCircle className="h-3 w-3" />;
-      case 'analyzing':
-      case 'initializing':
-      case 'planning':
-      case 'portfolio_management_started':
+      case REBALANCE_STATUS.RUNNING:
         return <Loader2 className="h-3 w-3 animate-spin" />;
-      case 'pending_trades':
-      case 'pending_approval':
-      case 'executing':
+      case REBALANCE_STATUS.AWAITING_APPROVAL:
+      case REBALANCE_STATUS.PENDING:
         return <Clock className="h-3 w-3" />;
       default:
         return <Clock className="h-3 w-3" />;
@@ -308,19 +313,18 @@ export default function RebalanceHistoryTable() {
   };
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case 'completed':
+    // Convert legacy status to new format for consistent variant display
+    const normalizedStatus = convertLegacyRebalanceStatus(status);
+    
+    switch (normalizedStatus) {
+      case REBALANCE_STATUS.COMPLETED:
         return 'default';
-      case 'cancelled':
-      case 'failed':
+      case REBALANCE_STATUS.CANCELLED:
+      case REBALANCE_STATUS.ERROR:
         return 'destructive';
-      case 'analyzing':
-      case 'initializing':
-      case 'pending_trades':
-      case 'planning':
-      case 'pending_approval':
-      case 'executing':
-      case 'portfolio_management_started':
+      case REBALANCE_STATUS.RUNNING:
+      case REBALANCE_STATUS.AWAITING_APPROVAL:
+      case REBALANCE_STATUS.PENDING:
         return 'secondary';
       default:
         return 'outline';
@@ -395,7 +399,7 @@ export default function RebalanceHistoryTable() {
 
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            {(item.status === 'analyzing' || item.status === 'initializing' || item.status === 'planning' || item.status === 'portfolio_management_started') && (
+                            {isRebalanceActive(convertLegacyRebalanceStatus(item.status)) && (
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                                   <div
@@ -565,8 +569,8 @@ export default function RebalanceHistoryTable() {
                           <span className="font-semibold">Portfolio Rebalance</span>
                           <Badge variant="destructive">
                             <span className="flex items-center gap-1">
-                              {item.status === 'failed' ? <AlertCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                              {item.status === 'failed' ? 'Failed' : 'Cancelled'}
+                              {getStatusIcon(item.status)}
+                              {getStatusDisplayText(convertLegacyRebalanceStatus(item.status))}
                             </span>
                           </Badge>
                         </div>
@@ -577,7 +581,7 @@ export default function RebalanceHistoryTable() {
 
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          {item.status === 'failed'
+                          {convertLegacyRebalanceStatus(item.status) === REBALANCE_STATUS.ERROR
                             ? (item.error_message || item.rebalance_plan?.error || item.rebalance_plan?.errorDetails || 'Rebalance failed')
                             : (item.error_message || 'Rebalance was cancelled by user')}
                         </span>
@@ -652,7 +656,7 @@ export default function RebalanceHistoryTable() {
                           <Badge variant={getStatusVariant(item.status)}>
                             <span className="flex items-center gap-1">
                               {getStatusIcon(item.status)}
-                              {item.status === 'failed' ? 'Failed' : item.status.replace('_', ' ')}
+                              {getStatusDisplayText(convertLegacyRebalanceStatus(item.status))}
                             </span>
                           </Badge>
                           {item.total_stocks > 0 && (
@@ -668,7 +672,7 @@ export default function RebalanceHistoryTable() {
 
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          {(item.status === 'analyzing' || item.status === 'initializing' || item.status === 'planning') && (
+                          {isRebalanceActive(convertLegacyRebalanceStatus(item.status)) && (
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                                 <div
@@ -843,8 +847,8 @@ export default function RebalanceHistoryTable() {
                           <span className="font-semibold">Portfolio Rebalance</span>
                           <Badge variant="destructive">
                             <span className="flex items-center gap-1">
-                              {item.status === 'failed' ? <AlertCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                              {item.status === 'failed' ? 'Failed' : 'Cancelled'}
+                              {getStatusIcon(item.status)}
+                              {getStatusDisplayText(convertLegacyRebalanceStatus(item.status))}
                             </span>
                           </Badge>
                         </div>
@@ -855,7 +859,7 @@ export default function RebalanceHistoryTable() {
 
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          {item.status === 'failed'
+                          {convertLegacyRebalanceStatus(item.status) === REBALANCE_STATUS.ERROR
                             ? (item.error_message || item.rebalance_plan?.error || item.rebalance_plan?.errorDetails || 'Rebalance failed')
                             : (item.error_message || 'Rebalance was cancelled by user')}
                         </span>

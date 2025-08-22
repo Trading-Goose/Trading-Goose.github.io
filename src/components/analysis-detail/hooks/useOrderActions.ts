@@ -2,6 +2,15 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+// Import centralized status system
+import {
+  type TradeOrderStatus,
+  type AlpacaOrderStatus,
+  TRADE_ORDER_STATUS,
+  ALPACA_ORDER_STATUS,
+  isAlpacaOrderTerminal,
+  isAlpacaOrderFilled
+} from "@/lib/statusTypes";
 
 interface UseOrderActionsProps {
   analysisData: any;
@@ -47,15 +56,16 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
           }
 
           // Check if order reached terminal state
-          if (['filled', 'canceled', 'rejected', 'expired'].includes(tradeOrder.alpaca_order_status)) {
+          const alpacaStatus = tradeOrder.alpaca_order_status as AlpacaOrderStatus;
+          if (isAlpacaOrderTerminal(alpacaStatus)) {
             clearInterval(pollInterval);
 
-            if (tradeOrder.alpaca_order_status === 'filled') {
+            if (alpacaStatus === ALPACA_ORDER_STATUS.FILLED) {
               toast({
                 title: "Order Filled",
                 description: `${analysisData.ticker} order filled at $${tradeOrder.alpaca_filled_price?.toFixed(2)} for ${tradeOrder.alpaca_filled_qty} shares`,
               });
-            } else if (['canceled', 'rejected', 'expired'].includes(tradeOrder.alpaca_order_status)) {
+            } else if ([ALPACA_ORDER_STATUS.CANCELED, ALPACA_ORDER_STATUS.REJECTED, ALPACA_ORDER_STATUS.EXPIRED].includes(alpacaStatus)) {
               toast({
                 title: "Order Not Filled",
                 description: `${analysisData.ticker} order was ${tradeOrder.alpaca_order_status}`,
@@ -128,7 +138,7 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
         if (analysisData.tradeOrder) {
           const updatedTradeOrder = {
             ...analysisData.tradeOrder,
-            status: 'approved',
+            status: TRADE_ORDER_STATUS.APPROVED,
             alpacaOrderId: data.alpacaOrderId,
             alpacaOrderStatus: data.alpacaStatus
           };
@@ -212,7 +222,7 @@ export function useOrderActions({ analysisData, updateAnalysisData }: UseOrderAc
         if (analysisData.tradeOrder) {
           const updatedTradeOrder = {
             ...analysisData.tradeOrder,
-            status: 'rejected'
+            status: TRADE_ORDER_STATUS.REJECTED
           };
           updateAnalysisData({
             tradeOrder: updatedTradeOrder

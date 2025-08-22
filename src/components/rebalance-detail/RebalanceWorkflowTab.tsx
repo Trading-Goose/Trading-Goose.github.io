@@ -1,0 +1,397 @@
+import { TabsContent } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import {
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Loader2,
+  Activity,
+  BarChart3,
+  Brain,
+  Shield,
+  XCircle
+} from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+
+interface RebalanceWorkflowTabProps {
+  workflowData: any;
+}
+
+// Workflow Steps Component
+function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
+  const getStepStatus = (step: any) => {
+    // Check if step should be skipped
+    if (step.id === 'threshold' && workflowData.skipThresholdCheck) {
+      return 'skipped';
+    }
+    if (step.id === 'opportunity' && workflowData.skipOpportunityAgent) {
+      return 'skipped';
+    }
+    // Check for error status in step data
+    if (step.data?.error || step.status === 'error') {
+      return 'error';
+    }
+    return step.status || 'pending';
+  };
+
+  const getAgentStatus = (agentKey: string, stockAnalysis?: any) => {
+    // The agents object contains the actual status for each agent
+    if (stockAnalysis && stockAnalysis.agents) {
+      const status = stockAnalysis.agents[agentKey];
+      return status || 'pending';
+    }
+    return 'pending';
+  };
+
+  return (
+    <div className="space-y-6">
+      {workflowData.workflowSteps?.map((step: any) => {
+        const Icon = step.icon || Activity;
+        const stepStatus = getStepStatus(step);
+        const isSkipped = stepStatus === 'skipped';
+        const isCompleted = stepStatus === 'completed';
+        const isRunning = stepStatus === 'running';
+        const isPending = stepStatus === 'pending';
+        const isError = stepStatus === 'error';
+
+        // Don't show skipped steps
+        if (isSkipped) return null;
+
+        return (
+          <div key={step.id} className="relative">
+            <div className="space-y-4">
+              {/* Step Header */}
+              <div className={`rounded-lg border p-4 transition-all ${isCompleted
+                ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
+                : isError
+                  ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5'
+                  : isRunning
+                    ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5'
+                    : 'border-border'
+                }`}>
+                <div className="relative">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4 flex-1">
+                      {/* Step Icon */}
+                      <div className={`p-3 rounded-lg ${isCompleted
+                        ? 'bg-green-500/10 dark:bg-green-500/5 text-green-600 dark:text-green-400'
+                        : isError
+                          ? 'bg-red-500/10 dark:bg-red-500/5 text-red-600 dark:text-red-400'
+                          : isRunning
+                            ? 'bg-yellow-500/10 dark:bg-yellow-500/5 text-yellow-600 dark:text-yellow-400'
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                        <Icon className="w-6 h-6" />
+                      </div>
+
+                      {/* Step Details */}
+                      <div className="flex-1 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-semibold">{step.title}</h3>
+                          {isCompleted && (
+                            <Badge variant="completed" className="text-xs">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Complete
+                            </Badge>
+                          )}
+                          {isRunning && (
+                            <Badge variant="running" className="text-xs">
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              In Progress
+                            </Badge>
+                          )}
+                          {isPending && (
+                            <Badge variant="pending" className="text-xs">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Pending
+                            </Badge>
+                          )}
+                          {isError && (
+                            <Badge variant="error" className="text-xs">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Failed
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{step.description}</p>
+
+                        {/* Show error details if step failed */}
+                        {isError && step.data?.error && (
+                          <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded text-sm">
+                            <p className="text-destructive font-medium">Error:</p>
+                            <p className="text-muted-foreground mt-1">
+                              {(() => {
+                                let errorMsg = step.data.error;
+                                // Try to extract cleaner error message
+                                if (typeof errorMsg === 'string' && errorMsg.includes('{') && errorMsg.includes('}')) {
+                                  try {
+                                    const jsonMatch = errorMsg.match(/"message"\s*:\s*"([^"]+)"/i);
+                                    if (jsonMatch) {
+                                      return jsonMatch[1];
+                                    } else if (errorMsg.includes('Insufficient credits')) {
+                                      const creditMatch = errorMsg.match(/Insufficient credits[^"\}]*/i);
+                                      if (creditMatch) {
+                                        return creditMatch[0];
+                                      }
+                                    }
+                                  } catch (e) {
+                                    // Fall through to return original
+                                  }
+                                }
+                                return errorMsg;
+                              })()}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Progress for stock analysis step */}
+                        {step.id === 'analysis' && step.stockAnalyses?.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                {step.stockAnalyses.filter((sa: any) =>
+                                  sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
+                                ).length}/{step.stockAnalyses.length} stocks analyzed
+                              </span>
+                              <span className={isCompleted ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
+                                {Math.round((step.stockAnalyses.filter((sa: any) =>
+                                  sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
+                                ).length / step.stockAnalyses.length) * 100)}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${isCompleted
+                                  ? 'bg-green-500'
+                                  : isRunning
+                                    ? 'bg-yellow-500'
+                                    : 'bg-muted-foreground/30'
+                                  }`}
+                                style={{
+                                  width: `${Math.round((step.stockAnalyses.filter((sa: any) =>
+                                    sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
+                                  ).length / step.stockAnalyses.length) * 100)}%`
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Timestamp */}
+                    {step.completedAt && (
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">
+                          {isCompleted ? 'Completed' : 'Started'}
+                        </p>
+                        <p className="text-sm">
+                          {formatDistanceToNow(new Date(step.completedAt), { addSuffix: true })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock Analysis Details - Show expanded view for analysis step */}
+              {step.id === 'analysis' && step.stockAnalyses && (
+                <div className="space-y-4 pl-14">
+                  {step.stockAnalyses.map((stockAnalysis: any) => {
+                    // Define workflow steps and determine their status based on agent completion
+                    const getWorkflowStepStatus = (agentKeys: string[]) => {
+                      const agentStatuses = agentKeys.map(key => stockAnalysis.agents?.[key] || 'pending');
+                      const hasError = agentStatuses.some(s => s === 'error' || s === 'failed');
+                      const hasCompleted = agentStatuses.some(s => s === 'completed');
+                      const hasRunning = agentStatuses.some(s => s === 'running');
+                      const allCompleted = agentStatuses.every(s => s === 'completed');
+
+                      if (hasError) return 'error';
+                      if (allCompleted && agentStatuses.length > 0) return 'completed';
+                      if (hasCompleted || hasRunning) return 'running';
+                      return 'pending';
+                    };
+
+                    // Get research and other steps from full_analysis workflow steps
+                    const fullAnalysis = stockAnalysis.fullAnalysis || {};
+                    const fullWorkflowSteps = fullAnalysis.workflowSteps || [];
+
+                    const getStepStatusFromWorkflow = (stepId: string) => {
+                      const step = fullWorkflowSteps.find((s: any) => s.id === stepId);
+                      if (!step) return 'pending';
+
+                      // Check if all agents in this step are completed
+                      const agents = step.agents || [];
+                      const anyError = agents.some((a: any) => a.status === 'error' || a.status === 'failed');
+                      const allCompleted = agents.length > 0 && agents.every((a: any) => a.status === 'completed');
+                      const anyRunning = agents.some((a: any) => a.status === 'running');
+                      const anyCompleted = agents.some((a: any) => a.status === 'completed');
+
+                      if (anyError) return 'error';
+                      if (allCompleted) return 'completed';
+                      if (anyRunning || anyCompleted) return 'running';
+                      return 'pending';
+                    };
+
+                    const workflowSteps = [
+                      {
+                        name: 'Data Analysis',
+                        key: 'dataAnalysis',
+                        icon: BarChart3,
+                        status: getWorkflowStepStatus(['marketAnalyst', 'newsAnalyst', 'socialMediaAnalyst', 'fundamentalsAnalyst'])
+                      },
+                      {
+                        name: 'Research',
+                        key: 'research',
+                        icon: Brain,
+                        status: getStepStatusFromWorkflow('research')
+                      },
+                      {
+                        name: 'Trading Decision',
+                        key: 'trading',
+                        icon: Activity,
+                        status: getStepStatusFromWorkflow('trading')
+                      },
+                      {
+                        name: 'Risk Assessment',
+                        key: 'risk',
+                        icon: Shield,
+                        status: getStepStatusFromWorkflow('risk')
+                      }
+                    ];
+
+                    return (
+                      <div key={stockAnalysis.ticker} className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="font-mono">
+                            {stockAnalysis.ticker}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">Analysis</span>
+                          {stockAnalysis.decision && stockAnalysis.decision !== 'PENDING' && (
+                            <Badge
+                              variant={
+                                stockAnalysis.decision === 'BUY' ? 'buy' :
+                                  stockAnalysis.decision === 'SELL' ? 'sell' :
+                                    'hold'
+                              }
+                              className="text-xs"
+                            >
+                              {stockAnalysis.decision}
+                            </Badge>
+                          )}
+                          {stockAnalysis.confidence > 0 && (
+                            <span className={`text-xs font-medium ${stockAnalysis.confidence >= 80 ? 'text-green-600 dark:text-green-400' :
+                              stockAnalysis.confidence >= 60 ? 'text-yellow-600 dark:text-yellow-400' :
+                                'text-red-600 dark:text-red-400'
+                              }`}>
+                              {stockAnalysis.confidence}%
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {workflowSteps.map((step) => {
+                            const stepStatus = step.status;
+                            const StepIcon = step.icon;
+
+                            return (
+                              <div
+                                key={step.key}
+                                className={`relative rounded-lg border p-3 transition-all ${stepStatus === 'completed'
+                                  ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
+                                  : stepStatus === 'running'
+                                    ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5 shadow-sm'
+                                    : 'border-border'
+                                  }`}
+                              >
+                                <div className="flex flex-col items-center text-center space-y-2">
+                                  <div className={`p-2 rounded-lg ${stepStatus === 'completed'
+                                    ? 'bg-green-500/10 dark:bg-green-500/5 text-green-600 dark:text-green-400'
+                                    : stepStatus === 'running'
+                                      ? 'bg-yellow-500/10 dark:bg-yellow-500/5 text-yellow-600 dark:text-yellow-400'
+                                      : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                    <StepIcon className="w-4 h-4" />
+                                  </div>
+
+                                  <h4 className="font-medium text-xs">{step.name}</h4>
+
+                                  <Badge
+                                    variant={
+                                      stepStatus === 'completed' ? 'completed' :
+                                      stepStatus === 'running' ? 'running' :
+                                      stepStatus === 'error' ? 'error' :
+                                      'pending' as any
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {stepStatus === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                                    {stepStatus === 'running' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                                    {stepStatus === 'pending' && <Clock className="w-3 h-3 mr-1" />}
+                                    {stepStatus.charAt(0).toUpperCase() + stepStatus.slice(1)}
+                                  </Badge>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Overall Progress Summary */}
+      <div className="rounded-lg border bg-card p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              Overall Progress
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Rebalance workflow execution status
+            </p>
+          </div>
+          <div>
+            {(workflowData.status === 'completed' || workflowData.status === 'pending_approval') && (
+              <Badge variant="completed" className="text-sm">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Complete
+              </Badge>
+            )}
+            {workflowData.status === 'running' && (
+              <Badge variant="running" className="text-sm">
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                In Progress
+              </Badge>
+            )}
+            {workflowData.status === 'error' && (
+              <Badge variant="error" className="text-sm">
+                <XCircle className="w-3 h-3 mr-1" />
+                Error
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function RebalanceWorkflowTab({ workflowData }: RebalanceWorkflowTabProps) {
+  return (
+    <TabsContent value="workflow" className="data-[state=active]:block hidden">
+      <ScrollArea className="h-[calc(90vh-220px)] px-6 pt-6">
+        <div className="pb-6">
+          <RebalanceWorkflowSteps workflowData={workflowData} />
+        </div>
+      </ScrollArea>
+    </TabsContent>
+  );
+}

@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+// Import centralized status system
+import {
+  type AnalysisStatus,
+  ANALYSIS_STATUS,
+  isAnalysisActive
+} from "@/lib/statusTypes";
 import { getCompleteMessages } from "@/lib/getCompleteMessages";
 
 interface UseAnalysisDataProps {
@@ -25,7 +31,7 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
 
     const loadAnalysis = async () => {
       if (!mounted) return;
-      
+
       try {
         let analysisToLoad = null;
 
@@ -94,26 +100,41 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
         }
 
         if (analysisToLoad && mounted) {
-          // Determine status
+          // Determine status - use new string-based status or fallback to numeric for backward compatibility
           let status = 'running';
-          if (analysisToLoad.analysis_status === -1) {
-            status = analysisToLoad.is_canceled ? 'canceled' : 'error';
-          } else if (analysisToLoad.analysis_status === 0) {
-            // Check if this is a rebalance analysis and Risk Manager has completed
-            if (analysisToLoad.rebalance_request_id && 
-                analysisToLoad.agent_insights?.riskManager) {
+
+          if (typeof analysisToLoad.analysis_status === 'string') {
+            // New string-based status system
+            status = analysisToLoad.analysis_status;
+
+            // Special handling for rebalance workflows
+            if (status === ANALYSIS_STATUS.RUNNING && analysisToLoad.rebalance_request_id &&
+              analysisToLoad.agent_insights?.riskManager) {
               // For rebalance workflows, consider complete when Risk Manager finishes
               console.log('Rebalance analysis with Risk Manager complete - marking as completed');
-              status = 'completed';
-            } else {
-              status = 'running';
+              status = ANALYSIS_STATUS.COMPLETED;
             }
-          } else if (analysisToLoad.analysis_status === 1) {
-            status = 'completed';
+          } else {
+            // Legacy numeric status system
+            if (analysisToLoad.analysis_status === -1) {
+              status = ANALYSIS_STATUS.ERROR; // Simplified - all errors/cancellations show as error
+            } else if (analysisToLoad.analysis_status === 0) {
+              // Check if this is a rebalance analysis and Risk Manager has completed
+              if (analysisToLoad.rebalance_request_id &&
+                analysisToLoad.agent_insights?.riskManager) {
+                // For rebalance workflows, consider complete when Risk Manager finishes
+                console.log('Rebalance analysis with Risk Manager complete - marking as completed');
+                status = ANALYSIS_STATUS.COMPLETED;
+              } else {
+                status = ANALYSIS_STATUS.RUNNING;
+              }
+            } else if (analysisToLoad.analysis_status === 1) {
+              status = ANALYSIS_STATUS.COMPLETED;
+            }
           }
 
-          setIsLiveAnalysis(status === 'running');
-          
+          setIsLiveAnalysis(isAnalysisActive(status as AnalysisStatus));
+
           console.log('Loaded analysis:', {
             ticker: analysisToLoad.ticker,
             analysis_status: analysisToLoad.analysis_status,
@@ -124,7 +145,7 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
 
           // Fetch complete messages including those in queue
           const messageResult = await getCompleteMessages(analysisToLoad.id);
-          
+
           // Fetch trade order if it exists (regardless of analysis completion status)
           let tradeOrderData = null;
           console.log('Looking for trade orders for analysis_id:', analysisToLoad.id);
@@ -134,9 +155,9 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
             .eq('analysis_id', analysisToLoad.id)
             .order('created_at', { ascending: false })
             .limit(1);
-          
+
           console.log('Trade orders query result:', { tradeOrders, tradeError });
-          
+
           if (!tradeError && tradeOrders && tradeOrders.length > 0) {
             const order = tradeOrders[0];
             tradeOrderData = {
@@ -159,12 +180,12 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
               afterValue: order.metadata?.afterPosition?.value
             };
           }
-          
+
           // Debug logging to understand data structure
           console.log('analysisToLoad:', analysisToLoad);
           console.log('analysisToLoad.agent_insights:', analysisToLoad.agent_insights);
           console.log('analysisToLoad.full_analysis:', analysisToLoad.full_analysis);
-          
+
           setAnalysisData({
             ...analysisToLoad,
             status,
@@ -174,13 +195,13 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
             // Explicitly include agent_insights
             agent_insights: analysisToLoad.agent_insights || {}
           });
-          
+
           if (messageResult.success && messageResult.queueCount > 0) {
             console.log(`Loaded ${messageResult.totalCount} messages (${messageResult.historyCount} from history, ${messageResult.queueCount} from queue)`);
           }
 
           // Start polling if running
-          if (status === 'running' && !analysisDate) {
+          if (isAnalysisActive(status as AnalysisStatus) && !analysisDate) {
             if (intervalRef.current) {
               clearInterval(intervalRef.current);
             }

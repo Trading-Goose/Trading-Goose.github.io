@@ -9,6 +9,12 @@ import { alpacaAPI } from "@/lib/alpaca";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import {
+  type RebalanceStatus,
+  REBALANCE_STATUS,
+  convertLegacyRebalanceStatus,
+  isRebalanceActive
+} from "@/lib/statusTypes";
 import RebalanceModal from "./RebalanceModal";
 import RebalanceDetailModal from "./RebalanceDetailModal";
 import ScheduleListModal from "./ScheduleListModal";
@@ -159,20 +165,26 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       if (!user) return;
 
       try {
-        // Check for active rebalance requests (including partial/incomplete portfolio manager states)
-        const { data, error } = await supabase
+        // Check for active rebalance requests using centralized status logic
+        const { data: allRebalances, error } = await supabase
           .from('rebalance_requests')
           .select('id, status, created_at, completed_at, rebalance_plan')
           .eq('user_id', user.id)
-          .in('status', ['initializing', 'analyzing', 'pending_trades', 'partial', 'portfolio_not_complete', 'portfolio_management_started'])
           .order('created_at', { ascending: false })
-          .limit(1);
+          .limit(10); // Get recent rebalances to check their status
 
         if (error) {
           console.warn('Error checking rebalance requests:', error);
-          // Don't set error state, just skip rebalance checking
           return;
         }
+
+        // Filter for active rebalances using centralized status logic
+        const activeRebalances = allRebalances?.filter(rebalance => {
+          const normalizedStatus = convertLegacyRebalanceStatus(rebalance.status);
+          return isRebalanceActive(normalizedStatus);
+        }) || [];
+
+        const data = activeRebalances.slice(0, 1); // Take the most recent active one
 
         if (data && data.length > 0) {
           const activeRebalance = data[0];
@@ -194,7 +206,9 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               .eq('id', previousRunningRef.current)
               .single();
 
-            if (completedRebalance?.status === 'completed' &&
+            const normalizedStatus = convertLegacyRebalanceStatus(completedRebalance?.status || '');
+            
+            if (normalizedStatus === REBALANCE_STATUS.COMPLETED &&
               completedRebalance?.rebalance_plan?.trades?.length > 0) {
               // Only show toast if portfolio manager actually ran and created trades
               console.log('Rebalance completed with trades:', previousRunningRef.current);
@@ -204,7 +218,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               });
               // Refresh positions to show updated holdings
               fetchPositions();
-            } else if (completedRebalance?.status === 'completed' &&
+            } else if (normalizedStatus === REBALANCE_STATUS.COMPLETED &&
               completedRebalance?.rebalance_plan?.recommendation === 'no_action_needed') {
               // Show different message when no opportunities were found
               console.log('Rebalance completed with no action needed:', previousRunningRef.current);
@@ -419,9 +433,9 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               constraints
             });
 
-            // Call analyze-stock-coordinator edge function with rebalance context
+            // Call rebalance-coordinator edge function for portfolio rebalancing
             // Note: Do NOT pass apiSettings or credentials - edge function will fetch from database
-            const { data, error } = await supabase.functions.invoke('analyze-stock-coordinator', {
+            const { data, error } = await supabase.functions.invoke('rebalance-coordinator', {
               body: {
                 userId: user?.id,
                 tickers: selectedPositions.map(p => p.ticker),

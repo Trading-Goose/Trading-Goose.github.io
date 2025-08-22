@@ -37,6 +37,12 @@ import type { WorkflowStep as EngineWorkflowStep } from "@/lib/tradingEngine";
 import StockTickerAutocomplete from "@/components/StockTickerAutocomplete";
 import { useToast } from "@/hooks/use-toast";
 import AnalysisDetailModal from "@/components/AnalysisDetailModal";
+import {
+  type AnalysisStatus,
+  ANALYSIS_STATUS,
+  convertLegacyAnalysisStatus,
+  isAnalysisActive
+} from "@/lib/statusTypes";
 
 interface Agent {
   id: string;
@@ -370,21 +376,30 @@ export default function HorizontalWorkflow() {
       if (user) {
         try {
           // Get all analyses that might be running
-          // Check both analysis_status = 0 and full_analysis->>'status' = 'running'
+          // Check both legacy numeric status and new string status
           // Also filter out cancelled analyses
           const { data, error } = await supabase
             .from('analysis_history')
             .select('ticker, analysis_status, full_analysis, created_at, id, decision, agent_insights, rebalance_request_id, is_canceled')
             .eq('user_id', user.id)
-            .eq('is_canceled', false)
-            .or('analysis_status.eq.0,full_analysis->>status.eq.running');
+            .order('created_at', { ascending: false });
 
           if (!error && data) {
-            // Filter to only actually running analyses
+            // Filter to only actually running analyses using centralized logic
             const runningData = data.filter(item => {
-              // Consider running if analysis_status is 0 OR full_analysis.status is 'running'
-              const isRunning = item.analysis_status === 0 ||
-                (item.full_analysis && item.full_analysis.status === 'running');
+              // Convert legacy numeric status if needed
+              const currentStatus = typeof item.analysis_status === 'number' 
+                ? convertLegacyAnalysisStatus(item.analysis_status)
+                : item.analysis_status;
+              
+              // Skip cancelled analyses (check both flag and status)
+              if (item.is_canceled || currentStatus === ANALYSIS_STATUS.CANCELLED) {
+                return false;
+              }
+              
+              // Use centralized logic to check if analysis is active
+              const isRunning = isAnalysisActive(currentStatus) ||
+                (item.full_analysis && item.full_analysis.status === ANALYSIS_STATUS.RUNNING);
               return isRunning;
             });
 
@@ -434,6 +449,7 @@ export default function HorizontalWorkflow() {
             .eq('user_id', user.id)
             .eq('is_canceled', false)
             .in('ticker', justCompleted)
+            .neq('analysis_status', ANALYSIS_STATUS.CANCELLED)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -464,6 +480,7 @@ export default function HorizontalWorkflow() {
             .select('*')
             .eq('user_id', user.id)
             .eq('is_canceled', false)
+            .neq('analysis_status', ANALYSIS_STATUS.CANCELLED)
             .gte('created_at', thirtyMinutesAgo.toISOString())
             .order('created_at', { ascending: false })
             .limit(1)
@@ -559,39 +576,17 @@ export default function HorizontalWorkflow() {
     return Brain;
   };
 
-  // Helper function to get agent status (same logic as AnalysisDetailModal)
+  // Helper function to get agent status (hybrid approach)
   const getAgentStatus = (agentKey: string, stepId: string, analysis: any) => {
+    // Check if analysis is cancelled
+    const isAnalysisCancelled = analysis.status === ANALYSIS_STATUS.CANCELLED || 
+        analysis.is_canceled;
+    
     const insights = analysis.agent_insights || {};
-
-    // Special handling for research phase agents
-    if (stepId === 'research' || stepId === 'research-debate') {
-      // For research phase, only mark Bull/Bear as complete when Research Manager is done
-      if (agentKey === 'bullResearcher' || agentKey === 'bearResearcher') {
-        // Check if Research Manager has completed (which means all debate rounds are done)
-        if (insights.researchManager) {
-          return 'completed';
-        }
-        // Check if there's any debate activity
-        if (insights.researchDebate && insights.researchDebate.length > 0) {
-          return 'running';
-        }
-        // Check if individual insights exist (first round running)
-        if (insights[agentKey]) {
-          return 'running';
-        }
-      } else if (agentKey === 'researchManager') {
-        // Research Manager is only complete when it has insights
-        if (insights.researchManager) {
-          return 'completed';
-        }
-        // If debate rounds exist but no manager yet, it's pending
-        if (insights.researchDebate && insights.researchDebate.length > 0) {
-          return 'pending';
-        }
-      }
-    }
-
-    // Default behavior for other agents
+    
+    // HYBRID APPROACH: Check agent_insights for completion (most reliable), workflow steps for running status
+    
+    // First check agent_insights for completion and errors (most reliable)
     if (insights) {
       // Check for error conditions first
       if (insights[agentKey + '_error']) {
@@ -602,28 +597,52 @@ export default function HorizontalWorkflow() {
         return 'completed';
       }
     }
-    // Check in workflow steps if available
+    
+    // Then check workflow steps for running status (when agents are actively working)
     if (analysis.full_analysis?.workflowSteps) {
       for (const step of analysis.full_analysis.workflowSteps) {
-        const agent = step.agents?.find((a: any) =>
-          a.name.toLowerCase().replace(/\s+/g, '').includes(agentKey.toLowerCase().replace(/analyst|researcher|manager/g, '').trim())
-        );
+        // Find the agent in workflow steps by matching names
+        const agent = step.agents?.find((a: any) => {
+          const agentNameLower = a.name.toLowerCase().replace(/\s+/g, '');
+          const keyLower = agentKey.toLowerCase();
+          
+          // Direct name matching patterns
+          if (agentNameLower.includes('market') && keyLower.includes('market')) return true;
+          if (agentNameLower.includes('news') && keyLower.includes('news')) return true;
+          if (agentNameLower.includes('social') && keyLower.includes('social')) return true;
+          if (agentNameLower.includes('fundamentals') && keyLower.includes('fundamentals')) return true;
+          if (agentNameLower.includes('bullresearcher') && keyLower.includes('bull')) return true;
+          if (agentNameLower.includes('bearresearcher') && keyLower.includes('bear')) return true;
+          if (agentNameLower.includes('researchmanager') && keyLower.includes('researchmanager')) return true;
+          if (agentNameLower.includes('trader') && keyLower.includes('trader')) return true;
+          if (agentNameLower.includes('risky') && keyLower.includes('risky')) return true;
+          if (agentNameLower.includes('safe') && keyLower.includes('safe')) return true;
+          if (agentNameLower.includes('neutral') && keyLower.includes('neutral')) return true;
+          if (agentNameLower.includes('riskmanager') && keyLower.includes('riskmanager')) return true;
+          if (agentNameLower.includes('portfoliomanager') && keyLower.includes('portfolio')) return true;
+          
+          return false;
+        });
+        
         if (agent) {
-          return agent.status || 'pending';
+          // If cancelled, convert 'running' or 'processing' to 'pending', but keep 'completed'
+          if (isAnalysisCancelled && (agent.status === 'running' || agent.status === 'processing')) {
+            return 'pending';
+          }
+          // Only return workflow status if it's an active state (running/processing/error)
+          if (agent.status === 'running' || agent.status === 'processing') return 'running';
+          if (agent.status === 'error' || agent.status === 'failed') return 'failed';
         }
       }
     }
+    
     return 'pending';
   };
 
-  // Update workflow based on analysis data
+  // Update workflow based on analysis data using unified agent status checking
   // Returns true if the analysis is still running, false if complete
   const updateWorkflowFromAnalysis = (analysis: any): boolean => {
     if (!analysis) return false;
-
-    // First try to use full_analysis if available for more detailed agent data
-    const fullAnalysis = analysis.full_analysis;
-    const insights = analysis.agent_insights || {};
 
     // Check if this is a rebalance analysis
     const isRebalanceAnalysis = !!analysis.rebalance_request_id;
@@ -632,422 +651,104 @@ export default function HorizontalWorkflow() {
       ticker: analysis.ticker,
       rebalance_request_id: analysis.rebalance_request_id,
       isRebalanceAnalysis,
-      analysis_status: analysis.analysis_status,
-      hasInsights: Object.keys(insights).length,
-      insightKeys: Object.keys(insights)
+      analysis_status: analysis.analysis_status
     });
 
     // Update the rebalance context state
     setIsRebalanceContext(isRebalanceAnalysis);
 
-    // Determine if analysis is completed or running
-    let isCompleted = analysis.analysis_status === 1 ||
-      (analysis.analysis_status !== 0 &&
-        (!fullAnalysis?.status || fullAnalysis.status !== 'running'));
-
-    // Special handling for rebalance analyses
-    if (isRebalanceAnalysis && analysis.analysis_status === 0) {
-      // For rebalance analyses, check if risk assessment is complete
-      // Risk Manager is the final agent for individual stock analysis in rebalance
-      const hasRiskManagerInsights = insights.riskManager || insights.riskJudge;
-
-      // Also check if all risk agents have completed
-      const riskAgentsComplete = insights.riskyAnalyst && insights.safeAnalyst &&
-        insights.neutralAnalyst && (insights.riskManager || insights.riskJudge);
-
-      if (hasRiskManagerInsights || riskAgentsComplete) {
-        console.log('Rebalance analysis - risk assessment complete, marking as done');
-        isCompleted = true;
-      }
-      
-      // Also check if all required agents have either completed or failed (allowing workflow to continue)
-      const analysisAgents = ['marketAnalyst', 'socialMediaAnalyst', 'newsAnalyst', 'fundamentalsAnalyst'];
-      const analysisAgentsFinished = analysisAgents.filter(agent => 
-        insights[agent] || insights[agent + '_error']
-      ).length;
-      
-      const researchAgents = ['bullResearcher', 'bearResearcher', 'researchManager'];
-      const researchAgentsFinished = researchAgents.filter(agent => insights[agent]).length;
-      
-      const traderFinished = insights.trader || analysis.decision;
-      
-      const riskAgents = ['riskyAnalyst', 'safeAnalyst', 'neutralAnalyst', 'riskManager'];
-      const riskAgentsFinished = riskAgents.filter(agent => insights[agent]).length;
-      
-      // For rebalance analyses, all phases through risk should be complete
-      if (analysisAgentsFinished === analysisAgents.length && 
-          researchAgentsFinished === researchAgents.length && 
-          traderFinished && 
-          riskAgentsFinished === riskAgents.length) {
-        console.log('Rebalance analysis - all required agents finished (including any failures), marking as done');
-        isCompleted = true;
-      }
-    } else if (!isRebalanceAnalysis && analysis.analysis_status === 0) {
-      // For individual analyses, check if portfolio manager has completed
-      const hasPortfolioManagerInsights = insights.portfolioManager;
-      
-      if (hasPortfolioManagerInsights) {
-        console.log('Individual analysis - portfolio management complete, marking as done');
-        isCompleted = true;
-      }
-      
-      // Also check if all required agents have either completed or failed (allowing workflow to continue)
-      const analysisAgents = ['marketAnalyst', 'socialMediaAnalyst', 'newsAnalyst', 'fundamentalsAnalyst'];
-      const analysisAgentsFinished = analysisAgents.filter(agent => 
-        insights[agent] || insights[agent + '_error']
-      ).length;
-      
-      const researchAgents = ['bullResearcher', 'bearResearcher', 'researchManager'];
-      const researchAgentsFinished = researchAgents.filter(agent => insights[agent]).length;
-      
-      const traderFinished = insights.trader || analysis.decision;
-      
-      const riskAgents = ['riskyAnalyst', 'safeAnalyst', 'neutralAnalyst', 'riskManager'];
-      const riskAgentsFinished = riskAgents.filter(agent => insights[agent]).length;
-      
-      // If all phases are complete (even with some failures), mark as complete
-      if (analysisAgentsFinished === analysisAgents.length && 
-          researchAgentsFinished === researchAgents.length && 
-          traderFinished && 
-          riskAgentsFinished === riskAgents.length) {
-        console.log('Individual analysis - all required agents finished (including any failures), marking as done');
-        isCompleted = true;
-      }
+    // Convert legacy numeric status if needed for proper checking
+    const currentStatus = typeof analysis.analysis_status === 'number' 
+      ? convertLegacyAnalysisStatus(analysis.analysis_status)
+      : analysis.analysis_status;
+    
+    // Check if analysis is cancelled - if so, don't display it
+    if (currentStatus === ANALYSIS_STATUS.CANCELLED || analysis.is_canceled) {
+      console.log('Analysis is cancelled, not displaying workflow');
+      return false; // Don't show cancelled analyses
     }
+    
+    // Determine completion using simple analysis status
+    const isCompleted = currentStatus === ANALYSIS_STATUS.COMPLETED;
+    const isRunning = !isCompleted && (currentStatus === ANALYSIS_STATUS.RUNNING || currentStatus === ANALYSIS_STATUS.PENDING);
 
-    const isRunning = !isCompleted && (analysis.analysis_status === 0 ||
-      (fullAnalysis?.status === 'running'));
 
+    // Build workflow steps using unified agent status checking
+    let baseSteps = getInitialWorkflowSteps();
 
-    // If full_analysis has workflowSteps, use them directly
-    if (fullAnalysis?.workflowSteps && Array.isArray(fullAnalysis.workflowSteps)) {
-      console.log('Using fullAnalysis.workflowSteps data');
-      const mappedSteps = fullAnalysis.workflowSteps.map((step: any) => {
-        const agents = step.agents.map((agent: any) => ({
-          id: agent.name.toLowerCase().replace(/\s+/g, '-'),
-          name: agent.name,
-          icon: getAgentIcon(agent.name),
-          status: agent.status === 'completed' ? 'idle' : 
-                  agent.status === 'processing' ? 'processing' : 
-                  agent.status === 'failed' ? 'failed' : 'idle',
-          lastAction: agent.status === 'completed' ? 'Analysis complete' :
-            agent.status === 'processing' ? 'Analyzing...' : 
-            agent.status === 'failed' ? 'Failed' : 'Waiting...',
-          progress: agent.status === 'completed' ? 100 : agent.status === 'failed' ? 0 : (agent.progress || 0)
-        }));
-
-        // SIMPLIFIED: Calculate step status based on agent completion
-        const completedAgents = agents.filter((agent: any) => agent.progress === 100).length;
-        const totalAgents = agents.length;
-
-        // Simple rule: 0 = pending, some = running, all = completed
-        let stepStatus = completedAgents === 0 ? 'pending' :
-          completedAgents === totalAgents ? 'completed' :
-            'running';
-
-        // Special handling for rebalance analyses - mark as complete if risk stage is done
-        if (isRebalanceAnalysis && step.id === 'risk' && stepStatus === 'completed') {
-          // This is the last step for rebalance analyses
-          console.log('Rebalance analysis - risk stage complete, marking analysis as done');
-        }
-
-        console.log(`Step ${step.name}:`, {
-          id: step.id,
-          completedAgents,
-          totalAgents,
-          calculatedStatus: stepStatus,
-          originalStatus: step.status,
-          isRebalanceAnalysis
-        });
-
-        return {
-          id: step.id,
-          name: step.name,
-          icon: workflowStepIcons[step.id] || Brain,
-          status: stepStatus,
-          currentActivity: stepStatus === 'completed' ? 'Completed' :
-            stepStatus === 'running' ? 'Processing...' :
-              'Pending',
-          details: step.description,
-          agents: agents,
-          insights: []
-        };
-      });
-
-      // Filter out portfolio management step for rebalance analyses
-      console.log('Before filtering mappedSteps:', mappedSteps.map((s: any) => ({ id: s.id, name: s.name })));
-      const filteredSteps = isRebalanceAnalysis
-        ? mappedSteps.filter((step: any) =>
-          step.id !== 'portfolio-management' &&
-          step.id !== 'portfolio' &&
-          !step.name.toLowerCase().includes('portfolio'))
-        : mappedSteps;
-      console.log('After filtering filteredSteps:', filteredSteps.map((s: any) => ({ id: s.id, name: s.name })));
-
-      setWorkflowData(filteredSteps);
-      return isRunning;
-    }
-
-    // Otherwise, build from agent insights
-    // Start with initial steps, but filter out portfolio management for rebalance
-    let updatedSteps = isRebalanceAnalysis
-      ? getInitialWorkflowSteps().filter(step => step.id !== 'portfolio-management')
-      : [...getInitialWorkflowSteps()];
-
-    // If the analysis is completed but we don't have detailed insights, mark all steps as completed
-    if (isCompleted && Object.keys(insights).length === 0) {
-      updatedSteps.forEach((step, index) => {
-        // Mark all steps as completed for a finished analysis
-        const maxSteps = isRebalanceAnalysis ? 3 : 4; // 4 steps for rebalance, 5 for regular
-        if (index <= maxSteps) {
-          step.status = 'completed';
-          step.currentActivity = 'Completed';
-          step.agents.forEach(agent => {
-            agent.progress = 100;
-            agent.lastAction = 'Analysis complete';
-          });
-        }
-        // Portfolio management only for non-rebalance analyses
-        if (!isRebalanceAnalysis && index === 4 && analysis.decision) {
-          step.status = 'completed';
-          step.currentActivity = 'Completed';
-          step.agents.forEach(agent => {
-            agent.progress = 100;
-            agent.lastAction = 'Position sizing calculated';
-          });
-        }
-      });
-      setWorkflowData(updatedSteps);
-      return false; // Analysis is complete
-    }
-
-    // If we have full analysis, extract more detailed agent information
-    if (fullAnalysis && typeof fullAnalysis === 'object') {
-      // Process each agent's full data
-      Object.entries(fullAnalysis).forEach(([agentName, agentData]: [string, any]) => {
-        if (agentData && agentData.messages && Array.isArray(agentData.messages)) {
-          // Get all messages from this agent
-          const messages = agentData.messages;
-          if (messages.length > 0) {
-            const lastMessage = messages[messages.length - 1];
-            if (lastMessage && lastMessage.content) {
-              // Override insights with full message content
-              insights[agentName] = lastMessage.content;
-            }
-          }
-        }
-      });
-    }
-
-    // SIMPLIFIED: Analysis Phase - count completed or failed agents
-    const analysisAgents = ['marketAnalyst', 'socialMediaAnalyst', 'newsAnalyst', 'fundamentalsAnalyst'];
-    const analysisCompleted = analysisAgents.filter(agent => 
-      insights[agent] || insights[agent + '_error']
-    ).length;
-    const analysisTotal = analysisAgents.length;
-
-    // Simple rule: 0 = pending, some = running, all = completed
-    const analysisStepStatus = analysisCompleted === 0 ? 'pending' :
-      analysisCompleted === analysisTotal ? 'completed' :
-        'running';
-
-    console.log('Analysis Step Debug:', {
-      insights: Object.keys(insights),
-      analysisAgents,
-      analysisCompleted,
-      analysisTotal,
-      calculatedStatus: analysisStepStatus
-    });
-
-    updatedSteps[0] = {
-      ...updatedSteps[0],
-      status: analysisStepStatus,
-      currentActivity: analysisStepStatus === 'completed' ? 'Completed' :
-        analysisStepStatus === 'running' ? 'Processing...' :
-          'Waiting to start',
-      agents: [
-        {
-          ...updatedSteps[0].agents[0],
-          status: insights['marketAnalyst_error'] ? 'failed' : 'idle',
-          lastAction: insights['marketAnalyst'] ? 'Analysis complete' : 
-                     insights['marketAnalyst_error'] ? 'Analysis failed (continued with fallback)' : 
-                     'Waiting...',
-          progress: insights['marketAnalyst'] ? 100 : insights['marketAnalyst_error'] ? 0 : 0
-        },
-        {
-          ...updatedSteps[0].agents[1],
-          status: insights['socialMediaAnalyst_error'] ? 'failed' : 'idle',
-          lastAction: insights['socialMediaAnalyst'] ? 'Social sentiment analyzed' : 
-                     insights['socialMediaAnalyst_error'] ? 'Analysis failed (continued with fallback)' : 
-                     'Waiting...',
-          progress: insights['socialMediaAnalyst'] ? 100 : insights['socialMediaAnalyst_error'] ? 0 : 0
-        },
-        {
-          ...updatedSteps[0].agents[2],
-          status: insights['newsAnalyst_error'] ? 'failed' : 'idle',
-          lastAction: insights['newsAnalyst'] ? 'News analysis complete' : 
-                     insights['newsAnalyst_error'] ? 'Analysis failed (continued with fallback)' : 
-                     'Waiting...',
-          progress: insights['newsAnalyst'] ? 100 : insights['newsAnalyst_error'] ? 0 : 0
-        },
-        {
-          ...updatedSteps[0].agents[3],
-          status: insights['fundamentalsAnalyst_error'] ? 'failed' : 'idle',
-          lastAction: insights['fundamentalsAnalyst'] ? 'Fundamentals analyzed' : 
-                     insights['fundamentalsAnalyst_error'] ? 'Analysis failed (continued with fallback)' : 
-                     'Waiting...',
-          progress: insights['fundamentalsAnalyst'] ? 100 : insights['fundamentalsAnalyst_error'] ? 0 : 0
-        }
-      ]
-    };
-
-    // SIMPLIFIED: Research Debate - just count completed agents
-    const researchAgents = ['bullResearcher', 'bearResearcher', 'researchManager'];
-    const researchCompleted = researchAgents.filter(agent => insights[agent]).length;
-    const researchTotal = researchAgents.length;
-
-    // Simple rule: 0 = pending, some = running, all = completed
-    const researchStepStatus = researchCompleted === 0 ? 'pending' :
-      researchCompleted === researchTotal ? 'completed' :
-        'running';
-
-    updatedSteps[1] = {
-      ...updatedSteps[1],
-      status: researchStepStatus,
-      currentActivity: researchStepStatus === 'completed' ? 'Completed' :
-        researchStepStatus === 'running' ? 'Debate in progress...' :
-          'Waiting for analysis',
-      agents: [
-        {
-          ...updatedSteps[1].agents[0],
-          status: 'idle',
-          lastAction: insights['bullResearcher'] ? 'Bull case presented' : 'Waiting...',
-          progress: insights['bullResearcher'] ? 100 : 0
-        },
-        {
-          ...updatedSteps[1].agents[1],
-          status: 'idle',
-          lastAction: insights['bearResearcher'] ? 'Bear case presented' : 'Waiting...',
-          progress: insights['bearResearcher'] ? 100 : 0
-        },
-        {
-          ...updatedSteps[1].agents[2],
-          status: 'idle',
-          lastAction: insights['researchManager'] ? 'Debate concluded' : 'Waiting...',
-          progress: insights['researchManager'] ? 100 : 0
-        }
-      ]
-    };
-
-    // SIMPLIFIED: Trading Decision - single agent
-    const hasTraderData = insights['trader'] || analysis.decision;
-
-    updatedSteps[2] = {
-      ...updatedSteps[2],
-      status: hasTraderData ? 'completed' : 'pending',
-      currentActivity: hasTraderData ? `Decision: ${analysis.decision || 'Made'}` :
-        'Awaiting research',
-      agents: [
-        {
-          ...updatedSteps[2].agents[0],
-          status: 'idle',
-          lastAction: hasTraderData ? `${analysis.decision || 'Trading'} decision made` : 'Waiting...',
-          progress: hasTraderData ? 100 : 0
-        }
-      ]
-    };
-
-    // SIMPLIFIED: Risk Assessment - just count completed agents
-    const riskAgents = ['riskyAnalyst', 'safeAnalyst', 'neutralAnalyst', 'riskManager'];
-    const riskCompleted = riskAgents.filter(agent => insights[agent]).length;
-    const riskTotal = riskAgents.length;
-
-    // Simple rule: 0 = pending, some = running, all = completed
-    const riskStepStatus = riskCompleted === 0 ? 'pending' :
-      riskCompleted === riskTotal ? 'completed' :
-        'running';
-
-    updatedSteps[3] = {
-      ...updatedSteps[3],
-      status: riskStepStatus,
-      currentActivity: riskStepStatus === 'completed' ? 'Completed' :
-        riskStepStatus === 'running' ? 'Risk assessment in progress...' :
-          'Awaiting decision',
-      agents: [
-        {
-          ...updatedSteps[3].agents[0],
-          status: 'idle',
-          lastAction: insights['riskyAnalyst'] ? 'Risk tolerance assessed' : 'Waiting...',
-          progress: insights['riskyAnalyst'] ? 100 : 0
-        },
-        {
-          ...updatedSteps[3].agents[1],
-          status: 'idle',
-          lastAction: insights['safeAnalyst'] ? 'Conservative view analyzed' : 'Waiting...',
-          progress: insights['safeAnalyst'] ? 100 : 0
-        },
-        {
-          ...updatedSteps[3].agents[2],
-          status: 'idle',
-          lastAction: insights['neutralAnalyst'] ? 'Balanced perspective provided' : 'Waiting...',
-          progress: insights['neutralAnalyst'] ? 100 : 0
-        },
-        {
-          ...updatedSteps[3].agents[3],
-          status: 'idle',
-          lastAction: insights['riskManager'] ? 'Risk assessment complete' : 'Waiting...',
-          progress: insights['riskManager'] ? 100 : 0
-        }
-      ]
-    };
-
-    // SIMPLIFIED: Portfolio Management - single agent (only for non-rebalance analyses)
-    if (!isRebalanceAnalysis) {
-      const hasPortfolioData = insights['portfolioManager'];
-
-      // Find the portfolio management step index (it might be at index 4 if not filtered)
-      const portfolioStepIndex = updatedSteps.findIndex(s => s.id === 'portfolio-management');
-      if (portfolioStepIndex !== -1) {
-        // Check if risk is complete to determine if portfolio management should be pending or running
-        const riskComplete = riskStepStatus === 'completed';
-        
-        updatedSteps[portfolioStepIndex] = {
-          ...updatedSteps[portfolioStepIndex],
-          status: hasPortfolioData ? 'completed' : (riskComplete ? 'running' : 'pending'),
-          currentActivity: hasPortfolioData ? 'Position sizing complete' : 
-            (riskComplete ? 'Calculating position size...' : 'Awaiting risk assessment'),
-          agents: [
-            {
-              ...updatedSteps[portfolioStepIndex].agents[0],
-              status: hasPortfolioData ? 'idle' : (riskComplete ? 'processing' : 'idle'),
-              lastAction: hasPortfolioData ? 'Position sizing calculated' : 
-                (riskComplete ? 'Analyzing portfolio...' : 'Waiting...'),
-              progress: hasPortfolioData ? 100 : (riskComplete ? 50 : 0)
-            }
-          ]
-        };
-      }
-    }
-
-    // Removed override logic - we're using simple agent-based status determination
-
-    // Filter out portfolio management step for rebalance analyses before setting
-    const finalSteps = isRebalanceAnalysis
-      ? updatedSteps.filter(step =>
+    // Filter out portfolio management step for rebalance analyses
+    if (isRebalanceAnalysis) {
+      baseSteps = baseSteps.filter(step => 
         step.id !== 'portfolio-management' &&
         step.id !== 'portfolio' &&
-        !step.name.toLowerCase().includes('portfolio'))
-      : updatedSteps;
+        !step.name.toLowerCase().includes('portfolio')
+      );
+    }
 
-    // Set the workflow data directly - status is already determined by agent completion
-    console.log('Final workflow steps before setting:', finalSteps.map(step => ({
-      name: step.name,
-      status: step.status,
-      agents: step.agents.filter(a => a.progress === 100).length + '/' + step.agents.length
-    })));
-    setWorkflowData(finalSteps);
+    // Update each step using unified agent status checking
+    const updatedSteps = baseSteps.map((step) => {
+      // Map step agents to their respective agent keys for status checking
+      const agentStatusMapping = {
+        'analysis': [
+          { agent: step.agents[0], key: 'marketAnalyst' },
+          { agent: step.agents[1], key: 'socialMediaAnalyst' },
+          { agent: step.agents[2], key: 'newsAnalyst' },
+          { agent: step.agents[3], key: 'fundamentalsAnalyst' }
+        ],
+        'research-debate': [
+          { agent: step.agents[0], key: 'bullResearcher' },
+          { agent: step.agents[1], key: 'bearResearcher' },
+          { agent: step.agents[2], key: 'researchManager' }
+        ],
+        'trading-decision': [
+          { agent: step.agents[0], key: 'trader' }
+        ],
+        'risk-assessment': [
+          { agent: step.agents[0], key: 'riskyAnalyst' },
+          { agent: step.agents[1], key: 'safeAnalyst' },
+          { agent: step.agents[2], key: 'neutralAnalyst' },
+          { agent: step.agents[3], key: 'riskManager' }
+        ],
+        'portfolio-management': [
+          { agent: step.agents[0], key: 'portfolioManager' }
+        ]
+      };
 
-    // Return the running state
+      const stepMappings = agentStatusMapping[step.id as keyof typeof agentStatusMapping] || [];
+      
+      // Update each agent using unified status checking
+      const updatedAgents = stepMappings.map(({ agent, key }) => {
+        const status = getAgentStatus(key, step.id, analysis);
+        
+        return {
+          ...agent,
+          status: status === 'completed' ? 'idle' : status === 'running' ? 'processing' : status === 'failed' ? 'failed' : 'idle',
+          lastAction: status === 'completed' ? 'Analysis complete' :
+            status === 'running' ? 'Analyzing...' :
+            status === 'failed' ? 'Failed' :
+            'Waiting...',
+          progress: status === 'completed' ? 100 : status === 'failed' ? 0 : (status === 'running' ? 50 : 0)
+        };
+      });
+
+      // Calculate step status based on agent statuses
+      const completedAgents = updatedAgents.filter(a => a.progress === 100).length;
+      const runningAgents = updatedAgents.filter(a => a.status === 'processing').length;
+      const totalAgents = updatedAgents.length;
+
+      const stepStatus = completedAgents === totalAgents ? 'completed' :
+        runningAgents > 0 ? 'running' : 'pending';
+
+      return {
+        ...step,
+        status: stepStatus,
+        currentActivity: stepStatus === 'completed' ? 'Completed' :
+          stepStatus === 'running' ? 'Processing...' : 'Pending',
+        agents: updatedAgents
+      };
+    });
+
+    setWorkflowData(updatedSteps);
     return isRunning;
   };
 
@@ -1271,8 +972,8 @@ export default function HorizontalWorkflow() {
                                 {agent.progress !== undefined && agent.progress > 0 && (
                                   <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                                     <div
-                                      className={`h-full transition-all duration-500 ${
-                                        agent.status === 'processing' ? 'bg-blue-500 animate-pulse' : 
+                                      className={`h-full transition-all ${
+                                        agent.status === 'processing' ? 'bg-yellow-500 animate-pulse' : 
                                         agent.status === 'failed' ? 'bg-orange-500' : 'bg-green-500'
                                       }`}
                                       style={{ width: `${agent.progress}%` }}
@@ -1347,7 +1048,7 @@ export default function HorizontalWorkflow() {
                             <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
                               <div
                                 className={`h-full transition-all ${
-                                  agent.status === 'processing' ? 'bg-blue-500' : 
+                                  agent.status === 'processing' ? 'bg-yellow-500 animate-pulse' : 
                                   agent.status === 'failed' ? 'bg-orange-500' : 'bg-green-500'
                                 }`}
                                 style={{ width: `${agent.progress}%` }}

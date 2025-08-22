@@ -55,7 +55,7 @@ class AnalysisManager {
 
       // Restore running analyses
       for (const item of data || []) {
-        if (item.full_analysis && item.full_analysis.status === 'running') {
+        if (item.analysis_status === 'running') {
           // Check if this is a server-side analysis
           if (this.useServerExecution) {
             console.log('📡 Resuming server-side analysis for:', item.ticker);
@@ -538,9 +538,9 @@ class AnalysisManager {
         const { error } = await supabase
           .from('analysis_history')
           .update({
+            analysis_status: 'cancelled',
             full_analysis: {
               ...analysis,
-              status: 'error',
               completedAt: analysis.completedAt,
               error: 'Analysis cancelled by user',
               messages: analysis.messages
@@ -548,7 +548,7 @@ class AnalysisManager {
           })
           .eq('user_id', userId)
           .eq('ticker', ticker)
-          .eq('full_analysis->>status', 'running');
+          .eq('analysis_status', 'running');
 
         if (error) throw error;
         console.log(`✅ Cancelled analysis for ${ticker} updated in database`);
@@ -593,7 +593,7 @@ class AnalysisManager {
           .delete()
           .eq('user_id', userId)
           .eq('ticker', ticker)
-          .eq('full_analysis->>status', analysis.status);
+          .eq('analysis_status', analysis.status);
 
         if (error) throw error;
         console.log(`✅ Deleted analysis for ${ticker} from database`);

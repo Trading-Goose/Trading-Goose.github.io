@@ -12,11 +12,9 @@ import { alpacaAPI } from "@/lib/alpaca";
 import AnalysisDetailModal from "./AnalysisDetailModal";
 import { 
   AnalysisStatus, 
-  ANALYSIS_STATUS, 
-  REBALANCE_STATUS,
+  ANALYSIS_STATUS,
   convertLegacyAnalysisStatus,
-  isAnalysisActive,
-  isAnalysisFinished
+  isAnalysisActive
 } from "@/lib/statusTypes";
 
 interface WatchlistItem {
@@ -218,7 +216,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
   // Use ref to track previous running analyses
   const previousRunningRef = useRef<Set<string>>(new Set());
 
-  // Check for running analyses and completed analyses
+  // Check for running analyses using unified logic
   useEffect(() => {
     const checkRunningAnalyses = async () => {
       const running = new Set<string>();
@@ -226,36 +224,14 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       // Check database for running analyses if user is authenticated
       if (user) {
         try {
-          // Get all analyses (running, completed, cancelled)
+          // Get all analyses
           const { data, error } = await supabase
             .from('analysis_history')
-            .select('ticker, analysis_status, full_analysis, agent_insights, rebalance_request_id, is_canceled, created_at, id')
+            .select('ticker, analysis_status, full_analysis, is_canceled, created_at')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
           if (!error && data) {
-            // First, get all cancelled rebalance IDs
-            const cancelledRebalanceIds = new Set<string>();
-            if (data.length > 0) {
-              // Get unique rebalance request IDs from the data
-              const rebalanceIds = [...new Set(data
-                .filter(item => item.rebalance_request_id)
-                .map(item => item.rebalance_request_id))];
-              
-              if (rebalanceIds.length > 0) {
-                // Check which rebalances are cancelled
-                const { data: rebalanceData } = await supabase
-                  .from('rebalance_requests')
-                  .select('id')
-                  .in('id', rebalanceIds)
-                  .eq('status', REBALANCE_STATUS.CANCELLED);
-                
-                if (rebalanceData) {
-                  rebalanceData.forEach(r => cancelledRebalanceIds.add(r.id));
-                }
-              }
-            }
-
             // Group by ticker to get the most recent analysis for each
             const latestByTicker = new Map<string, any>();
             for (const item of data) {
@@ -264,64 +240,24 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
               }
             }
 
-            // Check status of latest analysis for each ticker
+            // Check status of latest analysis for each ticker using unified logic
             for (const [ticker, item] of latestByTicker) {
               // Convert legacy numeric status if needed
               const currentStatus = typeof item.analysis_status === 'number' 
                 ? convertLegacyAnalysisStatus(item.analysis_status)
                 : item.analysis_status;
               
-              // Skip if this analysis is cancelled (check both flag and status)
-              if (item.is_canceled || 
-                  currentStatus === ANALYSIS_STATUS.CANCELLED ||
-                  (item.rebalance_request_id && cancelledRebalanceIds.has(item.rebalance_request_id))) {
-                continue; // Don't show as running if cancelled
+              // Skip cancelled analyses
+              if (item.is_canceled || currentStatus === ANALYSIS_STATUS.CANCELLED) {
+                continue;
               }
               
-              // Check if it's currently running using centralized logic
-              const isRunning = isAnalysisActive(currentStatus) ||
-                (item.full_analysis && item.full_analysis.status === ANALYSIS_STATUS.RUNNING);
+              // Use unified logic to check if analysis is active
+              const isRunning = isAnalysisActive(currentStatus);
               
-              // For rebalance analyses, consider complete if risk manager has finished
-              const isRebalanceComplete = item.rebalance_request_id && item.agent_insights?.riskManager;
-              
-              if (isRunning && !isRebalanceComplete) {
+              if (isRunning) {
                 running.add(ticker);
               }
-              // We don't add any completed analyses to viewable
-              // All completed analyses should show "Analyze" button
-            }
-
-            // Filter to only actually running analyses (for logging)
-            const runningData = data.filter(item => {
-              // Convert legacy numeric status if needed
-              const currentStatus = typeof item.analysis_status === 'number' 
-                ? convertLegacyAnalysisStatus(item.analysis_status)
-                : item.analysis_status;
-              
-              // Skip cancelled (check both flag and status)
-              if (item.is_canceled || currentStatus === ANALYSIS_STATUS.CANCELLED) {
-                return false;
-              }
-              
-              // For rebalance analyses, consider complete if risk manager has finished
-              if (item.rebalance_request_id && item.agent_insights?.riskManager) {
-                return false; // Not running anymore - risk manager completed
-              }
-              
-              // Consider running using centralized status logic
-              const isRunning = isAnalysisActive(currentStatus) ||
-                (item.full_analysis && item.full_analysis.status === ANALYSIS_STATUS.RUNNING);
-              return isRunning;
-            });
-
-            // Only log if there are actually running analyses
-            if (runningData.length > 0) {
-              console.log('Running analyses from DB:', runningData.map(d => ({
-                ticker: d.ticker,
-                status: d.analysis_status,
-                fullAnalysisStatus: d.full_analysis?.status
-              })));
             }
           }
         } catch (error) {
@@ -329,24 +265,10 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
         }
       }
 
-      // Check if any analyses just completed (were running before but not now)
+      // Check if any analyses just completed
       const justCompleted = Array.from(previousRunningRef.current).filter(ticker => !running.has(ticker));
       if (justCompleted.length > 0) {
-        console.log('Analyses completed, reloading watchlist for:', justCompleted);
-        // Reload watchlist to get updated last_analysis and last_decision
         loadWatchlist();
-      }
-
-      // Only log if there are running analyses or if status changed
-      const runningArray = Array.from(running);
-      const prevArray = Array.from(previousRunningRef.current);
-      if (runningArray.length > 0 || prevArray.length > 0) {
-        if (runningArray.join(',') !== prevArray.join(',')) {
-          console.log('Running analyses changed:', {
-            current: runningArray,
-            previous: prevArray
-          });
-        }
       }
 
       // Update the ref with current running set
@@ -355,7 +277,6 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
     };
 
     checkRunningAnalyses();
-    // Check periodically - every 10 seconds instead of 2 seconds
     const interval = setInterval(checkRunningAnalyses, 10000);
     return () => clearInterval(interval);
   }, [user]);

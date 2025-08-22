@@ -474,11 +474,26 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
                     <Line 
                       type="monotone" 
                       dataKey="value" 
-                      stroke={isPositive ? "#10b981" : "#ef4444"}
+                      stroke="url(#colorGradient)"
                       strokeWidth={2}
                       dot={false}
                       activeDot={{ r: 4, fill: isPositive ? "#10b981" : "#ef4444" }}
                     />
+                    <defs>
+                      <linearGradient id="colorGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        {currentData.map((point, index) => {
+                          const isAboveStart = point.value >= startPrice;
+                          const position = (index / (currentData.length - 1)) * 100;
+                          return (
+                            <stop 
+                              key={index}
+                              offset={`${position}%`} 
+                              stopColor={isAboveStart ? "#10b981" : "#ef4444"} 
+                            />
+                          );
+                        })}
+                      </linearGradient>
+                    </defs>
                   </LineChart>
                 </ResponsiveContainer>
                 ) : (

@@ -85,6 +85,7 @@ export default function RebalanceHistoryTable() {
   const [selectedDetailId, setSelectedDetailId] = useState<string | undefined>(undefined);
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [analysisData, setAnalysisData] = useState<{[key: string]: any[]}>({});
 
   useEffect(() => {
     if (user) {
@@ -117,6 +118,22 @@ export default function RebalanceHistoryTable() {
       };
     }
   }, [user, runningRebalances.length]);
+
+  const fetchAnalysisDataForRebalance = async (rebalanceId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('analysis_history')
+        .select('*')
+        .eq('rebalance_request_id', rebalanceId);
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching analysis data:', error);
+      return [];
+    }
+  };
 
   const fetchRebalanceRequests = async () => {
     if (!user) return;
@@ -164,6 +181,15 @@ export default function RebalanceHistoryTable() {
       setRunningRebalances(running);
       setCompletedRebalances(completed);
       setCancelledRebalances(cancelled);
+
+      // Fetch analysis data for running rebalances to calculate progress
+      const analysisDataMap: {[key: string]: any[]} = {};
+      for (const rebalance of running) {
+        const analyses = await fetchAnalysisDataForRebalance(rebalance.id);
+        analysisDataMap[rebalance.id] = analyses;
+      }
+      setAnalysisData(analysisDataMap);
+
     } catch (error) {
       console.error('Error fetching rebalance requests:', error);
       if (!loading) {
@@ -331,6 +357,140 @@ export default function RebalanceHistoryTable() {
     }
   };
 
+  // Calculate completion percentage based on agent step completion
+  const calculateAgentStepCompletion = (rebalanceRequest: RebalanceRequest): number => {
+    const analyses = analysisData[rebalanceRequest.id] || [];
+    
+    console.log('calculateAgentStepCompletion - rebalanceRequest:', {
+      id: rebalanceRequest.id,
+      status: rebalanceRequest.status,
+      hasRebalancePlan: !!rebalanceRequest.rebalance_plan,
+      analysesCount: analyses.length
+    });
+
+    // For completed rebalances with workflow steps, use the workflow data
+    if (rebalanceRequest.rebalance_plan?.workflowSteps) {
+      const workflowSteps = rebalanceRequest.rebalance_plan.workflowSteps;
+      const analysisStep = workflowSteps.find((step: any) => step.id === 'analysis');
+      
+      if (analysisStep?.stockAnalyses) {
+        const stockAnalyses = analysisStep.stockAnalyses;
+        let totalSteps = 0;
+        let completedSteps = 0;
+
+        stockAnalyses.forEach((stockAnalysis: any) => {
+          const fullAnalysis = stockAnalysis.fullAnalysis || {};
+          const fullWorkflowSteps = fullAnalysis.workflowSteps || [];
+          const expectedSteps = ['analysis', 'research', 'trading', 'risk'];
+          
+          expectedSteps.forEach(stepId => {
+            totalSteps++;
+            const step = fullWorkflowSteps.find((s: any) => s.id === stepId);
+            
+            if (step?.agents) {
+              const allAgentsCompleted = step.agents.length > 0 && 
+                step.agents.every((agent: any) => agent.status === 'completed');
+              if (allAgentsCompleted) {
+                completedSteps++;
+              }
+            } else if (stepId === 'analysis') {
+              const agents = stockAnalysis.agents || {};
+              const analysisAgents = ['marketAnalyst', 'newsAnalyst', 'socialMediaAnalyst', 'fundamentalsAnalyst'];
+              const allAnalysisCompleted = analysisAgents.every(agentKey => 
+                agents[agentKey] === 'completed'
+              );
+              if (allAnalysisCompleted) {
+                completedSteps++;
+              }
+            }
+          });
+        });
+
+        return totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+      }
+    }
+
+    // For running rebalances, use the analysis_history data
+    if (analyses.length === 0) {
+      console.log('calculateAgentStepCompletion - No analyses found, using legacy fallback');
+      return rebalanceRequest.total_stocks > 0 
+        ? (rebalanceRequest.stocks_analyzed / rebalanceRequest.total_stocks) * 100
+        : 0;
+    }
+
+    let totalAgentSteps = 0;
+    let completedAgentSteps = 0;
+
+    // Define expected agents per analysis (based on actual agent names from messages)
+    const expectedAgents = [
+      'market-analyst', 'news-analyst', 'social-media-analyst', 'fundamentals-analyst',
+      'bull-researcher', 'bear-researcher', 'research-manager',
+      'risky-analyst', 'safe-analyst', 'neutral-analyst', 'risk-judge',
+      'trader'
+    ];
+
+    console.log('calculateAgentStepCompletion - Expected agents:', expectedAgents);
+
+    analyses.forEach((analysis: any) => {
+      console.log(`calculateAgentStepCompletion - Analysis ${analysis.ticker}:`, {
+        ticker: analysis.ticker,
+        status: analysis.status,
+        hasMessages: !!analysis.full_analysis?.messages,
+        messageCount: analysis.full_analysis?.messages?.length || 0
+      });
+
+      // Count expected agent steps for this stock
+      totalAgentSteps += expectedAgents.length;
+
+      // Count completed agents based on messages in full_analysis
+      const messages = analysis.full_analysis?.messages || [];
+      const completedAgents = new Set<string>();
+
+      console.log(`calculateAgentStepCompletion - Stock ${analysis.ticker} messages sample:`, 
+        messages.slice(0, 5).map((msg: any) => ({
+          agent: msg.agent,
+          type: msg.type,
+          hasContent: !!msg.content,
+          timestamp: msg.timestamp
+        })));
+
+      messages.forEach((msg: any) => {
+        if (msg.agent && msg.timestamp) {
+          // Consider an agent completed if it has a timestamp (indicating it posted a message)
+          const normalizedAgent = msg.agent.toLowerCase().replace(/\s+/g, '-');
+          completedAgents.add(normalizedAgent);
+          console.log(`calculateAgentStepCompletion - Added agent: ${msg.agent} -> ${normalizedAgent}`);
+        }
+      });
+
+      console.log(`calculateAgentStepCompletion - Stock ${analysis.ticker} completed agents:`, 
+        Array.from(completedAgents));
+
+      // Count how many expected agents have completed
+      expectedAgents.forEach(agentKey => {
+        if (completedAgents.has(agentKey)) {
+          completedAgentSteps++;
+          console.log(`calculateAgentStepCompletion - Matched agent: ${agentKey} for ${analysis.ticker}`);
+        }
+      });
+
+      console.log(`calculateAgentStepCompletion - Stock ${analysis.ticker} matching:`, {
+        expectedAgents,
+        completedAgents: Array.from(completedAgents),
+        matches: expectedAgents.filter(key => completedAgents.has(key))
+      });
+    });
+
+    const percentage = totalAgentSteps > 0 ? (completedAgentSteps / totalAgentSteps) * 100 : 0;
+    console.log('calculateAgentStepCompletion - Final result:', {
+      totalAgentSteps,
+      completedAgentSteps,
+      percentage
+    });
+
+    return percentage;
+  };
+
   const viewRebalanceDetails = (rebalance: RebalanceRequest) => {
     setSelectedDetailId(rebalance.id);
     setDetailModalOpen(true);
@@ -405,14 +565,12 @@ export default function RebalanceHistoryTable() {
                                   <div
                                     className="h-full bg-blue-500 transition-all duration-300"
                                     style={{
-                                      width: `${item.total_stocks > 0
-                                        ? (item.stocks_analyzed / item.total_stocks) * 100
-                                        : 0}%`
+                                      width: `${calculateAgentStepCompletion(item)}%`
                                     }}
                                   />
                                 </div>
                                 <span className="text-xs text-muted-foreground">
-                                  {Math.round((item.stocks_analyzed / (item.total_stocks || 1)) * 100)}%
+                                  {Math.round(calculateAgentStepCompletion(item))}%
                                 </span>
                               </div>
                             )}
@@ -678,14 +836,12 @@ export default function RebalanceHistoryTable() {
                                 <div
                                   className="h-full bg-blue-500 transition-all duration-300"
                                   style={{
-                                    width: `${item.total_stocks > 0
-                                      ? (item.stocks_analyzed / item.total_stocks) * 100
-                                      : 0}%`
+                                    width: `${calculateAgentStepCompletion(item)}%`
                                   }}
                                 />
                               </div>
                               <span className="text-xs text-muted-foreground">
-                                {Math.round((item.stocks_analyzed / (item.total_stocks || 1)) * 100)}%
+                                {Math.round(calculateAgentStepCompletion(item))}%
                               </span>
                             </div>
                           )}

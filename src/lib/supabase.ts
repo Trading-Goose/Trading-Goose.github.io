@@ -39,7 +39,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
     fetch: async (url: RequestInfo | URL, options: RequestInit = {}) => {
       // Check if this is an Edge Function call
       const isEdgeFunction = typeof url === 'string' && url.includes('/functions/v1/');
-      
+
       // For Edge Functions, use a longer timeout and respect existing signals
       if (isEdgeFunction) {
         // If there's already a signal in options, respect it
@@ -56,11 +56,11 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
             throw error;
           }
         }
-        
+
         // For Edge Functions without existing signal, use 60 second timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for Edge Functions
-        
+
         try {
           const response = await fetch(url, {
             ...options,
@@ -76,11 +76,11 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
           throw error;
         }
       }
-      
+
       // For regular Supabase requests, use standard timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
+
       // Merge signals if one already exists
       let signal = controller.signal;
       if (options.signal) {
@@ -90,7 +90,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
         controller.signal.addEventListener('abort', () => combinedController.abort());
         signal = combinedController.signal;
       }
-      
+
       try {
         const response = await fetch(url, {
           ...options,
@@ -356,9 +356,9 @@ export const supabaseHelpers = {
         }
         return acc;
       }, {} as Partial<ApiSettings>);
-      
+
       console.log('Updating settings with:', cleanedUpdates);
-      
+
       // Direct database update
       const { data, error } = await supabase
         .from('api_settings')
@@ -514,14 +514,14 @@ export const supabaseHelpers = {
     try {
       // Note: This requires service_role key to access admin functions
       const { data, error } = await supabase.auth.admin.listUsers();
-      
+
       if (error) {
         console.error('Error fetching users:', error);
         return [];
       }
 
       // Filter for invited users (those without confirmed emails or with invite metadata)
-      return data.users.filter(user => 
+      return data.users.filter(user =>
         user.invited_at && !user.email_confirmed_at
       );
     } catch (error) {

@@ -12,7 +12,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   type RebalanceStatus,
   REBALANCE_STATUS,
-  convertLegacyRebalanceStatus,
   isRebalanceActive
 } from "@/lib/statusTypes";
 import RebalanceModal from "./RebalanceModal";
@@ -178,11 +177,21 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
           return;
         }
 
-        // Filter for active rebalances using centralized status logic
+        // Filter for active rebalances using correct logic
         const activeRebalances = allRebalances?.filter(rebalance => {
-          const normalizedStatus = convertLegacyRebalanceStatus(rebalance.status);
-          return isRebalanceActive(normalizedStatus);
+          const status = rebalance.status as RebalanceStatus;
+          // A rebalance is active if:
+          // - It's running or pending
+          // - It's awaiting approval BUT doesn't have a rebalance plan yet (still analyzing)
+          const isActive = status === REBALANCE_STATUS.RUNNING || 
+                          status === REBALANCE_STATUS.PENDING ||
+                          (status === REBALANCE_STATUS.AWAITING_APPROVAL && !rebalance.rebalance_plan);
+          
+          console.log(`Rebalance ${rebalance.id}: status="${rebalance.status}", has_plan=${!!rebalance.rebalance_plan} → active=${isActive}`);
+          return isActive;
         }) || [];
+
+        console.log(`Found ${allRebalances?.length || 0} total rebalances, ${activeRebalances.length} active`);
 
         const data = activeRebalances.slice(0, 1); // Take the most recent active one
 
@@ -206,9 +215,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               .eq('id', previousRunningRef.current)
               .single();
 
-            const normalizedStatus = convertLegacyRebalanceStatus(completedRebalance?.status || '');
-            
-            if (normalizedStatus === REBALANCE_STATUS.COMPLETED &&
+            if (completedRebalance?.status === REBALANCE_STATUS.COMPLETED &&
               completedRebalance?.rebalance_plan?.trades?.length > 0) {
               // Only show toast if portfolio manager actually ran and created trades
               console.log('Rebalance completed with trades:', previousRunningRef.current);
@@ -218,7 +225,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               });
               // Refresh positions to show updated holdings
               fetchPositions();
-            } else if (normalizedStatus === REBALANCE_STATUS.COMPLETED &&
+            } else if (completedRebalance?.status === REBALANCE_STATUS.COMPLETED &&
               completedRebalance?.rebalance_plan?.recommendation === 'no_action_needed') {
               // Show different message when no opportunities were found
               console.log('Rebalance completed with no action needed:', previousRunningRef.current);
@@ -449,8 +456,20 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               }
             });
 
-            if (error) throw error;
+            // Handle Supabase function errors (HTTP level)
+            if (error) {
+              console.error('HTTP-level error from rebalance function:', error);
+              throw error;
+            }
 
+            // Handle Edge Function errors (response body level)
+            if (data?.success === false) {
+              const errorMsg = data?.error || data?.message || 'Failed to initiate rebalance';
+              console.error('Edge Function returned error:', errorMsg, data);
+              throw new Error(errorMsg);
+            }
+
+            // Handle successful response
             if (data?.success) {
               toast({
                 title: "Rebalance Initiated",
@@ -462,13 +481,31 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                 localStorage.setItem('activeRebalanceId', data.rebalanceRequestId);
               }
             } else {
-              throw new Error(data?.message || 'Failed to initiate rebalance');
+              // Handle malformed response (no success field)
+              console.warn('Unexpected response format from rebalance function:', data);
+              throw new Error('Unexpected response from rebalance service');
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error('Rebalance error:', err);
+            
+            let errorMessage = "Failed to initiate portfolio rebalancing";
+            
+            // Extract error message from FunctionsHttpError
+            if (err?.name === 'FunctionsHttpError' && err?.context) {
+              try {
+                const responseData = await err.context.clone().json();
+                errorMessage = responseData?.error || responseData?.message || errorMessage;
+              } catch {
+                // If JSON parsing fails, use the generic message
+                errorMessage = "Service error. Please check your configuration.";
+              }
+            } else if (err?.message) {
+              errorMessage = err.message;
+            }
+            
             toast({
-              title: "Rebalance Failed",
-              description: err instanceof Error ? err.message : "Failed to initiate portfolio rebalancing",
+              title: "Rebalance Failed", 
+              description: errorMessage,
               variant: "destructive"
             });
           } finally {

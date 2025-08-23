@@ -157,8 +157,9 @@ export default function RebalanceInsightsTab({
                 ...insights,
                 recommendAnalysis: true, // If we have selected stocks, analysis was recommended
                 reasoning: reasoningText,
-                selectedStocksCount: insights.selectedStocks?.length || 0,
-                evaluatedStocksCount: insights.evaluatedStocks?.length || 0
+                // Use stored counts if available, otherwise calculate from arrays
+                selectedStocksCount: insights.selectedStocksCount ?? insights.selectedStocks?.length ?? 0,
+                evaluatedStocksCount: insights.evaluatedStocksCount ?? insights.evaluatedStocks?.length ?? 0
               };
             }
 

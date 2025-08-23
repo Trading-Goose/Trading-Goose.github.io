@@ -34,10 +34,11 @@ export const LEGACY_REBALANCE_STATUS_MAP = {
 
 /**
  * Convert legacy rebalance status to new simplified status
+ * Since database migration completed, this now just validates and returns the status
  */
-export function convertLegacyRebalanceStatus(legacyStatus: string): RebalanceStatus {
-  const mapped = LEGACY_REBALANCE_STATUS_MAP[legacyStatus as keyof typeof LEGACY_REBALANCE_STATUS_MAP];
-  return mapped || REBALANCE_STATUS.ERROR;
+export function convertLegacyRebalanceStatus(status: string): RebalanceStatus {
+  // Return status as-is since database migration already converted all legacy values
+  return status as RebalanceStatus;
 }
 
 /**
@@ -53,5 +54,7 @@ export function isRebalanceFinished(status: RebalanceStatus): boolean {
  * Check if rebalance status indicates active processing
  */
 export function isRebalanceActive(status: RebalanceStatus): boolean {
-  return status === REBALANCE_STATUS.RUNNING;
+  return status === REBALANCE_STATUS.RUNNING || 
+         status === REBALANCE_STATUS.PENDING ||
+         status === REBALANCE_STATUS.AWAITING_APPROVAL;
 }

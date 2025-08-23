@@ -255,8 +255,20 @@ class AnalysisManager {
         
         return analysisId;
       } catch (error) {
-        console.error('Failed to start server analysis, falling back to client-side:', error);
-        // Continue with client-side execution as fallback
+        console.error('Failed to start server analysis:', error);
+        
+        // Check if it's a configuration error that should be propagated to user
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        if (errorMessage.includes('API settings not found') || 
+            errorMessage.includes('not configured') ||
+            errorMessage.includes('Missing required parameters') ||
+            errorMessage.includes('Server configuration error')) {
+          // These are configuration issues that should be shown to the user
+          throw error;
+        }
+        
+        console.log('Falling back to client-side execution for non-configuration error');
+        // Continue with client-side execution as fallback for other errors
       }
     }
 

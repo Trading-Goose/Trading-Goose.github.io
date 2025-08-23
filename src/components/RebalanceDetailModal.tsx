@@ -347,7 +347,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           // Determine opportunity step status
           // Priority: 1) Check explicit status field, 2) Check overall workflow status
           let opportunityStatus = 'pending';
-          if (opportunityStep.status === 'error' || (opportunityStep.data && opportunityStep.data.error)) {
+          if (opportunityStep.data?.skipped || opportunityStep.data?.thresholdExceeded) {
+            opportunityStatus = 'skipped';
+          } else if (opportunityStep.status === 'error' || (opportunityStep.data && opportunityStep.data.error)) {
             opportunityStatus = 'error';
             // If the opportunity agent failed, the whole rebalance should show as failed
             insights = opportunityStep.data; // Keep the error data
@@ -527,11 +529,11 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         // Check if portfolio manager is complete or running using centralized status system
         // It's complete if either the rebalance_agent step is complete OR if we have a rebalance_plan
-        // It's running if rebalance is active
+        // It's running ONLY if the portfolio_manager workflow step is specifically running
         let portfolioManagerStatus: AnalysisStatus = ANALYSIS_STATUS.PENDING;
         if (rebalanceAgentStep.status === 'completed' || portfolioManagerStep.status === 'completed' || rebalanceRequest.rebalance_plan || isPendingApproval) {
           portfolioManagerStatus = ANALYSIS_STATUS.COMPLETED;
-        } else if (isRunning) {
+        } else if (portfolioManagerStep.status === 'running') {
           portfolioManagerStatus = ANALYSIS_STATUS.RUNNING;
         }
 

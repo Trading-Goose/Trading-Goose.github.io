@@ -344,7 +344,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                             {position.symbol}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right text-sm px-2">{position.shares}</TableCell>
+                        <TableCell className="text-right text-sm px-2">{position.shares.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-medium text-sm px-2">
                           ${(position.marketValue / 1000).toFixed(1)}k
                         </TableCell>

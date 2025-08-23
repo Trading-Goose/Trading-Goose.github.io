@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -34,13 +34,15 @@ import TradingTab from "./settings/TradingTab";
 import type { AiProvider } from "./settings/types";
 
 // Helper function to validate credentials via edge function
-const validateCredential = async (provider: string, apiKey: string): Promise<{ valid: boolean; message: string }> => {
+const validateCredential = async (provider: string, apiKey: string, model?: string, secretKey?: string): Promise<{ valid: boolean; message: string }> => {
   try {
     const { data, error } = await supabase.functions.invoke('settings-proxy', {
       body: {
         action: 'validate',
         provider,
-        apiKey
+        apiKey,
+        model,
+        secretKey
       }
     });
     
@@ -71,13 +73,14 @@ const checkConfiguredProviders = async (): Promise<{ configured: Record<string, 
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, apiSettings, updateApiSettings, isAuthenticated, isLoading, initialize } = useAuth();
   const { toast } = useToast();
   
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState("providers");
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "providers");
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState("");
   const [configuredProviders, setConfiguredProviders] = useState<Record<string, boolean>>({});
@@ -318,20 +321,9 @@ export default function SettingsPage() {
         for (let index = 0; index < aiProviders.length; index++) {
           const provider = aiProviders[index];
           if (provider.provider && provider.apiKey && provider.nickname) {
-            // Validate provider via edge function
-            let isValid = true;
-            if (provider.apiKey) {
-              const validation = await validateCredential(provider.provider, provider.apiKey);
-              isValid = validation.valid;
-              
-              if (!isValid) {
-                newErrors[`provider_${provider.id}`] = validation.message;
-              }
-            }
-            
-            if (isValid) {
-              // Always save the Default AI provider (ID '1') to api_settings via settings-proxy
-              if (provider.id === '1') {
+            // Let the backend handle validation and masking logic
+            // Always save the Default AI provider (ID '1') to api_settings via settings-proxy
+            if (provider.id === '1') {
                 settingsToSave.ai_provider = provider.provider as any;
                 // Update API key via settings-proxy
                 if (provider.apiKey) {
@@ -392,12 +384,6 @@ export default function SettingsPage() {
               }
             }
           }
-        }
-        
-        if (Object.keys(newErrors).length > 0) {
-          setErrors(newErrors);
-          return;
-        }
         
         // Check if we need to show migration warning
         let needsMigration = false;
@@ -453,11 +439,33 @@ export default function SettingsPage() {
           } else {
             throw new Error(data.error || 'Failed to save settings');
           }
-        } catch (proxyError) {
+        } catch (proxyError: any) {
           console.error('Error saving provider via settings-proxy:', proxyError);
-          // Fall back to direct save if proxy fails
-          console.log('Falling back to direct save for providers...');
+          
+          // Extract error message from FunctionsHttpError
+          let errorMessage = 'Failed to save provider settings';
+          if (proxyError?.name === 'FunctionsHttpError' && proxyError?.context) {
+            try {
+              const responseData = await proxyError.context.json();
+              errorMessage = responseData?.error || responseData?.message || errorMessage;
+            } catch {
+              errorMessage = proxyError.message || errorMessage;
+            }
+          } else if (proxyError?.message) {
+            errorMessage = proxyError.message;
+          }
+          
+          // Show error to user
+          toast({
+            title: "Provider Settings Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          
+          // Don't fall back to direct save - show the error instead
+          throw new Error(errorMessage);
         }
+        
       } else if (tab === 'agents') {
         // Save agent configuration
         // Validate custom model names are provided when 'custom' is selected
@@ -572,6 +580,75 @@ export default function SettingsPage() {
           settingsToSave[`${portfolioManagerProvider.provider}_api_key`] = portfolioManagerProvider.apiKey;
         }
       } else if (tab === 'trading') {
+        // Check if credentials have actually changed by comparing with backend masked values
+        const { data: changeCheckData, error: changeCheckError } = await supabase.functions.invoke('settings-proxy', {
+          body: {
+            action: 'check_credentials_changed',
+            alpacaPaperApiKey,
+            alpacaPaperSecretKey,
+            alpacaLiveApiKey,
+            alpacaLiveSecretKey
+          }
+        });
+        
+        if (changeCheckError) {
+          toast({
+            title: 'Validation Error',
+            description: 'Could not check if credentials changed',
+            variant: 'destructive'
+          });
+          return;
+        }
+        
+        const { shouldValidatePaper, shouldValidateLive } = changeCheckData;
+        let validationFailed = false;
+        
+        // Validate Paper Trading credentials if they have changed
+        if (shouldValidatePaper) {
+          const paperValidation = await validateCredential('alpaca_paper', alpacaPaperApiKey, undefined, alpacaPaperSecretKey);
+          if (!paperValidation.valid) {
+            toast({
+              title: 'Paper Trading Validation Failed',
+              description: paperValidation.message,
+              variant: 'destructive'
+            });
+            validationFailed = true;
+          } else {
+            toast({
+              title: 'Paper Trading Validated',
+              description: 'Alpaca paper trading credentials are valid and working',
+            });
+          }
+        } else if (alpacaPaperApiKey && alpacaPaperSecretKey) {
+          console.log('Paper trading credentials unchanged, skipping validation');
+        }
+        
+        // Validate Live Trading credentials if they have changed
+        if (shouldValidateLive) {
+          const liveValidation = await validateCredential('alpaca_live', alpacaLiveApiKey, undefined, alpacaLiveSecretKey);
+          if (!liveValidation.valid) {
+            toast({
+              title: 'Live Trading Validation Failed',
+              description: liveValidation.message,
+              variant: 'destructive'
+            });
+            validationFailed = true;
+          } else {
+            toast({
+              title: 'Live Trading Validated',
+              description: 'Alpaca live trading credentials are valid and working',
+            });
+          }
+        } else if (alpacaLiveApiKey && alpacaLiveSecretKey) {
+          console.log('Live trading credentials unchanged, skipping validation');
+        }
+        
+        
+        // If validation failed, stop here
+        if (validationFailed) {
+          return;
+        }
+        
         // Trading settings - use settings-proxy for credential masking
         settingsToSave = {
           alpaca_paper_api_key: alpacaPaperApiKey,
@@ -615,10 +692,31 @@ export default function SettingsPage() {
           } else {
             throw new Error(data.error || 'Failed to save settings');
           }
-        } catch (proxyError) {
+        } catch (proxyError: any) {
           console.error('Error saving via settings-proxy:', proxyError);
-          // Fall back to direct save if proxy fails
-          console.log('Falling back to direct save...');
+          
+          // Extract error message from FunctionsHttpError
+          let errorMessage = 'Failed to save trading settings';
+          if (proxyError?.name === 'FunctionsHttpError' && proxyError?.context) {
+            try {
+              const responseData = await proxyError.context.json();
+              errorMessage = responseData?.error || responseData?.message || errorMessage;
+            } catch {
+              errorMessage = proxyError.message || errorMessage;
+            }
+          } else if (proxyError?.message) {
+            errorMessage = proxyError.message;
+          }
+          
+          // Show error to user
+          toast({
+            title: "Trading Settings Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          
+          // Don't fall back to direct save - show the error instead
+          throw new Error(errorMessage);
         }
       } else if (tab === 'rebalance') {
         // Rebalance settings - use same logic as agent config tab

@@ -5,11 +5,11 @@ import { useAuth } from '@/lib/auth';
 
 export interface RoleLimit {
   role_id: string;
-  max_analysis_per_day: number;
-  max_rebalance_per_day: number;
+  max_parallel_analysis: number;
   max_watchlist_stocks: number;
   max_rebalance_stocks: number;
   max_scheduled_rebalances: number;
+  schedule_resolution: string;
   rebalance_access: boolean;
   opportunity_agent_access: boolean;
   additional_provider_access: boolean;
@@ -30,11 +30,11 @@ export interface RoleWithLimits {
   role_name: string;
   is_built_in?: boolean;
   // Flattened limits for easier access
-  max_analysis_per_day: number;
-  max_rebalance_per_day: number;
+  max_parallel_analysis: number;
   max_watchlist_stocks: number;
   max_rebalance_stocks: number;
   max_scheduled_rebalances: number;
+  schedule_resolution: string;
   rebalance_access: boolean;
   opportunity_agent_access: boolean;
   additional_provider_access: boolean;
@@ -100,11 +100,11 @@ export function useRoleManagement() {
           limits,
           permissions: rolePermNames,
           // Flatten limits for easier access in the component
-          max_analysis_per_day: limits?.max_analysis_per_day ?? 5,
-          max_rebalance_per_day: limits?.max_rebalance_per_day ?? 2,
+          max_parallel_analysis: limits?.max_parallel_analysis ?? 1,
           max_watchlist_stocks: limits?.max_watchlist_stocks ?? 10,
           max_rebalance_stocks: limits?.max_rebalance_stocks ?? 5,
           max_scheduled_rebalances: limits?.max_scheduled_rebalances ?? 2,
+          schedule_resolution: limits?.schedule_resolution ?? 'Month',
           rebalance_access: limits?.rebalance_access ?? false,
           opportunity_agent_access: limits?.opportunity_agent_access ?? false,
           additional_provider_access: limits?.additional_provider_access ?? false,
@@ -148,11 +148,11 @@ export function useRoleManagement() {
           .from('role_limits')
           .insert({
             role_id: data.id,
-            max_analysis_per_day: 5,
-            max_rebalance_per_day: 2,
+            max_parallel_analysis: 1,
             max_watchlist_stocks: 10,
             max_rebalance_stocks: 5,
             max_scheduled_rebalances: 2,
+            schedule_resolution: 'Month',
             rebalance_access: false,
             opportunity_agent_access: false,
             additional_provider_access: false,

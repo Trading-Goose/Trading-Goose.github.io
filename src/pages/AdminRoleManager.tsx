@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -96,11 +97,11 @@ export default function AdminRoleManager() {
     try {
       await updateRoleLimits(editingLimits.id, {
         role_id: editingLimits.id,
-        max_analysis_per_day: editingLimits.max_analysis_per_day,
-        max_rebalance_per_day: editingLimits.max_rebalance_per_day,
+        max_parallel_analysis: editingLimits.max_parallel_analysis,
         max_watchlist_stocks: editingLimits.max_watchlist_stocks,
         max_rebalance_stocks: editingLimits.max_rebalance_stocks,
         max_scheduled_rebalances: editingLimits.max_scheduled_rebalances,
+        schedule_resolution: editingLimits.schedule_resolution,
         rebalance_access: editingLimits.rebalance_access,
         opportunity_agent_access: editingLimits.opportunity_agent_access,
         additional_provider_access: editingLimits.additional_provider_access,
@@ -375,12 +376,8 @@ export default function AdminRoleManager() {
                         {/* Limits Display */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
-                            <Label className="text-xs">Analysis/Day</Label>
-                            <p className="text-lg font-semibold">{role.max_analysis_per_day}</p>
-                          </div>
-                          <div>
-                            <Label className="text-xs">Rebalance/Day</Label>
-                            <p className="text-lg font-semibold">{role.max_rebalance_per_day}</p>
+                            <Label className="text-xs">Parallel Analysis</Label>
+                            <p className="text-lg font-semibold">{role.max_parallel_analysis}</p>
                           </div>
                           <div>
                             <Label className="text-xs">Watchlist Stocks</Label>
@@ -389,6 +386,10 @@ export default function AdminRoleManager() {
                           <div>
                             <Label className="text-xs">Rebalance Stocks</Label>
                             <p className="text-lg font-semibold">{role.max_rebalance_stocks}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Schedule Resolution</Label>
+                            <p className="text-sm font-semibold">{role.schedule_resolution}</p>
                           </div>
                         </div>
 
@@ -533,23 +534,12 @@ export default function AdminRoleManager() {
                 {/* Numeric Limits */}
                 <div className="space-y-4">
                   <div>
-                    <Label>Max Analysis per Day: {editingLimits.max_analysis_per_day}</Label>
+                    <Label>Max Parallel Analysis: {editingLimits.max_parallel_analysis}</Label>
                     <Slider
-                      value={[editingLimits.max_analysis_per_day]}
-                      onValueChange={(v) => setEditingLimits({ ...editingLimits, max_analysis_per_day: v[0] })}
-                      min={0}
-                      max={200}
-                      step={1}
-                      className="mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label>Max Rebalance per Day: {editingLimits.max_rebalance_per_day}</Label>
-                    <Slider
-                      value={[editingLimits.max_rebalance_per_day]}
-                      onValueChange={(v) => setEditingLimits({ ...editingLimits, max_rebalance_per_day: v[0] })}
-                      min={0}
-                      max={25}
+                      value={[editingLimits.max_parallel_analysis]}
+                      onValueChange={(v) => setEditingLimits({ ...editingLimits, max_parallel_analysis: v[0] })}
+                      min={1}
+                      max={10}
                       step={1}
                       className="mt-2"
                     />
@@ -587,6 +577,47 @@ export default function AdminRoleManager() {
                       className="mt-2"
                     />
                   </div>
+                </div>
+
+                {/* Schedule Resolution */}
+                <div className="space-y-2">
+                  <Label>Schedule Resolution</Label>
+                  <div className="flex gap-4">
+                    {['Day', 'Week', 'Month'].map((resolution) => {
+                      const resolutions = editingLimits.schedule_resolution?.split(',') || [];
+                      const isChecked = resolutions.includes(resolution);
+                      return (
+                        <div key={resolution} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`resolution-${resolution}`}
+                            checked={isChecked}
+                            onCheckedChange={(checked) => {
+                              let newResolutions = [...resolutions];
+                              if (checked) {
+                                if (!newResolutions.includes(resolution)) {
+                                  newResolutions.push(resolution);
+                                }
+                              } else {
+                                newResolutions = newResolutions.filter(r => r !== resolution);
+                              }
+                              // Ensure at least one resolution is selected
+                              if (newResolutions.length === 0) {
+                                newResolutions = ['Month'];
+                              }
+                              setEditingLimits({ 
+                                ...editingLimits, 
+                                schedule_resolution: newResolutions.join(',') 
+                              });
+                            }}
+                          />
+                          <Label htmlFor={`resolution-${resolution}`}>{resolution}</Label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Select which schedule intervals this role can access
+                  </p>
                 </div>
 
                 {/* Boolean Flags */}

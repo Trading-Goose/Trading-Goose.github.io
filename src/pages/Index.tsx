@@ -21,12 +21,7 @@ const Index = () => {
       navigate(`/reset-password${window.location.hash}`);
       return;
     }
-
-    // Redirect authenticated users to dashboard
-    if (!isLoading && isAuthenticated) {
-      navigate('/dashboard');
-    }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -49,12 +44,20 @@ const Index = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="text-lg px-8 py-6" onClick={() => navigate('/register')}>
-                Get Started Free
-              </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8 py-6" onClick={() => navigate('/login')}>
-                Sign In
-              </Button>
+              {!isLoading && isAuthenticated ? (
+                <Button size="lg" className="text-lg px-8 py-6" onClick={() => navigate('/dashboard')}>
+                  Go to Dashboard
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" className="text-lg px-8 py-6" onClick={() => navigate('/register')}>
+                    Get Started Free
+                  </Button>
+                  <Button variant="outline" size="lg" className="text-lg px-8 py-6" onClick={() => navigate('/login')}>
+                    Sign In
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 

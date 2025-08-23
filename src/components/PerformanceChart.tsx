@@ -398,7 +398,7 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => navigate('/settings')}
+                onClick={() => navigate('/settings?tab=trading')}
                 className="ml-4"
               >
                 <Settings className="h-4 w-4 mr-2" />

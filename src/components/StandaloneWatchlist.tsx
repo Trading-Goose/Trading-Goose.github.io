@@ -611,7 +611,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
               {watchlist.map((item) => (
                 <div
                   key={item.ticker}
-                  className={`flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer ${selectedStock === item.ticker
+                  className={`relative flex flex-col sm:flex-row sm:items-center sm:justify-between sm:p-4 rounded-lg border transition-colors cursor-pointer ${selectedStock === item.ticker
                     ? 'border-primary bg-primary/10'
                     : 'border-border hover:bg-muted/50'
                     }`}
@@ -621,16 +621,29 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                     onSelectStock?.(item.ticker);
                   }}
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                  {/* Mobile: X button in top-right corner */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="absolute top-2 right-2 sm:hidden h-8 w-8 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFromWatchlist(item.ticker);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex-1 p-4 pb-2 sm:p-0 pr-10 sm:pr-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                       <span className="font-semibold">{item.ticker}</span>
                       {item.description && (
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-sm text-muted-foreground line-clamp-1">
                           {item.description}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 mt-1 text-sm">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 text-sm">
                       {item.currentPrice > 0 && (
                         <span className="font-medium">
                           ${item.currentPrice.toFixed(2)}
@@ -647,15 +660,40 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                           <span>{Math.abs(item.priceChangePercent).toFixed(2)}%</span>
                         </div>
                       )}
-                      {(item.lastAnalysis || item.currentPrice > 0) && (
-                        <span className="text-muted-foreground">
-                          Last: {item.lastAnalysis || new Date().toISOString().split('T')[0]}
-                        </span>
-                      )}
+                      <span className="text-muted-foreground hidden sm:inline">
+                        Last: {item.lastAnalysis || new Date().toISOString().split('T')[0]}
+                      </span>
                       {getDecisionBadge(item.lastDecision)}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  
+                  {/* Mobile: Show analyze button below at full width */}
+                  <div className="sm:hidden border-t border-border/50 px-4 py-2 bg-muted/30">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full border border-slate-700"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAnalysis(item.ticker);
+                      }}
+                    >
+                      {runningAnalyses.has(item.ticker) ? (
+                        <>
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Progress
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-1" />
+                          Analyze
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {/* Desktop: Show buttons on the right */}
+                  <div className="hidden sm:flex items-center gap-2">
                     <Button
                       size="sm"
                       variant="outline"

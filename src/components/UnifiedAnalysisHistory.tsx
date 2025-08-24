@@ -537,10 +537,18 @@ export default function UnifiedAnalysisHistory() {
         <CardContent className="pt-6">
           <Tabs defaultValue="all" className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="all">All ({history.length + runningAnalyses.length + canceledAnalyses.length})</TabsTrigger>
-              <TabsTrigger value="running">Running ({runningAnalyses.length})</TabsTrigger>
-              <TabsTrigger value="completed">Completed ({history.length})</TabsTrigger>
-              <TabsTrigger value="canceled">Canceled ({canceledAnalyses.length})</TabsTrigger>
+              <TabsTrigger value="all">
+                All <span className="hidden sm:inline">({history.length + runningAnalyses.length + canceledAnalyses.length})</span>
+              </TabsTrigger>
+              <TabsTrigger value="running">
+                Running <span className="hidden sm:inline">({runningAnalyses.length})</span>
+              </TabsTrigger>
+              <TabsTrigger value="completed">
+                Completed <span className="hidden sm:inline">({history.length})</span>
+              </TabsTrigger>
+              <TabsTrigger value="canceled">
+                Canceled <span className="hidden sm:inline">({canceledAnalyses.length})</span>
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="space-y-4">

@@ -11,7 +11,8 @@ import {
   Home,
   RefreshCw,
   UserPlus,
-  Activity
+  Activity,
+  Menu
 } from "lucide-react";
 import { useAuth, hasRequiredApiKeys } from "@/lib/auth";
 import { useRBAC } from "@/hooks/useRBAC";
@@ -141,8 +142,9 @@ export default function Header() {
             <div className="flex items-center gap-2 sm:gap-3">
               {isAuthenticated ? (
                 <>
+                  {/* Desktop Profile Dropdown */}
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                    <DropdownMenuTrigger asChild className="hidden md:flex">
                       <Button variant="outline" size="sm" className="max-w-[150px] sm:max-w-none">
                         <UserIcon className="h-4 w-4 mr-2" />
                         <span className="truncate">{profile?.name || profile?.full_name || user?.email || 'Profile'}</span>
@@ -167,28 +169,88 @@ export default function Header() {
                           Settings
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="md:hidden">
+                      <RoleGate permissions={['admin.access']}>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">Admin</DropdownMenuLabel>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/invitations" className="flex items-center">
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Invitations
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/users" className="flex items-center">
+                            <UserIcon className="h-4 w-4 mr-2" />
+                            User Management
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/roles" className="flex items-center">
+                            <Settings className="h-4 w-4 mr-2" />
+                            Role Management
+                          </Link>
+                        </DropdownMenuItem>
+                      </RoleGate>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={logout} className="text-red-600">
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Mobile Hamburger Menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild className="md:hidden">
+                      <Button variant="outline" size="icon">
+                        <Menu className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-normal truncate">{profile?.name || profile?.full_name || user?.email}</span>
+                          <RoleBadge className="mt-1" />
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">Navigation</DropdownMenuLabel>
+                      <DropdownMenuItem asChild>
                         <Link to="/dashboard" className="flex items-center">
                           <Home className="h-4 w-4 mr-2" />
                           Dashboard
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="md:hidden">
+                      <DropdownMenuItem asChild>
                         <Link to="/analysis-records" className="flex items-center">
                           <FileText className="h-4 w-4 mr-2" />
                           Analysis Records
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="md:hidden">
+                      <DropdownMenuItem asChild>
                         <Link to="/rebalance-records" className="flex items-center">
                           <RefreshCw className="h-4 w-4 mr-2" />
                           Rebalance Records
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild className="md:hidden">
+                      <DropdownMenuItem asChild>
                         <Link to="/trade-history" className="flex items-center">
                           <TrendingUp className="h-4 w-4 mr-2" />
                           Trade History
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">Account</DropdownMenuLabel>
+                      <DropdownMenuItem asChild>
+                        <Link to="/profile" className="flex items-center">
+                          <UserIcon className="h-4 w-4 mr-2" />
+                          Profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/settings" className="flex items-center">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Settings
                         </Link>
                       </DropdownMenuItem>
                       <RoleGate permissions={['admin.access']}>

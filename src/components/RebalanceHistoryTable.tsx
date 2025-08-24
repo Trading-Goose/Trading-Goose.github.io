@@ -519,10 +519,18 @@ export default function RebalanceHistoryTable() {
         <CardContent className="pt-6">
           <Tabs defaultValue="all" className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="all">All ({totalCount})</TabsTrigger>
-              <TabsTrigger value="running">Running ({runningRebalances.length})</TabsTrigger>
-              <TabsTrigger value="completed">Completed ({completedRebalances.length})</TabsTrigger>
-              <TabsTrigger value="cancelled">Cancelled ({cancelledRebalances.length})</TabsTrigger>
+              <TabsTrigger value="all">
+                All <span className="hidden sm:inline">({totalCount})</span>
+              </TabsTrigger>
+              <TabsTrigger value="running">
+                Running <span className="hidden sm:inline">({runningRebalances.length})</span>
+              </TabsTrigger>
+              <TabsTrigger value="completed">
+                Completed <span className="hidden sm:inline">({completedRebalances.length})</span>
+              </TabsTrigger>
+              <TabsTrigger value="cancelled">
+                Cancelled <span className="hidden sm:inline">({cancelledRebalances.length})</span>
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="space-y-4">

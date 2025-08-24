@@ -700,19 +700,24 @@ export default function TradeHistoryTable() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="all">
-              All ({allTrades.length})
+              <span className="sm:hidden">All</span>
+              <span className="hidden sm:inline">All ({allTrades.length})</span>
             </TabsTrigger>
             <TabsTrigger value="pending">
-              Pending ({getFilteredTrades('pending').length})
+              <span className="sm:hidden">Pending</span>
+              <span className="hidden sm:inline">Pending ({getFilteredTrades('pending').length})</span>
             </TabsTrigger>
             <TabsTrigger value="approved">
-              Approved ({getFilteredTrades('approved').length})
+              <span className="sm:hidden">Approved</span>
+              <span className="hidden sm:inline">Approved ({getFilteredTrades('approved').length})</span>
             </TabsTrigger>
             <TabsTrigger value="executed">
-              Executed ({getFilteredTrades('executed').length})
+              <span className="sm:hidden">Executed</span>
+              <span className="hidden sm:inline">Executed ({getFilteredTrades('executed').length})</span>
             </TabsTrigger>
             <TabsTrigger value="rejected">
-              Rejected ({getFilteredTrades('rejected').length})
+              <span className="sm:hidden">Rejected</span>
+              <span className="hidden sm:inline">Rejected ({getFilteredTrades('rejected').length})</span>
             </TabsTrigger>
           </TabsList>
           

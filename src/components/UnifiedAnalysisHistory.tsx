@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Loader2, RefreshCw, Eye, Trash2, MoreVertical, StopCircle, Users, MessageSquare, AlertCircle, Package, Calendar } from "lucide-react";
+import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Loader2, RefreshCw, Eye, Trash2, MoreVertical, StopCircle, Users, MessageSquare, AlertCircle, Package, Calendar, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -66,6 +66,9 @@ interface RunningAnalysisItem {
   id: string;
   ticker: string;
   created_at: string;
+  full_analysis?: any;  // Add to store progress data
+  rebalance_request_id?: string;  // To check if part of rebalance
+  status?: AnalysisStatus;  // To distinguish between pending and running
 }
 
 interface RebalanceAnalysisGroup {
@@ -74,6 +77,45 @@ interface RebalanceAnalysisGroup {
   status: string;
   analyses: AnalysisHistoryItem[];
 }
+
+// Calculate agent completion percentage for a single analysis
+const calculateAgentCompletion = (fullAnalysis: any, isRebalanceAnalysis: boolean = false): number => {
+  if (!fullAnalysis?.messages) return 0;
+
+  // Define expected agents (including macro-analyst)
+  // For rebalance analyses, exclude portfolio-manager as it runs at rebalance level
+  const expectedAgents = [
+    'macro-analyst', 'market-analyst', 'news-analyst', 'social-media-analyst', 'fundamentals-analyst',
+    'bull-researcher', 'bear-researcher', 'research-manager',
+    'risky-analyst', 'safe-analyst', 'neutral-analyst', 'risk-manager',
+    'trader'
+  ];
+  
+  // Only add portfolio-manager for standalone analyses (not part of rebalance)
+  if (!isRebalanceAnalysis) {
+    expectedAgents.push('portfolio-manager');
+  }
+
+  const messages = fullAnalysis.messages || [];
+  const completedAgents = new Set<string>();
+
+  messages.forEach((msg: any) => {
+    if (msg.agent && msg.timestamp) {
+      const normalizedAgent = msg.agent.toLowerCase().replace(/\s+/g, '-');
+      completedAgents.add(normalizedAgent);
+    }
+  });
+
+  // Count matches
+  let matchedAgents = 0;
+  expectedAgents.forEach(agentKey => {
+    if (completedAgents.has(agentKey)) {
+      matchedAgents++;
+    }
+  });
+
+  return expectedAgents.length > 0 ? (matchedAgents / expectedAgents.length) * 100 : 0;
+};
 
 export default function UnifiedAnalysisHistory() {
   const { user, isAuthenticated } = useAuth();
@@ -102,7 +144,7 @@ export default function UnifiedAnalysisHistory() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);
-      
+
       if (error) {
         console.error('Error loading analyses:', error);
         throw error;
@@ -112,20 +154,23 @@ export default function UnifiedAnalysisHistory() {
       const runningAnalyses: RunningAnalysisItem[] = [];
       const completedAnalyses: AnalysisHistoryItem[] = [];
       const canceledAnalyses: AnalysisHistoryItem[] = [];
-      
+
       for (const item of data || []) {
         // Use analysis_status field if available, otherwise fall back to old logic
         if ('analysis_status' in item) {
           // Convert legacy numeric status to new string format
-          const status: AnalysisStatus = typeof item.analysis_status === 'number' 
+          const status: AnalysisStatus = typeof item.analysis_status === 'number'
             ? convertLegacyAnalysisStatus(item.analysis_status)
             : item.analysis_status as AnalysisStatus;
-          
+
           if (status === ANALYSIS_STATUS.RUNNING || status === ANALYSIS_STATUS.PENDING) {
             runningAnalyses.push({
               id: item.id,
               ticker: item.ticker,
-              created_at: item.created_at
+              created_at: item.created_at,
+              full_analysis: item.full_analysis,
+              rebalance_request_id: item.rebalance_request_id,
+              status: status
             });
           } else if (status === ANALYSIS_STATUS.COMPLETED) {
             completedAnalyses.push(item);
@@ -140,21 +185,24 @@ export default function UnifiedAnalysisHistory() {
         } else {
           // Fall back to old logic for backward compatibility
           const hasAgentInsights = item.agent_insights && Object.keys(item.agent_insights).length > 0;
-          const isRunning = item.analysis_status === ANALYSIS_STATUS.RUNNING || 
-                           (item.confidence === 0 && !hasAgentInsights);
-          
+          const isRunning = item.analysis_status === ANALYSIS_STATUS.RUNNING ||
+            (item.confidence === 0 && !hasAgentInsights);
+
           if (isRunning) {
             runningAnalyses.push({
               id: item.id,
               ticker: item.ticker,
-              created_at: item.created_at
+              created_at: item.created_at,
+              full_analysis: item.full_analysis,
+              rebalance_request_id: item.rebalance_request_id,
+              status: ANALYSIS_STATUS.RUNNING  // Default to running for fallback logic
             });
           } else if ((item.confidence > 0 || hasAgentInsights) && item.decision && ['BUY', 'SELL', 'HOLD'].includes(item.decision)) {
             completedAnalyses.push(item);
           }
         }
       }
-      
+
       setRunningAnalyses(runningAnalyses);
       setHistory(completedAnalyses);
       setCanceledAnalyses(canceledAnalyses);
@@ -186,14 +234,14 @@ export default function UnifiedAnalysisHistory() {
   // Poll for updates only when there are running analyses
   useEffect(() => {
     if (!user) return;
-    
+
     const interval = setInterval(() => {
       // Only poll if there are running analyses
       if (runningAnalyses.length > 0) {
         loadAllAnalyses();
       }
     }, 3000); // Poll every 3 seconds instead of 2
-    
+
     return () => clearInterval(interval);
   }, [user, runningAnalyses.length]);
 
@@ -212,11 +260,11 @@ export default function UnifiedAnalysisHistory() {
 
   const cancelAnalysis = async (analysisId: string, ticker: string) => {
     if (!user) return;
-    
+
     setCancelling(true);
     try {
       await analysisManager.cancelAnalysis(ticker, user.id);
-      
+
       // First get the current analysis to preserve existing messages
       const { data: currentAnalysis } = await supabase
         .from('analysis_history')
@@ -226,7 +274,7 @@ export default function UnifiedAnalysisHistory() {
         .single();
 
       const existingMessages = currentAnalysis?.full_analysis?.messages || [];
-      
+
       // Mark the analysis as canceled and preserve existing messages
       const { error } = await supabase
         .from('analysis_history')
@@ -249,24 +297,24 @@ export default function UnifiedAnalysisHistory() {
         })
         .eq('id', analysisId)
         .eq('user_id', user.id);
-      
+
       if (error) throw error;
-      
+
       // Move from running to canceled list
       setRunningAnalyses(prev => prev.filter(item => item.id !== analysisId));
-      
+
       toast({
         title: "Analysis Cancelled",
         description: `Analysis for ${ticker} has been cancelled and moved to canceled history.`,
       });
-      
+
       setShowCancelDialog(false);
       setSelectedAnalysisId(null);
       setSelectedAnalysisTicker(null);
-      
+
       // Refresh the analysis lists to show the canceled item
       loadAllAnalyses();
-      
+
       // Close modal if this analysis was being viewed
       if (selectedTicker === ticker || selectedViewAnalysisId === analysisId) {
         setSelectedTicker(null);
@@ -287,7 +335,7 @@ export default function UnifiedAnalysisHistory() {
 
   const deleteAnalysis = async (analysisId: string, ticker: string) => {
     if (!user) return;
-    
+
     setDeleting(true);
     try {
       const { error } = await supabase
@@ -301,12 +349,12 @@ export default function UnifiedAnalysisHistory() {
       setHistory(prev => prev.filter(item => item.id !== analysisId));
       setRunningAnalyses(prev => prev.filter(item => item.id !== analysisId));
       setCanceledAnalyses(prev => prev.filter(item => item.id !== analysisId));
-      
+
       toast({
         title: "Analysis Deleted",
         description: `Analysis for ${ticker} has been deleted successfully.`,
       });
-      
+
       setShowDeleteDialog(false);
       setSelectedAnalysisId(null);
       setSelectedAnalysisTicker(null);
@@ -417,7 +465,7 @@ export default function UnifiedAnalysisHistory() {
 
     // Combine all items with their creation timestamps for unified sorting
     const allItems: (AnalysisHistoryItem | RebalanceAnalysisGroup)[] = [];
-    
+
     // Add rebalance groups
     Array.from(rebalanceGroups.values()).forEach(group => {
       // Sort analyses within group by creation time
@@ -440,9 +488,8 @@ export default function UnifiedAnalysisHistory() {
   const renderAnalysisCard = (item: AnalysisHistoryItem, isInRebalanceGroup: boolean = false) => (
     <div
       key={item.id}
-      className={`border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors ${
-        isInRebalanceGroup ? 'bg-muted/10' : ''
-      }`}
+      className={`border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors ${isInRebalanceGroup ? 'bg-muted/10' : ''
+        }`}
       onClick={() => viewDetails(item)}
     >
       <div className="flex items-center justify-between">
@@ -464,10 +511,10 @@ export default function UnifiedAnalysisHistory() {
           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
         </span>
       </div>
-      
+
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
-          {item.analysis_date ? 
+          {item.analysis_date ?
             `Analysis date: ${new Date(item.analysis_date).toLocaleDateString()}` :
             `Started: ${new Date(item.created_at).toLocaleDateString()}`
           }
@@ -541,7 +588,7 @@ export default function UnifiedAnalysisHistory() {
                 All <span className="hidden sm:inline">({history.length + runningAnalyses.length + canceledAnalyses.length})</span>
               </TabsTrigger>
               <TabsTrigger value="running">
-                Running <span className="hidden sm:inline">({runningAnalyses.length})</span>
+                Active <span className="hidden sm:inline">({runningAnalyses.length})</span>
               </TabsTrigger>
               <TabsTrigger value="completed">
                 Completed <span className="hidden sm:inline">({history.length})</span>
@@ -555,91 +602,124 @@ export default function UnifiedAnalysisHistory() {
               {/* Running Analyses Section */}
               {runningAnalyses.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Currently Running</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Active Analyses</h3>
                   <div className="space-y-2">
                     {runningAnalyses.map((item) => (
-                  <div
-                    key={item.id}
-                    className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => viewRunningAnalysis(item.ticker)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold">{item.ticker}</span>
-                        <Badge variant="default">
-                          <span className="flex items-center gap-1">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Running
+                      <div
+                        key={item.id}
+                        className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => viewRunningAnalysis(item.ticker)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold">{item.ticker}</span>
+                            <Badge variant={item.status === ANALYSIS_STATUS.PENDING ? "secondary" : "default"}>
+                              <span className="flex items-center gap-1">
+                                {item.status === ANALYSIS_STATUS.PENDING ? (
+                                  <>
+                                    <Clock className="h-3 w-3" />
+                                    Pending
+                                  </>
+                                ) : (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Running
+                                  </>
+                                )}
+                              </span>
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            Started {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                           </span>
-                        </Badge>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        Started {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">
-                        Analysis in progress...
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="border border-slate-700"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            viewRunningAnalysis(item.ticker);
-                          }}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Details
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            {item.status === ANALYSIS_STATUS.RUNNING && item.full_analysis && (
+                              <div className="flex items-center gap-2 mr-4">
+                                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-yellow-500 animate-pulse transition-all"
+                                    style={{
+                                      width: `${calculateAgentCompletion(item.full_analysis, !!item.rebalance_request_id)}%`
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                                  {Math.round(calculateAgentCompletion(item.full_analysis, !!item.rebalance_request_id))}%
+                                </span>
+                              </div>
+                            )}
+                            {item.status === ANALYSIS_STATUS.PENDING && (
+                              <span className="text-xs text-muted-foreground">
+                                Waiting to start...
+                              </span>
+                            )}
+                            {item.status === ANALYSIS_STATUS.RUNNING && !item.full_analysis && (
+                              <span className="text-xs text-muted-foreground">
+                                Analysis in progress...
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
                             <Button
-                              variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 border border-slate-700"
-                              onClick={(e) => e.stopPropagation()}
+                              variant="ghost"
+                              className="border border-slate-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                viewRunningAnalysis(item.ticker);
+                              }}
                             >
-                              <MoreVertical className="h-4 w-4" />
+                              <Eye className="h-4 w-4 mr-1" />
+                              View Details
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedAnalysisId(item.id);
-                                setSelectedAnalysisTicker(item.ticker);
-                                setShowCancelDialog(true);
-                              }}
-                              className="text-red-500 hover:text-white hover:bg-red-600"
-                            >
-                              <StopCircle className="h-4 w-4 mr-2" />
-                              Cancel Analysis
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedAnalysisId(item.id);
-                                setSelectedAnalysisTicker(item.ticker);
-                                setShowDeleteDialog(true);
-                              }}
-                            className="text-red-500 hover:text-white hover:bg-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 border border-slate-700"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedAnalysisId(item.id);
+                                    setSelectedAnalysisTicker(item.ticker);
+                                    setShowCancelDialog(true);
+                                  }}
+                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                >
+                                  <StopCircle className="h-4 w-4 mr-2" />
+                                  Cancel Analysis
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedAnalysisId(item.id);
+                                    setSelectedAnalysisTicker(item.ticker);
+                                    setShowDeleteDialog(true);
+                                  }}
+                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                ))}
-              </div>
-            </div>
-          )}
+              )}
 
               {/* Completed Analyses Section */}
               {history.length > 0 && (
@@ -668,7 +748,7 @@ export default function UnifiedAnalysisHistory() {
                                 {formatFullDate(group.createdAt)}
                               </div>
                             </div>
-                            
+
                             {/* Rebalance Analyses */}
                             <div className="space-y-3">
                               {group.analyses.map(analysis => renderAnalysisCard(analysis, true))}
@@ -708,7 +788,7 @@ export default function UnifiedAnalysisHistory() {
                           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
                           Started: {new Date(item.created_at).toLocaleDateString()}
@@ -767,73 +847,113 @@ export default function UnifiedAnalysisHistory() {
                   {runningAnalyses.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                      className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => viewRunningAnalysis(item.ticker)}
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
                           <span className="font-semibold">{item.ticker}</span>
-                          <Badge variant="default">
+                          <Badge variant={item.status === ANALYSIS_STATUS.PENDING ? "secondary" : "default"}>
                             <span className="flex items-center gap-1">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              Running
+                              {item.status === ANALYSIS_STATUS.PENDING ? (
+                                <>
+                                  <Clock className="h-3 w-3" />
+                                  Pending
+                                </>
+                              ) : (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  Running
+                                </>
+                              )}
                             </span>
                           </Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           Started {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                        </div>
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            viewRunningAnalysis(item.ticker);
-                          }}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Details
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 border border-slate-700"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedAnalysisId(item.id);
-                                setSelectedAnalysisTicker(item.ticker);
-                                setShowCancelDialog(true);
-                              }}
-                              className="text-red-500 hover:text-white hover:bg-red-600"
-                            >
-                              <StopCircle className="h-4 w-4 mr-2" />
-                              Cancel Analysis
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedAnalysisId(item.id);
-                                setSelectedAnalysisTicker(item.ticker);
-                                setShowDeleteDialog(true);
-                              }}
-                              className="text-red-500 hover:text-white hover:bg-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          {item.status === ANALYSIS_STATUS.RUNNING && item.full_analysis && (
+                            <div className="flex items-center gap-2 mr-4">
+                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-yellow-500 animate-pulse transition-all"
+                                  style={{
+                                    width: `${calculateAgentCompletion(item.full_analysis, !!item.rebalance_request_id)}%`
+                                  }}
+                                />
+                              </div>
+                              <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                                {Math.round(calculateAgentCompletion(item.full_analysis, !!item.rebalance_request_id))}%
+                              </span>
+                            </div>
+                          )}
+                          {item.status === ANALYSIS_STATUS.PENDING && (
+                            <span className="text-xs text-muted-foreground">
+                              Waiting to start...
+                            </span>
+                          )}
+                          {item.status === ANALYSIS_STATUS.RUNNING && !item.full_analysis && (
+                            <span className="text-xs text-muted-foreground">
+                              Analysis in progress...
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="border border-slate-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              viewRunningAnalysis(item.ticker);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View Details
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 border border-slate-700"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAnalysisId(item.id);
+                                  setSelectedAnalysisTicker(item.ticker);
+                                  setShowCancelDialog(true);
+                                }}
+                                className="text-red-500 hover:text-white hover:bg-red-600"
+                              >
+                                <StopCircle className="h-4 w-4 mr-2" />
+                                Cancel Analysis
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAnalysisId(item.id);
+                                  setSelectedAnalysisTicker(item.ticker);
+                                  setShowDeleteDialog(true);
+                                }}
+                                className="text-red-500 hover:text-white hover:bg-red-600"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -870,7 +990,7 @@ export default function UnifiedAnalysisHistory() {
                                 {formatFullDate(group.createdAt)}
                               </div>
                             </div>
-                            
+
                             {/* Rebalance Analyses */}
                             <div className="space-y-3">
                               {group.analyses.map(analysis => renderAnalysisCard(analysis, true))}
@@ -915,7 +1035,7 @@ export default function UnifiedAnalysisHistory() {
                           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
                           Started: {new Date(item.created_at).toLocaleDateString()}
@@ -973,7 +1093,7 @@ export default function UnifiedAnalysisHistory() {
           }}
         />
       )}
-      
+
       {/* Cancel Confirmation Dialog */}
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent>
@@ -1011,7 +1131,7 @@ export default function UnifiedAnalysisHistory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

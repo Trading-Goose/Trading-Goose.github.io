@@ -20,8 +20,8 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { 
-  AnalysisStatus, 
+import {
+  AnalysisStatus,
   ANALYSIS_STATUS,
   convertLegacyAnalysisStatus,
   isAnalysisActive,
@@ -58,7 +58,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
   const [showLimitAlert, setShowLimitAlert] = useState(false);
   const [showRebalanceAlert, setShowRebalanceAlert] = useState(false);
   const [hasRunningRebalance, setHasRunningRebalance] = useState(false);
-  
+
   const maxParallelAnalysis = getMaxParallelAnalysis();
 
   // Fetch stock data including description and price using Alpaca
@@ -245,7 +245,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           .eq('user_id', user.id);
 
         if (rebalanceData) {
-          const hasRunning = rebalanceData.some(item => 
+          const hasRunning = rebalanceData.some(item =>
             isRebalanceActive(item.status)
           );
           setHasRunningRebalance(hasRunning);
@@ -287,18 +287,18 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
             // Check status of latest analysis for each ticker using unified logic
             for (const [ticker, item] of latestByTicker) {
               // Convert legacy numeric status if needed
-              const currentStatus = typeof item.analysis_status === 'number' 
+              const currentStatus = typeof item.analysis_status === 'number'
                 ? convertLegacyAnalysisStatus(item.analysis_status)
                 : item.analysis_status;
-              
+
               // Skip cancelled analyses
               if (item.is_canceled || currentStatus === ANALYSIS_STATUS.CANCELLED) {
                 continue;
               }
-              
+
               // Use unified logic to check if analysis is active
               const isRunning = isAnalysisActive(currentStatus);
-              
+
               if (isRunning) {
                 running.add(ticker);
               }
@@ -485,13 +485,13 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
         setShowRebalanceAlert(true);
         return;
       }
-      
+
       // Check if we've reached the parallel analysis limit
       if (runningAnalyses.size >= maxParallelAnalysis) {
         setShowLimitAlert(true);
         return;
       }
-      
+
       try {
         // Start analysis via analysis coordinator
         // Don't send any credentials from frontend - coordinator will fetch from database
@@ -633,7 +633,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                   >
                     <X className="h-4 w-4" />
                   </Button>
-                  
+
                   <div className="flex-1 p-4 pb-2 sm:p-0 pr-10 sm:pr-0">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                       <span className="font-semibold">{item.ticker}</span>
@@ -666,7 +666,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                       {getDecisionBadge(item.lastDecision)}
                     </div>
                   </div>
-                  
+
                   {/* Mobile: Show analyze button below at full width */}
                   <div className="sm:hidden border-t border-border/50 px-4 py-2 bg-muted/30">
                     <Button
@@ -691,7 +691,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                       )}
                     </Button>
                   </div>
-                  
+
                   {/* Desktop: Show buttons on the right */}
                   <div className="hidden sm:flex items-center gap-2">
                     <Button
@@ -746,7 +746,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           }}
         />
       )}
-      
+
       {/* Limit Reached Alert Dialog */}
       <AlertDialog open={showLimitAlert} onOpenChange={setShowLimitAlert}>
         <AlertDialogContent>
@@ -771,13 +771,13 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
       {/* Rebalance Running Alert Dialog */}
       <AlertDialog open={showRebalanceAlert} onOpenChange={setShowRebalanceAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
+              <RefreshCw className="h-5 w-5 text-yellow-500 animate-spin" />
               Portfolio Rebalance in Progress
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">

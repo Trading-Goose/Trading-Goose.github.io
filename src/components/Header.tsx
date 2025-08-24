@@ -15,7 +15,6 @@ import {
   Menu
 } from "lucide-react";
 import { useAuth, hasRequiredApiKeys } from "@/lib/auth";
-import { useRBAC } from "@/hooks/useRBAC";
 import { RoleBadge, RoleGate } from "@/components/RoleBasedAccess";
 import { supabase } from "@/lib/supabase";
 import { 
@@ -36,12 +35,10 @@ import {
 export default function Header() {
   const navigate = useNavigate();
   const { user, profile, isAuthenticated, logout, apiSettings } = useAuth();
-  const { getMaxParallelAnalysis } = useRBAC();
   const [runningAnalyses, setRunningAnalyses] = useState(0);
   const [runningRebalances, setRunningRebalances] = useState(0);
 
   const hasApiKeys = hasRequiredApiKeys(apiSettings);
-  const maxParallelAnalysis = getMaxParallelAnalysis();
 
   // Check for running analyses and rebalances
   useEffect(() => {
@@ -337,11 +334,6 @@ export default function Header() {
                   <span className="font-medium">
                     {runningAnalyses} Analysis{runningAnalyses > 1 ? 'es' : ''} Running
                   </span>
-                  {maxParallelAnalysis > 1 && (
-                    <span className="text-xs text-muted-foreground">
-                      ({maxParallelAnalysis - runningAnalyses} slot{maxParallelAnalysis - runningAnalyses !== 1 ? 's' : ''} available)
-                    </span>
-                  )}
                 </div>
               )}
             </div>

@@ -47,11 +47,12 @@ export default function AnalysisInsightsTab({
 
   // Define the display order for insights
   const orderMap: { [key: string]: number } = {
-    // 1. Analysts (order: 1-4)
-    'marketAnalyst': 1,
-    'newsAnalyst': 2,
-    'socialMediaAnalyst': 3,
-    'fundamentalsAnalyst': 4,
+    // 1. Analysts (order: 1-5)
+    'macroAnalyst': 1,
+    'marketAnalyst': 2,
+    'newsAnalyst': 3,
+    'socialMediaAnalyst': 4,
+    'fundamentalsAnalyst': 5,
     
     // 2. Research (order: 5-7)
     'bullResearcher': 5,

@@ -50,6 +50,7 @@ export default function WorkflowStepsLayout({
       description: 'Gathering and analyzing market data from multiple sources',
       icon: BarChart3,
       agents: [
+        { name: 'Macro Analyst', key: 'macroAnalyst', icon: BarChart3 },
         { name: 'Market Analyst', key: 'marketAnalyst', icon: TrendingUp },
         { name: 'News Analyst', key: 'newsAnalyst', icon: FileText },
         { name: 'Social Media Analyst', key: 'socialMediaAnalyst', icon: MessageSquare },
@@ -142,6 +143,7 @@ export default function WorkflowStepsLayout({
           
           // More flexible name matching patterns
           // Handle both camelCase keys and display names
+          if (agentNameLower.includes('macroanalyst') && keyLower.includes('macro')) return true;
           if (agentNameLower.includes('marketanalyst') && keyLower.includes('market')) return true;
           if (agentNameLower.includes('newsanalyst') && keyLower.includes('news')) return true;
           if (agentNameLower.includes('socialmediaanalyst') && keyLower.includes('social')) return true;
@@ -465,7 +467,15 @@ export default function WorkflowStepsLayout({
 
               {/* Agents Grid - Skip for single agent steps like Trading Decision and Portfolio Management */}
               {step.agents.length > 1 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pl-14">
+                <div 
+                  className={`grid gap-3 pl-14 ${
+                    step.agents.length === 2 ? 'grid-cols-2' :
+                    step.agents.length === 3 ? 'grid-cols-3' :
+                    step.agents.length === 4 ? 'grid-cols-2 md:grid-cols-4' :
+                    step.agents.length === 5 ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5' :
+                    'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
+                  }`}
+                >
                   {step.agents.map((agent) => {
                     const status = getAgentStatus(agent.key, step.id);
                     const agentError = getAgentError(agent.key);

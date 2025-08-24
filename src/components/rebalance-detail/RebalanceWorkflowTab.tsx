@@ -13,10 +13,54 @@ import {
   XCircle
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { isRebalanceActive, convertLegacyRebalanceStatus } from "@/lib/statusTypes";
 
 interface RebalanceWorkflowTabProps {
   workflowData: any;
 }
+
+// Calculate completion percentage based on agent step completion (same logic as RebalanceHistoryTable)
+const calculateAgentStepCompletion = (stockAnalyses: any[]): number => {
+  if (!stockAnalyses || stockAnalyses.length === 0) return 0;
+
+  let totalAgentSteps = 0;
+  let completedAgentSteps = 0;
+
+  // Define expected agents per analysis (matching RebalanceHistoryTable)
+  const expectedAgents = [
+    'macro-analyst', 'market-analyst', 'news-analyst', 'social-media-analyst', 'fundamentals-analyst',
+    'bull-researcher', 'bear-researcher', 'research-manager',
+    'risky-analyst', 'safe-analyst', 'neutral-analyst', 'risk-judge',
+    'trader'
+  ];
+
+  stockAnalyses.forEach((stockAnalysis: any) => {
+    // Count expected agent steps for this stock
+    totalAgentSteps += expectedAgents.length;
+
+    // Count completed agents based on messages in fullAnalysis
+    const messages = stockAnalysis.fullAnalysis?.messages || [];
+    const completedAgents = new Set<string>();
+
+    messages.forEach((msg: any) => {
+      if (msg.agent && msg.timestamp) {
+        // Consider an agent completed if it has a timestamp (indicating it posted a message)
+        const normalizedAgent = msg.agent.toLowerCase().replace(/\s+/g, '-');
+        completedAgents.add(normalizedAgent);
+      }
+    });
+
+    // Count how many expected agents have completed
+    expectedAgents.forEach(agentKey => {
+      if (completedAgents.has(agentKey)) {
+        completedAgentSteps++;
+      }
+    });
+  });
+
+  const percentage = totalAgentSteps > 0 ? (completedAgentSteps / totalAgentSteps) * 100 : 0;
+  return percentage;
+};
 
 // Workflow Steps Component
 function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
@@ -145,37 +189,65 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                           </div>
                         )}
 
-                        {/* Progress for stock analysis step */}
+                        {/* Progress for stock analysis step - matches RebalanceHistoryTable exactly */}
                         {step.id === 'analysis' && step.stockAnalyses?.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                {step.stockAnalyses.filter((sa: any) =>
-                                  sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
-                                ).length}/{step.stockAnalyses.length} stocks analyzed
-                              </span>
-                              <span className={isCompleted ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
-                                {Math.round((step.stockAnalyses.filter((sa: any) =>
-                                  sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
-                                ).length / step.stockAnalyses.length) * 100)}%
-                              </span>
-                            </div>
-                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${isCompleted
-                                  ? 'bg-green-500'
-                                  : isRunning
-                                    ? 'bg-yellow-500'
-                                    : 'bg-muted-foreground/30'
-                                  }`}
-                                style={{
-                                  width: `${Math.round((step.stockAnalyses.filter((sa: any) =>
-                                    sa.status === 'completed' || (sa.decision && sa.decision !== 'PENDING' && sa.confidence > 0)
-                                  ).length / step.stockAnalyses.length) * 100)}%`
-                                }}
-                              />
-                            </div>
-                          </div>
+                          (() => {
+                            // Check if overall rebalance is active (same as RebalanceHistoryTable)
+                            const rebalanceIsActive = workflowData.status && isRebalanceActive(convertLegacyRebalanceStatus(workflowData.status));
+
+                            if (rebalanceIsActive) {
+                              // Active rebalance - show yellow with pulse animation
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-yellow-500 animate-pulse transition-all duration-300"
+                                      style={{
+                                        width: `${calculateAgentStepCompletion(step.stockAnalyses)}%`
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                                    {Math.round(calculateAgentStepCompletion(step.stockAnalyses))}%
+                                  </span>
+                                </div>
+                              );
+                            } else if (isCompleted) {
+                              // Completed - show green
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-green-500 transition-all duration-300"
+                                      style={{
+                                        width: `${calculateAgentStepCompletion(step.stockAnalyses)}%`
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-green-600 dark:text-green-400">
+                                    {Math.round(calculateAgentStepCompletion(step.stockAnalyses))}%
+                                  </span>
+                                </div>
+                              );
+                            } else {
+                              // Other states - show gray
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-muted-foreground/30 transition-all duration-300"
+                                      style={{
+                                        width: `${calculateAgentStepCompletion(step.stockAnalyses)}%`
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {Math.round(calculateAgentStepCompletion(step.stockAnalyses))}%
+                                  </span>
+                                </div>
+                              );
+                            }
+                          })()
                         )}
                       </div>
                     </div>
@@ -320,9 +392,9 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                                   <Badge
                                     variant={
                                       stepStatus === 'completed' ? 'completed' :
-                                      stepStatus === 'running' ? 'running' :
-                                      stepStatus === 'error' ? 'error' :
-                                      'pending' as any
+                                        stepStatus === 'running' ? 'running' :
+                                          stepStatus === 'error' ? 'error' :
+                                            'pending' as any
                                     }
                                     className="text-xs"
                                   >

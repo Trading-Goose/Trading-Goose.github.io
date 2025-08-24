@@ -85,7 +85,7 @@ export default function RebalanceHistoryTable() {
   const [selectedDetailId, setSelectedDetailId] = useState<string | undefined>(undefined);
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [analysisData, setAnalysisData] = useState<{[key: string]: any[]}>({});
+  const [analysisData, setAnalysisData] = useState<{ [key: string]: any[] }>({});
 
   useEffect(() => {
     if (user) {
@@ -163,14 +163,14 @@ export default function RebalanceHistoryTable() {
       for (const item of data || []) {
         // Convert legacy status to new format
         const status: RebalanceStatus = convertLegacyRebalanceStatus(item.status);
-        
+
         if (status === REBALANCE_STATUS.ERROR || status === REBALANCE_STATUS.CANCELLED) {
           cancelled.push(item);
         } else if (status === REBALANCE_STATUS.AWAITING_APPROVAL && item.rebalance_plan) {
           // If status is awaiting approval with a rebalance plan, treat as completed
           completed.push(item);
-        } else if (status === REBALANCE_STATUS.RUNNING || 
-                   (status === REBALANCE_STATUS.AWAITING_APPROVAL && !item.rebalance_plan)) {
+        } else if (status === REBALANCE_STATUS.RUNNING ||
+          (status === REBALANCE_STATUS.AWAITING_APPROVAL && !item.rebalance_plan)) {
           // Running or awaiting approval without plan (still analyzing)
           running.push(item);
         } else if (status === REBALANCE_STATUS.COMPLETED) {
@@ -183,7 +183,7 @@ export default function RebalanceHistoryTable() {
       setCancelledRebalances(cancelled);
 
       // Fetch analysis data for running rebalances to calculate progress
-      const analysisDataMap: {[key: string]: any[]} = {};
+      const analysisDataMap: { [key: string]: any[] } = {};
       for (const rebalance of running) {
         const analyses = await fetchAnalysisDataForRebalance(rebalance.id);
         analysisDataMap[rebalance.id] = analyses;
@@ -320,7 +320,7 @@ export default function RebalanceHistoryTable() {
   const getStatusIcon = (status: string) => {
     // Convert legacy status to new format for consistent icon display
     const normalizedStatus = convertLegacyRebalanceStatus(status);
-    
+
     switch (normalizedStatus) {
       case REBALANCE_STATUS.COMPLETED:
         return <CheckCircle className="h-3 w-3" />;
@@ -341,7 +341,7 @@ export default function RebalanceHistoryTable() {
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     // Convert legacy status to new format for consistent variant display
     const normalizedStatus = convertLegacyRebalanceStatus(status);
-    
+
     switch (normalizedStatus) {
       case REBALANCE_STATUS.COMPLETED:
         return 'default';
@@ -360,7 +360,7 @@ export default function RebalanceHistoryTable() {
   // Calculate completion percentage based on agent step completion
   const calculateAgentStepCompletion = (rebalanceRequest: RebalanceRequest): number => {
     const analyses = analysisData[rebalanceRequest.id] || [];
-    
+
     console.log('calculateAgentStepCompletion - rebalanceRequest:', {
       id: rebalanceRequest.id,
       status: rebalanceRequest.status,
@@ -372,7 +372,7 @@ export default function RebalanceHistoryTable() {
     if (rebalanceRequest.rebalance_plan?.workflowSteps) {
       const workflowSteps = rebalanceRequest.rebalance_plan.workflowSteps;
       const analysisStep = workflowSteps.find((step: any) => step.id === 'analysis');
-      
+
       if (analysisStep?.stockAnalyses) {
         const stockAnalyses = analysisStep.stockAnalyses;
         let totalSteps = 0;
@@ -382,13 +382,13 @@ export default function RebalanceHistoryTable() {
           const fullAnalysis = stockAnalysis.fullAnalysis || {};
           const fullWorkflowSteps = fullAnalysis.workflowSteps || [];
           const expectedSteps = ['analysis', 'research', 'trading', 'risk'];
-          
+
           expectedSteps.forEach(stepId => {
             totalSteps++;
             const step = fullWorkflowSteps.find((s: any) => s.id === stepId);
-            
+
             if (step?.agents) {
-              const allAgentsCompleted = step.agents.length > 0 && 
+              const allAgentsCompleted = step.agents.length > 0 &&
                 step.agents.every((agent: any) => agent.status === 'completed');
               if (allAgentsCompleted) {
                 completedSteps++;
@@ -396,7 +396,7 @@ export default function RebalanceHistoryTable() {
             } else if (stepId === 'analysis') {
               const agents = stockAnalysis.agents || {};
               const analysisAgents = ['marketAnalyst', 'newsAnalyst', 'socialMediaAnalyst', 'fundamentalsAnalyst'];
-              const allAnalysisCompleted = analysisAgents.every(agentKey => 
+              const allAnalysisCompleted = analysisAgents.every(agentKey =>
                 agents[agentKey] === 'completed'
               );
               if (allAnalysisCompleted) {
@@ -413,7 +413,7 @@ export default function RebalanceHistoryTable() {
     // For running rebalances, use the analysis_history data
     if (analyses.length === 0) {
       console.log('calculateAgentStepCompletion - No analyses found, using legacy fallback');
-      return rebalanceRequest.total_stocks > 0 
+      return rebalanceRequest.total_stocks > 0
         ? (rebalanceRequest.stocks_analyzed / rebalanceRequest.total_stocks) * 100
         : 0;
     }
@@ -446,7 +446,7 @@ export default function RebalanceHistoryTable() {
       const messages = analysis.full_analysis?.messages || [];
       const completedAgents = new Set<string>();
 
-      console.log(`calculateAgentStepCompletion - Stock ${analysis.ticker} messages sample:`, 
+      console.log(`calculateAgentStepCompletion - Stock ${analysis.ticker} messages sample:`,
         messages.slice(0, 5).map((msg: any) => ({
           agent: msg.agent,
           type: msg.type,
@@ -463,7 +463,7 @@ export default function RebalanceHistoryTable() {
         }
       });
 
-      console.log(`calculateAgentStepCompletion - Stock ${analysis.ticker} completed agents:`, 
+      console.log(`calculateAgentStepCompletion - Stock ${analysis.ticker} completed agents:`,
         Array.from(completedAgents));
 
       // Count how many expected agents have completed
@@ -569,15 +569,15 @@ export default function RebalanceHistoryTable() {
                           <div className="flex-1">
                             {isRebalanceActive(convertLegacyRebalanceStatus(item.status)) && (
                               <div className="flex items-center gap-2">
-                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div className="flex-1 h-2  bg-muted rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-blue-500 transition-all duration-300"
+                                    className="h-full bg-yellow-500 animate-pulse transition-all"
                                     style={{
                                       width: `${calculateAgentStepCompletion(item)}%`
                                     }}
                                   />
                                 </div>
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-xs text-yellow-600 dark:text-yellow-400">
                                   {Math.round(calculateAgentStepCompletion(item))}%
                                 </span>
                               </div>
@@ -842,7 +842,7 @@ export default function RebalanceHistoryTable() {
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-blue-500 transition-all duration-300"
+                                  className="h-full bg-blue-500 transition-all "
                                   style={{
                                     width: `${calculateAgentStepCompletion(item)}%`
                                   }}

@@ -30,7 +30,7 @@ const calculateAgentStepCompletion = (stockAnalyses: any[]): number => {
   const expectedAgents = [
     'macro-analyst', 'market-analyst', 'news-analyst', 'social-media-analyst', 'fundamentals-analyst',
     'bull-researcher', 'bear-researcher', 'research-manager',
-    'risky-analyst', 'safe-analyst', 'neutral-analyst', 'risk-judge',
+    'risky-analyst', 'safe-analyst', 'neutral-analyst', 'risk-manager',
     'trader'
   ];
 
@@ -76,6 +76,17 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
     if (step.data?.error || step.status === 'error') {
       return 'error';
     }
+    
+    // Special handling for analysis step - check if all analyses are complete
+    if (step.id === 'analysis' && step.stockAnalyses?.length > 0) {
+      const completionPercentage = calculateAgentStepCompletion(step.stockAnalyses);
+      if (completionPercentage >= 100) {
+        return 'completed';
+      } else if (completionPercentage > 0) {
+        return 'running';
+      }
+    }
+    
     return step.status || 'pending';
   };
 
@@ -192,40 +203,44 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                         {/* Progress for stock analysis step - matches RebalanceHistoryTable exactly */}
                         {step.id === 'analysis' && step.stockAnalyses?.length > 0 && (
                           (() => {
+                            // Calculate completion percentage
+                            const completionPercentage = calculateAgentStepCompletion(step.stockAnalyses);
+                            const isFullyComplete = completionPercentage >= 100;
+                            
                             // Check if overall rebalance is active (same as RebalanceHistoryTable)
                             const rebalanceIsActive = workflowData.status && isRebalanceActive(convertLegacyRebalanceStatus(workflowData.status));
 
-                            if (rebalanceIsActive) {
-                              // Active rebalance - show yellow with pulse animation
+                            if (rebalanceIsActive && !isFullyComplete) {
+                              // Active rebalance and not complete - show yellow with pulse animation
                               return (
                                 <div className="flex items-center gap-2">
                                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                                     <div
                                       className="h-full bg-yellow-500 animate-pulse transition-all "
                                       style={{
-                                        width: `${calculateAgentStepCompletion(step.stockAnalyses)}%`
+                                        width: `${completionPercentage}%`
                                       }}
                                     />
                                   </div>
                                   <span className="text-xs text-yellow-600 dark:text-yellow-400">
-                                    {Math.round(calculateAgentStepCompletion(step.stockAnalyses))}%
+                                    {Math.round(completionPercentage)}%
                                   </span>
                                 </div>
                               );
-                            } else if (isCompleted) {
-                              // Completed - show green
+                            } else if (isFullyComplete || isCompleted) {
+                              // 100% complete or step marked as completed - show green
                               return (
                                 <div className="flex items-center gap-2">
                                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                                     <div
                                       className="h-full bg-green-500 transition-all duration-300"
                                       style={{
-                                        width: `${calculateAgentStepCompletion(step.stockAnalyses)}%`
+                                        width: `${completionPercentage}%`
                                       }}
                                     />
                                   </div>
                                   <span className="text-xs text-green-600 dark:text-green-400">
-                                    {Math.round(calculateAgentStepCompletion(step.stockAnalyses))}%
+                                    {Math.round(completionPercentage)}%
                                   </span>
                                 </div>
                               );
@@ -237,12 +252,12 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                                     <div
                                       className="h-full bg-muted-foreground/30 transition-all duration-300"
                                       style={{
-                                        width: `${calculateAgentStepCompletion(step.stockAnalyses)}%`
+                                        width: `${completionPercentage}%`
                                       }}
                                     />
                                   </div>
                                   <span className="text-xs text-muted-foreground">
-                                    {Math.round(calculateAgentStepCompletion(step.stockAnalyses))}%
+                                    {Math.round(completionPercentage)}%
                                   </span>
                                 </div>
                               );

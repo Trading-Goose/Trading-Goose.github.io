@@ -91,22 +91,25 @@ export const useAuth = create<AuthState>()(
           return;
         }
 
-        // If already authenticated with same session, skip
-        if (currentState.isAuthenticated && currentState.session) {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token === currentState.session.access_token) {
-            console.log('🔐 Auth: Already authenticated with same session');
-            set({ isLoading: false });
-            return;
-          }
-        }
-
         console.log('🔐 Auth: Initializing...');
         set({ isLoading: true, error: null });
 
         try {
-          // Get current session
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          // Get current session with refresh if needed
+          let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          // If we have a session, try to refresh it to ensure it's valid
+          if (session && !sessionError) {
+            const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshedSession && !refreshError) {
+              console.log('🔐 Auth: Session refreshed successfully');
+              // Use the refreshed session
+              session = refreshedSession;
+            } else if (refreshError) {
+              console.warn('Failed to refresh session:', refreshError);
+              // Continue with existing session
+            }
+          }
 
           if (sessionError) {
             console.error('Session error:', sessionError);
@@ -535,10 +538,21 @@ export const initializeAuth = () => {
       if (!currentState.isAuthenticated && session) {
         await useAuth.getState().initialize();
       }
-    } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-      // Just update the session, don't re-initialize everything
+    } else if (event === 'TOKEN_REFRESHED') {
+      // Token was refreshed, update the session
       if (session) {
-        useAuth.setState({ session });
+        console.log('🔐 Token refreshed, updating session');
+        useAuth.setState({ 
+          session,
+          user: session.user,
+          isAuthenticated: true
+        });
+      }
+    } else if (event === 'USER_UPDATED') {
+      // User data was updated, refresh everything
+      if (session) {
+        console.log('🔐 User updated, refreshing auth state');
+        await useAuth.getState().initialize();
       }
     } else if (event === 'SIGNED_OUT') {
       // Clear state

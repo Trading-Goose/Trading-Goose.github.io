@@ -17,22 +17,30 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    // Add storage key to avoid conflicts
-    storageKey: 'sb-auth-token',
+    // Use the default storage key that matches the project
+    // This should be 'sb-lnvjsqyvhczgxvygbqer-auth-token'
+    // Let Supabase handle the key automatically
     // Add flow type for better compatibility
     flowType: 'pkce',
-    // Store session for offline access
+    // Storage key for auth token
     storage: {
       getItem: (key) => {
-        return localStorage.getItem(key);
+        if (typeof window !== 'undefined') {
+          return window.localStorage.getItem(key);
+        }
+        return null;
       },
       setItem: (key, value) => {
-        localStorage.setItem(key, value);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(key, value);
+        }
       },
       removeItem: (key) => {
-        localStorage.removeItem(key);
-      }
-    }
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(key);
+        }
+      },
+    },
   },
   // Add global fetch options with timeout and better error handling
   global: {

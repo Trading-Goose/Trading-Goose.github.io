@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +32,9 @@ import {
   ArrowRight,
   CheckSquare,
   X,
-  PieChart
+  PieChart,
+  RefreshCw,
+  PlayCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -52,6 +54,8 @@ import {
   isAnalysisFinished,
   isRebalanceFinished
 } from "@/lib/statusTypes";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AnalysisDetailModalProps {
   ticker?: string;
@@ -84,6 +88,115 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
     analysisData,
     updateAnalysisData
   });
+
+  const { toast } = useToast();
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  // Check if analysis is stale (no update in 5+ minutes)
+  const isAnalysisStale = () => {
+    if (!analysisData?.updated_at) return false;
+    const lastUpdate = new Date(analysisData.updated_at);
+    const timeSinceUpdate = Date.now() - lastUpdate.getTime();
+    return timeSinceUpdate > 5 * 60 * 1000; // 5 minutes
+  };
+
+  // Handle retry for error status
+  const handleRetry = async () => {
+    if (!analysisData?.id) return;
+    
+    setIsRetrying(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to retry the analysis",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('analysis-coordinator', {
+        body: {
+          analysisId: analysisData.id,
+          userId: user.id
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Retry initiated",
+        description: "The analysis has been restarted from the failed point",
+      });
+
+      // Refresh the analysis data
+      if (updateAnalysisData) {
+        setTimeout(() => {
+          window.location.reload(); // Simple refresh to get updated data
+        }, 1000);
+      }
+    } catch (error: any) {
+      console.error('Retry failed:', error);
+      toast({
+        title: "Retry failed",
+        description: error.message || "Failed to retry the analysis",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  // Handle reactivate for stale running status
+  const handleReactivate = async () => {
+    if (!analysisData?.id) return;
+    
+    setIsRetrying(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to reactivate the analysis",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('analysis-coordinator', {
+        body: {
+          action: 'reactivate',
+          analysisId: analysisData.id,
+          userId: user.id,
+          forceReactivate: false
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Analysis reactivated",
+        description: "The analysis has been resumed from where it stalled",
+      });
+
+      // Refresh the analysis data
+      if (updateAnalysisData) {
+        setTimeout(() => {
+          window.location.reload(); // Simple refresh to get updated data
+        }, 1000);
+      }
+    } catch (error: any) {
+      console.error('Reactivate failed:', error);
+      toast({
+        title: "Reactivation failed",
+        description: error.message || "Failed to reactivate the analysis",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
 
   // Helper functions (keep these as they are not extracted yet)
@@ -165,6 +278,46 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                 </div>
               )}
             </div>
+            
+            {/* Retry/Reactivate Button */}
+            {analysisData && (
+              <>
+                {analysisData.status === ANALYSIS_STATUS.ERROR && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetry}
+                    disabled={isRetrying}
+                    className="flex items-center gap-2"
+                  >
+                    {isRetrying ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    Retry Analysis
+                  </Button>
+                )}
+                
+                {(analysisData.status === ANALYSIS_STATUS.RUNNING || analysisData.status === ANALYSIS_STATUS.PENDING) && isAnalysisStale() && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReactivate}
+                    disabled={isRetrying}
+                    className="flex items-center gap-2"
+                    title={`Last updated ${formatDistanceToNow(new Date(analysisData.updated_at))} ago`}
+                  >
+                    {isRetrying ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <PlayCircle className="w-4 h-4" />
+                    )}
+                    Reactivate
+                  </Button>
+                )}
+              </>
+            )}
           </div>
           <DialogDescription className="mt-2">
             {isLiveAnalysis

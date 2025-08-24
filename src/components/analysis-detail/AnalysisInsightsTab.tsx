@@ -1,5 +1,5 @@
 import React from "react";
-import { 
+import {
   Activity,
   AlertCircle,
   BarChart3,
@@ -26,16 +26,16 @@ interface AnalysisInsightsTabProps {
   formatAgentName: (agent: string) => string;
 }
 
-export default function AnalysisInsightsTab({ 
-  analysisData, 
-  getMessageIcon, 
-  getAgentIcon, 
-  formatAgentName 
+export default function AnalysisInsightsTab({
+  analysisData,
+  getMessageIcon,
+  getAgentIcon,
+  formatAgentName
 }: AnalysisInsightsTabProps) {
   console.log('Insights tab - analysisData.agent_insights:', analysisData.agent_insights);
   console.log('Market Analyst insight:', analysisData.agent_insights?.marketAnalyst);
   console.log('Fundamentals Analyst insight:', analysisData.agent_insights?.fundamentalsAnalyst);
-  
+
   if (!analysisData.agent_insights || Object.keys(analysisData.agent_insights).length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -53,36 +53,36 @@ export default function AnalysisInsightsTab({
     'newsAnalyst': 3,
     'socialMediaAnalyst': 4,
     'fundamentalsAnalyst': 5,
-    
+
     // 2. Research (order: 5-7)
-    'bullResearcher': 5,
-    'bearResearcher': 6,
-    'researchDebate': 7,
-    'researchManager': 8,
-    
+    'bullResearcher': 6,
+    'bearResearcher': 7,
+    'researchDebate': 8,
+    'researchManager': 9,
+
     // 3. Trader (order: 9)
-    'trader': 9,
-    
+    'trader': 10,
+
     // 4. Risk (order: 10-14)
-    'riskyAnalyst': 10,
-    'safeAnalyst': 11,
-    'neutralAnalyst': 12,
-    'riskDebate': 13,
-    'riskManager': 14,
-    
+    'riskyAnalyst': 11,
+    'safeAnalyst': 12,
+    'neutralAnalyst': 13,
+    'riskDebate': 14,
+    'riskManager': 15,
+
     // 5. Portfolio (order: 15)
-    'portfolioManager': 15
+    'portfolioManager': 16
   };
-  
+
   // Sort entries based on the defined order
   // Get entries from agent_insights
   let entries = Object.entries(analysisData.agent_insights);
-  
+
   // Filter out Portfolio Manager for rebalance analyses
   if (analysisData.rebalance_request_id) {
     entries = entries.filter(([agent]) => agent !== 'portfolioManager');
   }
-  
+
   // Add missing agents that have messages but no insights
   const missingAgents = ['fundamentalsAnalyst', 'safeAnalyst'];
   missingAgents.forEach(agentKey => {
@@ -96,20 +96,20 @@ export default function AnalysisInsightsTab({
       }
     }
   });
-  
+
   const sortedEntries = entries.sort(([agentA], [agentB]) => {
     const orderA = orderMap[agentA] || 999;
     const orderB = orderMap[agentB] || 999;
     return orderA - orderB;
   });
-  
+
   console.log('Sorted insight entries (including missing):', sortedEntries.map(([agent]) => agent));
 
   return (
     <>
       {sortedEntries.map(([agent, insight]) => {
         console.log(`Processing insight for ${agent}:`, typeof insight, insight);
-        
+
         // Handle debate rounds specially
         if ((agent === 'researchDebate' || agent === 'riskDebate') && Array.isArray(insight)) {
           const isResearchDebate = agent === 'researchDebate';
@@ -192,27 +192,27 @@ export default function AnalysisInsightsTab({
         // First extract the content from the insight regardless of type
         let insightContent = '';
         let additionalData = null;
-        
+
         if (typeof insight === 'string') {
           insightContent = insight;
         } else if (typeof insight === 'object' && insight !== null && !Array.isArray(insight)) {
           // Extract the analysis text from various possible fields
           insightContent = insight.analysis || insight.assessment || insight.content || insight.summary || '';
-          
+
           // For market and fundamental analysts, also capture additional data
           if (agent === 'marketAnalyst' || agent === 'fundamentalsAnalyst') {
             additionalData = insight.data || null;
-            
+
             // If still no content, try to extract from nested structures
             if (!insightContent && insight.data) {
               insightContent = insight.data.analysis || insight.data.assessment || '';
             }
-            
+
             // FALLBACK: If still no content, try to find it in messages
             if (!insightContent || insightContent.trim() === '') {
               const agentDisplayName = formatAgentName(agent);
-              const agentMessage = analysisData.messages?.find((msg: any) => 
-                msg.agent === agentDisplayName || 
+              const agentMessage = analysisData.messages?.find((msg: any) =>
+                msg.agent === agentDisplayName ||
                 msg.agent === agent.replace(/([A-Z])/g, ' $1').trim()
               );
               if (agentMessage?.message) {
@@ -220,7 +220,7 @@ export default function AnalysisInsightsTab({
                 console.log(`Using message fallback for ${agent}:`, insightContent.substring(0, 100));
               }
             }
-            
+
             // Log for debugging
             console.log(`${agent} insight structure:`, {
               hasAnalysis: !!insight.analysis,
@@ -231,10 +231,10 @@ export default function AnalysisInsightsTab({
             });
           }
         }
-        
+
         // For missing fundamentalsAnalyst, try to get from messages
         if (agent === 'fundamentalsAnalyst' && !insight) {
-          const fundamentalsMessage = analysisData.messages?.find((msg: any) => 
+          const fundamentalsMessage = analysisData.messages?.find((msg: any) =>
             msg.agent === 'Fundamentals Analyst'
           );
           if (fundamentalsMessage?.message) {
@@ -242,13 +242,13 @@ export default function AnalysisInsightsTab({
             console.log('Using message for missing Fundamentals Analyst insight');
           }
         }
-        
+
         // Skip if no content
         if (!insightContent) {
           console.warn(`Skipping empty insight for ${agent}. Full insight:`, insight);
           return null;
         }
-        
+
         // Special styling for bull and bear researchers
         if (agent === 'bullResearcher') {
           return (
@@ -267,7 +267,7 @@ export default function AnalysisInsightsTab({
             </Card>
           );
         }
-        
+
         if (agent === 'bearResearcher') {
           return (
             <Card key={agent} className="overflow-hidden">
@@ -285,17 +285,17 @@ export default function AnalysisInsightsTab({
             </Card>
           );
         }
-        
+
         // Special rendering for Market Analyst with data, historical chart, and indicators
         if (agent === 'marketAnalyst') {
           return <MarketAnalystInsight key={agent} insight={insight} insightContent={insightContent} additionalData={additionalData} />;
         }
-        
+
         // Special rendering for Fundamentals Analyst with data
         if (agent === 'fundamentalsAnalyst' && additionalData) {
           return <FundamentalsAnalystInsight key={agent} insightContent={insightContent} additionalData={additionalData} />;
         }
-        
+
         // Special rendering for Portfolio Manager - simple format like RebalanceDetailModal
         if (agent === 'portfolioManager') {
           return (
@@ -312,7 +312,7 @@ export default function AnalysisInsightsTab({
             </Card>
           );
         }
-        
+
         // Default rendering for all other agents
         return (
           <Card key={agent} className="overflow-hidden">

@@ -423,9 +423,9 @@ export default function RebalanceHistoryTable() {
 
     // Define expected agents per analysis (based on actual agent names from messages)
     const expectedAgents = [
-      'market-analyst', 'news-analyst', 'social-media-analyst', 'fundamentals-analyst',
+      'macro-analyst', 'market-analyst', 'news-analyst', 'social-media-analyst', 'fundamentals-analyst',
       'bull-researcher', 'bear-researcher', 'research-manager',
-      'risky-analyst', 'safe-analyst', 'neutral-analyst', 'risk-judge',
+      'risky-analyst', 'safe-analyst', 'neutral-analyst', 'risk-manager',
       'trader'
     ];
 

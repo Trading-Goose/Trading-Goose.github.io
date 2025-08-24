@@ -36,24 +36,22 @@ export default defineConfig(({ mode }) => ({
     target: 'es2015',
     modulePreload: {
       polyfill: true,
-      resolveDependencies: (_, deps) => deps
     },
     rollupOptions: {
       output: {
         // Ensure JS files have proper extensions and format for GitHub Pages
         format: 'es',
-        entryFileNames: 'assets/main.[hash].js',
-        chunkFileNames: 'assets/chunk.[hash].js',
+        entryFileNames: '[name]-[hash].js',
+        chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
-          // Use simple, clear naming for GitHub Pages compatibility
-          const fileName = assetInfo.names?.[0] || 'asset';
-          if (fileName.endsWith('.css')) {
-            return 'assets/styles.[hash].css';
+          const info = assetInfo.names?.[0] || '';
+          if (/\.(css)$/.test(info)) {
+            return 'css/[name]-[hash][extname]';
           }
-          if (fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.gif') || fileName.endsWith('.svg')) {
-            return 'assets/images/[name].[hash][extname]';
+          if (/\.(png|jpg|jpeg|gif|svg|ico|webp)$/.test(info)) {
+            return 'images/[name]-[hash][extname]';
           }
-          return 'assets/[name].[hash][extname]';
+          return 'assets/[name]-[hash][extname]';
         },
         manualChunks: undefined
       }

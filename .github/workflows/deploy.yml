@@ -40,8 +40,6 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           # Disable public registration for production
           VITE_ENABLE_PUBLIC_REGISTRATION: 'false'
-          # Set base path for GitHub Pages (root for TradingGoose.github.io)
-          PUBLIC_URL: /
           # Set to production to enable console stripping
           NODE_ENV: production
         run: npm run build
@@ -49,70 +47,32 @@ jobs:
       - name: Copy index.html to 404.html for SPA routing
         run: cp ./dist/index.html ./dist/404.html
         
-      - name: Add .nojekyll file
-        run: touch ./dist/.nojekyll
-        
-      - name: Fix GitHub Pages compatibility and create _headers
+      - name: Prepare for GitHub Pages
         run: |
-          cd ./dist
+          # Add .nojekyll to prevent Jekyll processing
+          touch ./dist/.nojekyll
           
-          # Create proper Netlify-style _headers file for GitHub Pages compatibility
-          cat > _headers << 'EOF'
-          /*
-            X-Frame-Options: DENY
-            X-Content-Type-Options: nosniff
-            Referrer-Policy: strict-origin-when-cross-origin
+          # Add CNAME file if using custom domain (comment out if not needed)
+          # echo "yourdomain.com" > ./dist/CNAME
           
-          /*.js
-            Content-Type: text/javascript; charset=utf-8
-            Cache-Control: public, max-age=31536000, immutable
+          # Verify the build output
+          echo "=== Build Output Structure ==="
+          ls -la ./dist/
           
-          /*.mjs  
-            Content-Type: text/javascript; charset=utf-8
-            Cache-Control: public, max-age=31536000, immutable
-          
-          /assets/*.js
-            Content-Type: text/javascript; charset=utf-8
-            Cache-Control: public, max-age=31536000, immutable
-          
-          /*.css
-            Content-Type: text/css; charset=utf-8
-            Cache-Control: public, max-age=31536000, immutable
-          
-          /assets/*.css
-            Content-Type: text/css; charset=utf-8
-            Cache-Control: public, max-age=31536000, immutable
-          
-          /favicon.ico
-            Content-Type: image/x-icon
-            Cache-Control: public, max-age=86400
-          EOF
-          
-          # Verify files exist
-          echo "=== Checking build output ==="
-          ls -la ./
           echo ""
-          echo "=== Assets directory ==="
-          ls -la assets/ || echo "No assets directory found"
+          echo "=== JavaScript Files ==="
+          find ./dist -name "*.js" -type f | head -10
+          
           echo ""
-          
-          # Find all JavaScript files
-          find . -name "*.js" -type f | while read file; do
-            echo "✓ Found JS file: $file ($(file -b --mime-type "$file"))"
-          done
-          
-          # Verify favicon
-          if [ ! -f "favicon.ico" ]; then
-            echo "ERROR: favicon.ico not found"
-            exit 1
+          echo "=== Checking index.html ==="
+          if [ -f "./dist/index.html" ]; then
+            echo "✓ index.html found"
+            # Show script tags to debug MIME type issues
+            grep -E '<script|<link' ./dist/index.html | head -5
           else
-            echo "✓ favicon.ico found ($(file -b --mime-type favicon.ico))"
+            echo "ERROR: index.html not found!"
+            exit 1
           fi
-          
-          # Check HTML references
-          echo ""
-          echo "=== Module script references in HTML ==="
-          grep 'type="module"' index.html || echo "No module scripts found"
         
       - name: Setup Pages
         uses: actions/configure-pages@v4

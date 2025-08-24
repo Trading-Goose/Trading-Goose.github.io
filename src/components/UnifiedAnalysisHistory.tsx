@@ -133,7 +133,7 @@ export default function UnifiedAnalysisHistory() {
             // Show canceled/error analyses in the canceled section
             canceledAnalyses.push({
               ...item,
-              decision: status === ANALYSIS_STATUS.CANCELLED ? 'CANCELED' : (item.decision || 'ERROR'),
+              decision: status === ANALYSIS_STATUS.ERROR ? 'ERROR' : 'CANCELED',
               confidence: item.confidence || 0
             });
           }

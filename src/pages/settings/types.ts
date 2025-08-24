@@ -48,7 +48,7 @@ export interface AgentsTabProps {
   portfolioManagerProviderId: string;
   portfolioManagerModel: string;
   portfolioManagerCustomModel: string;
-  newsSocialOptimization: string;
+  analysisOptimization: string;
   analysisHistoryDays: string;
   analysisMaxTokens: number;
   researchMaxTokens: number;
@@ -75,7 +75,7 @@ export interface AgentsTabProps {
   setPortfolioManagerProviderId: (id: string) => void;
   setPortfolioManagerModel: (model: string) => void;
   setPortfolioManagerCustomModel: (model: string) => void;
-  setNewsSocialOptimization: (opt: string) => void;
+  setAnalysisOptimization: (opt: string) => void;
   setAnalysisHistoryDays: (days: string) => void;
   setAnalysisMaxTokens: (tokens: number) => void;
   setResearchMaxTokens: (tokens: number) => void;

@@ -12,9 +12,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { 
-  Settings, 
-  Key, 
+import {
+  Settings,
+  Key,
   AlertCircle,
   TrendingUp,
   Bot,
@@ -45,7 +45,7 @@ const validateCredential = async (provider: string, apiKey: string, model?: stri
         secretKey
       }
     });
-    
+
     if (error) throw error;
     return data;
   } catch (error) {
@@ -62,7 +62,7 @@ const checkConfiguredProviders = async (): Promise<{ configured: Record<string, 
         action: 'check_configured'
       }
     });
-    
+
     if (error) throw error;
     return data;
   } catch (error) {
@@ -76,7 +76,7 @@ export default function SettingsPage() {
   const [searchParams] = useSearchParams();
   const { user, apiSettings, updateApiSettings, isAuthenticated, isLoading, initialize } = useAuth();
   const { toast } = useToast();
-  
+
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -88,14 +88,14 @@ export default function SettingsPage() {
   const [sessionChecked, setSessionChecked] = useState(false);
 
   // Form state
-  
+
   // AI Provider configurations - Default AI is always first, additional providers follow
-  const [aiProviders, setAiProviders] = useState<Array<{id: string, nickname: string, provider: string, apiKey: string}>>([]);
-  
+  const [aiProviders, setAiProviders] = useState<Array<{ id: string, nickname: string, provider: string, apiKey: string }>>([]);
+
   // Default AI settings
   const [defaultAiModel, setDefaultAiModel] = useState(apiSettings?.ai_model || 'gpt-4');
   const [defaultCustomModel, setDefaultCustomModel] = useState('');
-  
+
   // Team-specific settings - now storing provider IDs instead of provider names
   const [researchDebateRounds, setResearchDebateRounds] = useState(apiSettings?.research_debate_rounds || 2);
   const [analysisTeamProviderId, setAnalysisTeamProviderId] = useState('1'); // Default to first provider
@@ -110,39 +110,39 @@ export default function SettingsPage() {
   const [riskTeamProviderId, setRiskTeamProviderId] = useState('1'); // Default to first provider
   const [riskTeamModel, setRiskTeamModel] = useState(apiSettings?.risk_team_model || 'gpt-4');
   const [riskCustomModel, setRiskCustomModel] = useState('');
-  
-  // News & Social analysis optimization settings
-  const [newsSocialOptimization, setNewsSocialOptimization] = useState(apiSettings?.news_social_optimization || 'normal');
-  
+
+  // Analysis optimization settings (for all analysis agents)
+  const [analysisOptimization, setAnalysisOptimization] = useState(apiSettings?.analysis_optimization || 'normal');
+
   // Historical data time ranges (separate from opportunity agent)
   const [analysisHistoryDays, setAnalysisHistoryDays] = useState(apiSettings?.analysis_history_days || '1M');
-  
+
   // Max tokens settings for each workflow step
   const [analysisMaxTokens, setAnalysisMaxTokens] = useState(apiSettings?.analysis_max_tokens || 2000);
   const [researchMaxTokens, setResearchMaxTokens] = useState(apiSettings?.research_max_tokens || 3000);
   const [tradingMaxTokens, setTradingMaxTokens] = useState(apiSettings?.trading_max_tokens || 1500);
   const [riskMaxTokens, setRiskMaxTokens] = useState(apiSettings?.risk_max_tokens || 2000);
-  
+
   // Rebalance configuration state
   const [rebalanceThreshold, setRebalanceThreshold] = useState(apiSettings?.rebalance_threshold || apiSettings?.default_rebalance_threshold || 10);
   const [rebalanceMinPositionSize, setRebalanceMinPositionSize] = useState(apiSettings?.rebalance_min_position_size || apiSettings?.default_min_position_size || 100);
   const [rebalanceMaxPositionSize, setRebalanceMaxPositionSize] = useState(apiSettings?.rebalance_max_position_size || apiSettings?.default_max_position_size || 10000);
   const [targetStockAllocation, setTargetStockAllocation] = useState(apiSettings?.target_stock_allocation || 80);
   const [targetCashAllocation, setTargetCashAllocation] = useState(apiSettings?.target_cash_allocation || 20);
-  
+
   // Portfolio Manager settings
   const [portfolioManagerProviderId, setPortfolioManagerProviderId] = useState('1');
   const [portfolioManagerModel, setPortfolioManagerModel] = useState(apiSettings?.portfolio_manager_model || 'gpt-4');
   const [portfolioManagerCustomModel, setPortfolioManagerCustomModel] = useState('');
   const [portfolioManagerMaxTokens, setPortfolioManagerMaxTokens] = useState(apiSettings?.portfolio_manager_max_tokens || 2000);
-  
+
   // Opportunity Agent settings
   const [opportunityAgentProviderId, setOpportunityAgentProviderId] = useState('1');
   const [opportunityAgentModel, setOpportunityAgentModel] = useState(apiSettings?.opportunity_agent_model || 'gpt-4');
   const [opportunityCustomModel, setOpportunityCustomModel] = useState('');
   const [opportunityMaxTokens, setOpportunityMaxTokens] = useState(apiSettings?.opportunity_max_tokens || 2000);
   const [opportunityMarketRange, setOpportunityMarketRange] = useState(apiSettings?.opportunity_market_range || '1M');
-  
+
   // Trading settings
   const [alpacaPaperApiKey, setAlpacaPaperApiKey] = useState(apiSettings?.alpaca_paper_api_key || '');
   const [alpacaPaperSecretKey, setAlpacaPaperSecretKey] = useState(apiSettings?.alpaca_paper_secret_key || '');
@@ -165,7 +165,7 @@ export default function SettingsPage() {
       hasApiSettings: !!apiSettings,
       isLoading
     });
-    
+
     // If authenticated but no user data and not loading, initialize again
     if (isAuthenticated && !user && !isLoading) {
       console.log('Authenticated but no user data, initializing...');
@@ -186,11 +186,11 @@ export default function SettingsPage() {
     // Only load settings once when they first become available or when user logs in
     if ((apiSettings || isAuthenticated) && !initialLoadComplete) {
       console.log('Loading initial settings...', { hasApiSettings: !!apiSettings, isAuthenticated });
-      
+
       // If we have apiSettings, use them for non-credential settings
       if (apiSettings) {
         // Default settings (ai_provider is handled by provider configuration loading)
-        
+
         // Check if the default model is a custom one (not in the preset list)
         const savedDefaultModel = apiSettings.ai_model || 'gpt-4';
         const availableModels = getModelOptions(apiSettings.ai_provider || 'openrouter');
@@ -200,7 +200,7 @@ export default function SettingsPage() {
           availableModels: availableModels,
           isCustom: !availableModels.includes(savedDefaultModel)
         });
-        
+
         if (savedDefaultModel && !availableModels.includes(savedDefaultModel)) {
           setDefaultAiModel('custom');
           setDefaultCustomModel(savedDefaultModel);
@@ -209,46 +209,46 @@ export default function SettingsPage() {
           setDefaultAiModel(savedDefaultModel);
           setDefaultCustomModel(''); // Clear custom model if using preset
         }
-        
+
         // Non-credential settings from apiSettings
         setAlpacaPaperTrading(apiSettings.alpaca_paper_trading ?? true);
         setAutoExecuteTrades(apiSettings.auto_execute_trades ?? false);
         setUserRiskLevel(apiSettings.user_risk_level || 'moderate');
         setDefaultPositionSizeDollars(apiSettings.default_position_size_dollars || 1000);
-        
+
         // Team-specific settings
         setResearchDebateRounds(apiSettings.research_debate_rounds || 2);
-        
+
         // NOTE: Team provider IDs will be set after providers are loaded (see separate useEffect below)
-        
-        // News & Social analysis optimization settings
-        setNewsSocialOptimization(apiSettings.news_social_optimization || 'normal');
-        
+
+        // Analysis optimization settings (for all analysis agents)
+        setAnalysisOptimization(apiSettings.analysis_optimization || 'normal');
+
         // Historical data time ranges (separate from opportunity agent)
         setAnalysisHistoryDays(apiSettings.analysis_history_days || '1M');
-        
+
         // Max tokens settings
         setAnalysisMaxTokens(apiSettings.analysis_max_tokens || 2000);
         setResearchMaxTokens(apiSettings.research_max_tokens || 3000);
         setTradingMaxTokens(apiSettings.trading_max_tokens || 1500);
         setRiskMaxTokens(apiSettings.risk_max_tokens || 2000);
-        
+
         // Rebalance settings
         setRebalanceThreshold(apiSettings.rebalance_threshold || apiSettings.default_rebalance_threshold || 10);
         setRebalanceMinPositionSize(apiSettings.rebalance_min_position_size || apiSettings.default_min_position_size || 100);
         setRebalanceMaxPositionSize(apiSettings.rebalance_max_position_size || apiSettings.default_max_position_size || 10000);
         setTargetStockAllocation(apiSettings.target_stock_allocation || 80);
         setTargetCashAllocation(apiSettings.target_cash_allocation || 20);
-        
+
         // Portfolio Manager settings
         setPortfolioManagerModel(apiSettings.portfolio_manager_model || 'gpt-4');
         setPortfolioManagerMaxTokens(apiSettings.portfolio_manager_max_tokens || 2000);
-        
+
         // Opportunity Agent settings will be loaded after providers are loaded
         setOpportunityMaxTokens(apiSettings.opportunity_max_tokens || 2000);
         setOpportunityMarketRange(apiSettings.opportunity_market_range || '1M');
       }
-      
+
       // Mark initial load as complete and reset team settings loaded flag
       setInitialLoadComplete(true);
       setTeamSettingsLoaded(false); // Reset so team settings can be loaded
@@ -258,7 +258,7 @@ export default function SettingsPage() {
 
   const handleSaveTab = async (tab: string) => {
     console.log(`Save button clicked for tab: ${tab}`);
-    
+
     try {
       // Skip session check since we already have the user from useAuth
       if (!user || !user.id) {
@@ -266,7 +266,7 @@ export default function SettingsPage() {
         setErrors({ save: 'You must be logged in to save settings.' });
         return;
       }
-      
+
       console.log('Using user from auth state:', user.id);
 
       let settingsToSave: Partial<ApiSettings> = {};
@@ -276,12 +276,12 @@ export default function SettingsPage() {
         // Check if it's the Default AI provider
         if (providerId === '1' || providerId === defaultProviderId) {
           // Return the default provider info from api_settings
-          return { 
+          return {
             provider: apiSettings?.ai_provider || 'openrouter',
             apiKey: apiSettings?.ai_api_key || ''
           };
         }
-        
+
         // Otherwise look for it in the additional providers
         const provider = aiProviders.find(p => p.id === providerId);
         if (!provider) {
@@ -293,7 +293,7 @@ export default function SettingsPage() {
       if (tab === 'providers') {
         // Save provider settings
         const newErrors: Record<string, string> = {};
-        
+
         // Validate that all providers have required fields
         for (const provider of aiProviders) {
           if (!provider.provider) {
@@ -303,7 +303,7 @@ export default function SettingsPage() {
             newErrors[`provider_${provider.id}`] = 'API key is required';
           }
         }
-        
+
         // Validate default provider's custom model if selected
         if (defaultAiModel === 'custom' && !defaultCustomModel) {
           newErrors.default_custom_model = 'Custom model name is required for default provider';
@@ -316,7 +316,7 @@ export default function SettingsPage() {
 
         // Build settings object
         settingsToSave = {};
-        
+
         // Save each provider
         for (let index = 0; index < aiProviders.length; index++) {
           const provider = aiProviders[index];
@@ -324,50 +324,30 @@ export default function SettingsPage() {
             // Let the backend handle validation and masking logic
             // Always save the Default AI provider (ID '1') to api_settings via settings-proxy
             if (provider.id === '1') {
-                settingsToSave.ai_provider = provider.provider as any;
-                // Update API key via settings-proxy
-                if (provider.apiKey) {
-                  settingsToSave.ai_api_key = provider.apiKey;
-                }
-                settingsToSave.ai_model = defaultAiModel === 'custom' ? defaultCustomModel : (defaultAiModel || getModelOptions(provider.provider)[0]);
-              } else {
-                // Save additional providers via settings-proxy for masking support
-                try {
-                  const { data: saveData, error: saveError } = await supabase.functions.invoke('settings-proxy', {
-                    body: {
-                      action: 'save_provider_configuration',
-                      provider: {
-                        id: provider.id !== '1' ? provider.id : undefined, // Don't pass ID for new providers
-                        nickname: provider.nickname,
-                        provider: provider.provider,
-                        api_key: provider.apiKey,
-                        is_default: false
-                      }
-                    }
-                  });
-                  
-                  if (saveError || !saveData.success) {
-                    console.error('Error saving provider via proxy:', saveError);
-                    // Fallback to direct save
-                    const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
+              settingsToSave.ai_provider = provider.provider as any;
+              // Update API key via settings-proxy
+              if (provider.apiKey) {
+                settingsToSave.ai_api_key = provider.apiKey;
+              }
+              settingsToSave.ai_model = defaultAiModel === 'custom' ? defaultCustomModel : (defaultAiModel || getModelOptions(provider.provider)[0]);
+            } else {
+              // Save additional providers via settings-proxy for masking support
+              try {
+                const { data: saveData, error: saveError } = await supabase.functions.invoke('settings-proxy', {
+                  body: {
+                    action: 'save_provider_configuration',
+                    provider: {
+                      id: provider.id !== '1' ? provider.id : undefined, // Don't pass ID for new providers
                       nickname: provider.nickname,
                       provider: provider.provider,
                       api_key: provider.apiKey,
                       is_default: false
-                    });
-                    
-                    if (!saved) {
-                      settingsToSave[`${provider.provider}_api_key`] = provider.apiKey;
-                      console.warn(`Note: Nickname "${provider.nickname}" for ${provider.provider} cannot be saved without the provider_configurations table`);
                     }
-                  } else {
-                    // Update local provider state with masked API key
-                    setAiProviders(prev => prev.map(p => 
-                      p.id === provider.id ? { ...p, apiKey: saveData.configuration.api_key } : p
-                    ));
                   }
-                } catch (saveError) {
-                  console.error('Error saving provider configuration via proxy:', saveError);
+                });
+
+                if (saveError || !saveData.success) {
+                  console.error('Error saving provider via proxy:', saveError);
                   // Fallback to direct save
                   const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
                     nickname: provider.nickname,
@@ -375,16 +355,36 @@ export default function SettingsPage() {
                     api_key: provider.apiKey,
                     is_default: false
                   });
-                  
+
                   if (!saved) {
                     settingsToSave[`${provider.provider}_api_key`] = provider.apiKey;
                     console.warn(`Note: Nickname "${provider.nickname}" for ${provider.provider} cannot be saved without the provider_configurations table`);
                   }
+                } else {
+                  // Update local provider state with masked API key
+                  setAiProviders(prev => prev.map(p =>
+                    p.id === provider.id ? { ...p, apiKey: saveData.configuration.api_key } : p
+                  ));
+                }
+              } catch (saveError) {
+                console.error('Error saving provider configuration via proxy:', saveError);
+                // Fallback to direct save
+                const saved = await supabaseHelpers.saveProviderConfiguration(user.id, {
+                  nickname: provider.nickname,
+                  provider: provider.provider,
+                  api_key: provider.apiKey,
+                  is_default: false
+                });
+
+                if (!saved) {
+                  settingsToSave[`${provider.provider}_api_key`] = provider.apiKey;
+                  console.warn(`Note: Nickname "${provider.nickname}" for ${provider.provider} cannot be saved without the provider_configurations table`);
                 }
               }
             }
           }
-        
+        }
+
         // Check if we need to show migration warning
         let needsMigration = false;
         for (const provider of aiProviders) {
@@ -397,12 +397,12 @@ export default function SettingsPage() {
             }
           }
         }
-        
+
         if (needsMigration) {
           console.warn('Database migration required for full provider functionality');
-          setErrors({ 
+          setErrors({
             ...errors,
-            migration: 'Note: Additional providers saved with limited functionality. To enable custom nicknames and multiple providers of the same type, run: npx supabase db push --project-ref lnvjsqyvhczgxvygbqer' 
+            migration: 'Note: Additional providers saved with limited functionality. To enable custom nicknames and multiple providers of the same type, run: npx supabase db push --project-ref lnvjsqyvhczgxvygbqer'
           });
         }
 
@@ -414,20 +414,20 @@ export default function SettingsPage() {
               settings: settingsToSave
             }
           });
-          
+
           if (error) throw error;
-          
+
           if (data.success) {
             // Update the local state with the masked values returned from the proxy
             if (data.settings) {
               // Update the first provider (Default AI) with masked credentials
               if (aiProviders.length > 0 && aiProviders[0].id === '1') {
-                setAiProviders(prev => prev.map(p => 
+                setAiProviders(prev => prev.map(p =>
                   p.id === '1' ? { ...p, apiKey: data.settings.ai_api_key || '' } : p
                 ));
               }
             }
-            
+
             toast({
               title: "Success",
               description: "Provider settings saved successfully!",
@@ -441,7 +441,7 @@ export default function SettingsPage() {
           }
         } catch (proxyError: any) {
           console.error('Error saving provider via settings-proxy:', proxyError);
-          
+
           // Extract error message from FunctionsHttpError
           let errorMessage = 'Failed to save provider settings';
           if (proxyError?.name === 'FunctionsHttpError' && proxyError?.context) {
@@ -454,23 +454,23 @@ export default function SettingsPage() {
           } else if (proxyError?.message) {
             errorMessage = proxyError.message;
           }
-          
+
           // Show error to user
           toast({
             title: "Provider Settings Error",
             description: errorMessage,
             variant: "destructive",
           });
-          
+
           // Don't fall back to direct save - show the error instead
           throw new Error(errorMessage);
         }
-        
+
       } else if (tab === 'agents') {
         // Save agent configuration
         // Validate custom model names are provided when 'custom' is selected
         const newErrors: Record<string, string> = {};
-        
+
         if (analysisTeamModel === 'custom' && !analysisCustomModel) {
           newErrors.analysis_custom_model = 'Custom model name is required';
         }
@@ -491,17 +491,17 @@ export default function SettingsPage() {
           setErrors(newErrors);
           return;
         }
-        
+
         // For now, we'll map provider IDs back to provider names for backward compatibility
         // In a future update, we'll modify the Edge Functions to use provider configurations
-        
+
         const analysisProvider = getProviderInfo(analysisTeamProviderId);
         const researchProvider = getProviderInfo(researchTeamProviderId);
         const tradingProvider = getProviderInfo(tradingTeamProviderId);
         const riskProvider = getProviderInfo(riskTeamProviderId);
         const portfolioManagerProvider = getProviderInfo(portfolioManagerProviderId);
-        
-        
+
+
         // Debug logging
         console.log('All AI Providers:', aiProviders);
         console.log('All AI Providers (detailed):', JSON.stringify(aiProviders, null, 2));
@@ -519,7 +519,7 @@ export default function SettingsPage() {
           riskProvider,
           portfolioManagerProvider
         });
-        
+
         // Helper to get model value
         const getModelValue = (teamProviderId: string, teamModel: string, customModel: string) => {
           if (teamProviderId === defaultProviderId) {
@@ -553,7 +553,7 @@ export default function SettingsPage() {
           portfolio_manager_provider_id: portfolioManagerProviderId === '1' ? null : portfolioManagerProviderId,
           portfolio_manager_max_tokens: portfolioManagerMaxTokens,
           // Analysis customization
-          news_social_optimization: newsSocialOptimization,
+          analysis_optimization: analysisOptimization,
           analysis_history_days: analysisHistoryDays, // Separate time range for analysis agents
           // Max tokens for each workflow step
           analysis_max_tokens: analysisMaxTokens,
@@ -561,9 +561,9 @@ export default function SettingsPage() {
           trading_max_tokens: tradingMaxTokens,
           risk_max_tokens: riskMaxTokens
         };
-        
+
         console.log('Settings to save (before API keys):', settingsToSave);
-        
+
         // DO NOT include API keys when saving agent configurations
         // API keys should only be saved from the Providers tab
         // This prevents the "Rejecting suspicious masked credential" error
@@ -579,7 +579,7 @@ export default function SettingsPage() {
             alpacaLiveSecretKey
           }
         });
-        
+
         if (changeCheckError) {
           toast({
             title: 'Validation Error',
@@ -588,10 +588,10 @@ export default function SettingsPage() {
           });
           return;
         }
-        
+
         const { shouldValidatePaper, shouldValidateLive } = changeCheckData;
         let validationFailed = false;
-        
+
         // Validate Paper Trading credentials if they have changed
         if (shouldValidatePaper) {
           const paperValidation = await validateCredential('alpaca_paper', alpacaPaperApiKey, undefined, alpacaPaperSecretKey);
@@ -611,7 +611,7 @@ export default function SettingsPage() {
         } else if (alpacaPaperApiKey && alpacaPaperSecretKey) {
           console.log('Paper trading credentials unchanged, skipping validation');
         }
-        
+
         // Validate Live Trading credentials if they have changed
         if (shouldValidateLive) {
           const liveValidation = await validateCredential('alpaca_live', alpacaLiveApiKey, undefined, alpacaLiveSecretKey);
@@ -631,13 +631,13 @@ export default function SettingsPage() {
         } else if (alpacaLiveApiKey && alpacaLiveSecretKey) {
           console.log('Live trading credentials unchanged, skipping validation');
         }
-        
-        
+
+
         // If validation failed, stop here
         if (validationFailed) {
           return;
         }
-        
+
         // Trading settings - use settings-proxy for credential masking
         settingsToSave = {
           alpaca_paper_api_key: alpacaPaperApiKey,
@@ -658,9 +658,9 @@ export default function SettingsPage() {
               settings: settingsToSave
             }
           });
-          
+
           if (error) throw error;
-          
+
           if (data.success) {
             // Update the local state with the masked values returned from the proxy
             if (data.settings) {
@@ -669,7 +669,7 @@ export default function SettingsPage() {
               setAlpacaLiveApiKey(data.settings.alpaca_live_api_key || '');
               setAlpacaLiveSecretKey(data.settings.alpaca_live_secret_key || '');
             }
-            
+
             toast({
               title: "Success",
               description: "Trading settings saved successfully!",
@@ -683,7 +683,7 @@ export default function SettingsPage() {
           }
         } catch (proxyError: any) {
           console.error('Error saving via settings-proxy:', proxyError);
-          
+
           // Extract error message from FunctionsHttpError
           let errorMessage = 'Failed to save trading settings';
           if (proxyError?.name === 'FunctionsHttpError' && proxyError?.context) {
@@ -696,14 +696,14 @@ export default function SettingsPage() {
           } else if (proxyError?.message) {
             errorMessage = proxyError.message;
           }
-          
+
           // Show error to user
           toast({
             title: "Trading Settings Error",
             description: errorMessage,
             variant: "destructive",
           });
-          
+
           // Don't fall back to direct save - show the error instead
           throw new Error(errorMessage);
         }
@@ -711,7 +711,7 @@ export default function SettingsPage() {
         // Rebalance settings - use same logic as agent config tab
         // Validate custom model name if 'custom' is selected
         const newErrors: Record<string, string> = {};
-        
+
         if (opportunityAgentModel === 'custom' && !opportunityCustomModel) {
           newErrors.opportunity_custom_model = 'Custom model name is required';
         }
@@ -720,10 +720,10 @@ export default function SettingsPage() {
           setErrors(newErrors);
           return;
         }
-        
+
         const opportunityAgentProvider = getProviderInfo(opportunityAgentProviderId);
-        
-        
+
+
         // Helper to get model value - same as agent config tab
         const getModelValue = (teamProviderId: string, teamModel: string, customModel: string) => {
           if (teamProviderId === defaultProviderId || teamProviderId === '1') {
@@ -735,7 +735,7 @@ export default function SettingsPage() {
           if (teamModel === 'custom') return customModel || null;
           return teamModel || null;
         };
-        
+
         // Debug logging
         console.log('Opportunity Agent Saving:', {
           providerId: opportunityAgentProviderId,
@@ -743,7 +743,7 @@ export default function SettingsPage() {
           model: getModelValue(opportunityAgentProviderId, opportunityAgentModel, opportunityCustomModel),
           maxTokens: opportunityMaxTokens
         });
-        
+
         settingsToSave = {
           rebalance_threshold: rebalanceThreshold,
           rebalance_min_position_size: rebalanceMinPositionSize,
@@ -761,14 +761,14 @@ export default function SettingsPage() {
           opportunity_max_tokens: opportunityMaxTokens,
           opportunity_agent_provider_id: opportunityAgentProviderId === '1' ? null : opportunityAgentProviderId,
         };
-        
+
         // DO NOT include API keys when saving rebalance configurations
         // API keys should only be saved from the Providers tab
         // This prevents the "Rejecting suspicious masked credential" error
       }
 
       console.log(`Settings to save for ${tab}:`, settingsToSave);
-      
+
       // Validate settings before saving
       if (tab === 'agents') {
         // Check if any null providers are being saved
@@ -777,11 +777,11 @@ export default function SettingsPage() {
         if (!settingsToSave.research_team_ai) nullProviders.push('Research Team');
         if (!settingsToSave.trading_team_ai) nullProviders.push('Trading Team');
         if (!settingsToSave.risk_team_ai) nullProviders.push('Risk Team');
-        
+
         if (nullProviders.length > 0) {
           console.error('Null providers detected:', nullProviders);
-          setErrors({ 
-            save: `Please configure providers first. Missing providers for: ${nullProviders.join(', ')}` 
+          setErrors({
+            save: `Please configure providers first. Missing providers for: ${nullProviders.join(', ')}`
           });
           return;
         }
@@ -802,28 +802,28 @@ export default function SettingsPage() {
         default:
           successMessage = 'Settings saved successfully!';
       }
-      
+
       toast({
         title: "Success",
         description: successMessage,
         variant: "default",
       });
       setErrors({});
-      
+
       console.log('Settings saved successfully');
-      
+
       // Don't force reload - it resets the form and prevents editing
       // The auth context will update naturally when needed
     } catch (error) {
       console.error(`Error saving ${tab} settings:`, error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       toast({
         title: "Error",
         description: `Failed to save ${tab} settings: ${errorMessage}`,
         variant: "destructive",
       });
-      
+
       setErrors({ save: `Failed to save ${tab} settings: ${errorMessage}` });
     }
   };
@@ -844,8 +844,8 @@ export default function SettingsPage() {
         return ['deepseek-chat', 'deepseek-coder', 'custom'];
       case 'openrouter':
         return [
-          'openai/gpt-4-turbo', 
-          'openai/gpt-4o', 
+          'openai/gpt-4-turbo',
+          'openai/gpt-4o',
           'openai/gpt-4o-mini',
           'anthropic/claude-3.5-sonnet',
           'anthropic/claude-3-opus',
@@ -862,14 +862,14 @@ export default function SettingsPage() {
         return ['custom'];
     }
   };
-  
+
   const getConfiguredProviders = () => {
     // Return all configured providers (Default AI is always first)
     return aiProviders
       .filter(p => p.apiKey && p.apiKey.trim() !== '' && p.nickname && p.nickname.trim() !== '')
       .map(p => ({ id: p.id, nickname: p.nickname, provider: p.provider }));
   };
-  
+
   const addAiProvider = () => {
     const newId = Date.now().toString();
     // Count total providers (excluding the default one at index 0) and add 1
@@ -877,13 +877,13 @@ export default function SettingsPage() {
     const defaultNickname = `Provider ${providerNumber}`;
     setAiProviders([...aiProviders, { id: newId, nickname: defaultNickname, provider: 'openrouter', apiKey: '' }]);
   };
-  
+
   const updateAiProvider = (id: string, field: 'nickname' | 'provider' | 'apiKey', value: string) => {
-    setAiProviders(aiProviders.map(p => 
+    setAiProviders(aiProviders.map(p =>
       p.id === id ? { ...p, [field]: value } : p
     ));
   };
-  
+
   const removeAiProvider = async (id: string) => {
     // Don't allow removing the default provider
     if (id === '1') {
@@ -891,10 +891,10 @@ export default function SettingsPage() {
       setErrorDialogOpen(true);
       return;
     }
-    
+
     const provider = aiProviders.find(p => p.id === id);
     if (!provider || !user?.id) return;
-    
+
     // Check if this provider is assigned to any teams
     const teamsUsingProvider: string[] = [];
     if (analysisTeamProviderId === id) teamsUsingProvider.push('Analysis Team');
@@ -903,7 +903,7 @@ export default function SettingsPage() {
     if (riskTeamProviderId === id) teamsUsingProvider.push('Risk Team');
     if (portfolioManagerProviderId === id) teamsUsingProvider.push('Portfolio Manager');
     if (opportunityAgentProviderId === id) teamsUsingProvider.push('Opportunity Agent');
-    
+
     if (teamsUsingProvider.length > 0) {
       setErrorDialogMessage(
         `Cannot delete provider "${provider.nickname}" because it's assigned to: ${teamsUsingProvider.join(', ')}. Please unassign it first.`
@@ -911,7 +911,7 @@ export default function SettingsPage() {
       setErrorDialogOpen(true);
       return;
     }
-    
+
     try {
       // Delete from database if it exists there
       if (id !== '1') {
@@ -920,7 +920,7 @@ export default function SettingsPage() {
           console.warn('Provider configuration not found in database, removing from local state only');
         }
       }
-      
+
       // Remove from local state
       setAiProviders(aiProviders.filter(p => p.id !== id));
     } catch (error) {
@@ -935,10 +935,10 @@ export default function SettingsPage() {
 
   const loadProviderConfigurations = async () => {
     if (!user?.id) return;
-    
+
     try {
       const providers: AiProvider[] = [];
-      
+
       // Get masked settings from settings-proxy
       let maskedSettings = null;
       try {
@@ -947,14 +947,14 @@ export default function SettingsPage() {
             action: 'get_settings'
           }
         });
-        
+
         if (!error && data.settings) {
           maskedSettings = data.settings;
         }
       } catch (proxyError) {
         console.error('Error loading masked settings:', proxyError);
       }
-      
+
       // Always add the default provider first - use masked settings as source of truth
       if (maskedSettings?.ai_provider || apiSettings?.ai_provider) {
         providers.push({
@@ -978,14 +978,14 @@ export default function SettingsPage() {
         const savedDefaultModel = maskedSettings.ai_model;
         const providerType = maskedSettings.ai_provider || 'openrouter';
         const availableModels = getModelOptions(providerType);
-        
+
         console.log('Loading default model from masked settings:', {
           savedModel: savedDefaultModel,
           provider: providerType,
           availableModels: availableModels,
           isCustom: !availableModels.includes(savedDefaultModel)
         });
-        
+
         if (savedDefaultModel && !availableModels.includes(savedDefaultModel)) {
           setDefaultAiModel('custom');
           setDefaultCustomModel(savedDefaultModel);
@@ -994,7 +994,7 @@ export default function SettingsPage() {
           setDefaultCustomModel(''); // Clear custom model if using preset
         }
       }
-      
+
       // Fetch additional provider configurations from settings-proxy (with masking)
       let configurations = [];
       try {
@@ -1003,7 +1003,7 @@ export default function SettingsPage() {
             action: 'get_provider_configurations'
           }
         });
-        
+
         if (!configError && configData.configurations) {
           configurations = configData.configurations;
         }
@@ -1012,7 +1012,7 @@ export default function SettingsPage() {
         // Fallback to direct database access
         configurations = await supabaseHelpers.getProviderConfigurations(user.id);
       }
-      
+
       if (configurations.length > 0) {
         // Add configurations (excluding default) with masked API keys
         configurations
@@ -1025,25 +1025,8 @@ export default function SettingsPage() {
               apiKey: config.api_key // Already masked by settings-proxy
             });
           });
-      } else {
-        // Legacy fallback - check for additional providers in old columns
-        if (apiSettings.openai_api_key && apiSettings.ai_provider !== 'openai') {
-          providers.push({ id: Date.now().toString() + '1', nickname: 'OpenAI', provider: 'openai', apiKey: apiSettings.openai_api_key });
-        }
-        if (apiSettings.anthropic_api_key && apiSettings.ai_provider !== 'anthropic') {
-          providers.push({ id: Date.now().toString() + '2', nickname: 'Anthropic', provider: 'anthropic', apiKey: apiSettings.anthropic_api_key });
-        }
-        if (apiSettings.google_api_key && apiSettings.ai_provider !== 'google') {
-          providers.push({ id: Date.now().toString() + '3', nickname: 'Google AI', provider: 'google', apiKey: apiSettings.google_api_key });
-        }
-        if (apiSettings.deepseek_api_key && apiSettings.ai_provider !== 'deepseek') {
-          providers.push({ id: Date.now().toString() + '4', nickname: 'DeepSeek', provider: 'deepseek', apiKey: apiSettings.deepseek_api_key });
-        }
-        if (apiSettings.openrouter_api_key && apiSettings.ai_provider !== 'openrouter') {
-          providers.push({ id: Date.now().toString() + '5', nickname: 'OpenRouter', provider: 'openrouter', apiKey: apiSettings.openrouter_api_key });
-        }
       }
-      
+
       setAiProviders(providers);
     } catch (error) {
       console.error('Error loading provider configurations:', error);
@@ -1054,14 +1037,14 @@ export default function SettingsPage() {
 
   const loadMaskedTradingCredentials = async () => {
     if (!user?.id) return;
-    
+
     try {
       const { data, error } = await supabase.functions.invoke('settings-proxy', {
         body: {
           action: 'get_settings'
         }
       });
-      
+
       if (!error && data.settings) {
         // Update trading credentials with masked values
         setAlpacaPaperApiKey(data.settings.alpaca_paper_api_key || '');
@@ -1078,17 +1061,17 @@ export default function SettingsPage() {
   useEffect(() => {
     const initAuth = async () => {
       console.log('Settings page initializing auth check...');
-      
+
       // First, wait a bit for persisted state to be restored from localStorage
       await new Promise(resolve => setTimeout(resolve, 300));
-      
+
       // Then initialize auth to refresh session
       await initialize();
       setSessionChecked(true);
-      
+
       // Give the auth state time to update after session check
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Now we can safely check authentication
       // Can't use useAuth.getState() here since useAuth is destructured as a hook above
       // Use the hook values directly instead
@@ -1099,7 +1082,7 @@ export default function SettingsPage() {
         setAuthChecking(false);
       }
     };
-    
+
     initAuth();
   }, []); // Only run once on mount
 
@@ -1115,19 +1098,19 @@ export default function SettingsPage() {
   // Load team provider IDs after providers are loaded
   useEffect(() => {
     if (!apiSettings || aiProviders.length === 0) return;
-    
+
     // Don't reload if we've already loaded the team settings and user is just saving
     if (teamSettingsLoaded) {
       console.log('Team settings already loaded, skipping reload');
       return;
     }
-    
+
     console.log('Loading team provider IDs with providers:', aiProviders);
-    console.log('Provider details (formatted):', JSON.stringify(aiProviders.map(p => ({ 
-      id: p.id, 
-      nickname: p.nickname, 
+    console.log('Provider details (formatted):', JSON.stringify(aiProviders.map(p => ({
+      id: p.id,
+      nickname: p.nickname,
       provider: p.provider,
-      hasApiKey: !!p.apiKey 
+      hasApiKey: !!p.apiKey
     })), null, 2));
     console.log('Looking for teams:', {
       analysis: apiSettings.analysis_team_ai,
@@ -1136,15 +1119,15 @@ export default function SettingsPage() {
       risk: apiSettings.risk_team_ai,
       portfolio: apiSettings.portfolio_manager_ai
     });
-    
+
     // Map team providers to provider IDs
     // This is tricky because we only save the provider type (e.g., "openrouter") not which specific configuration
     const findProviderIdByName = (providerName: string | null, savedApiKey?: string | null) => {
       if (!providerName) return '1'; // Default to first provider
-      
+
       // If we have a saved API key, try to find the provider with that exact key
       if (savedApiKey) {
-        const providerWithKey = aiProviders.find(p => 
+        const providerWithKey = aiProviders.find(p =>
           p.provider === providerName && p.apiKey === savedApiKey
         );
         if (providerWithKey) {
@@ -1152,7 +1135,7 @@ export default function SettingsPage() {
           return providerWithKey.id;
         }
       }
-      
+
       // Check if it matches the default AI provider (ID '1')
       const defaultProvider = aiProviders.find(p => p.id === '1');
       if (defaultProvider && defaultProvider.provider === providerName) {
@@ -1168,15 +1151,15 @@ export default function SettingsPage() {
           return otherProvider.id;
         }
       }
-      
+
       // Not the default provider, find any matching provider
       const provider = aiProviders.find(p => p.provider === providerName);
       console.log(`Finding provider ID for ${providerName}:`, provider);
-      
+
       // If we found a matching provider, use it. Otherwise default to '1'
       return provider ? provider.id : '1';
     };
-    
+
     // Set Analysis Team (use provider ID if available and valid, otherwise fallback to name matching)
     let analysisProviderId = apiSettings.analysis_team_provider_id;
     if (!analysisProviderId) {
@@ -1198,7 +1181,7 @@ export default function SettingsPage() {
     } else {
       setAnalysisTeamModel(analysisModel);
     }
-    
+
     // Set Research Team (use provider ID if available and valid, otherwise fallback to name matching)
     let researchProviderId = apiSettings.research_team_provider_id;
     if (!researchProviderId) {
@@ -1219,7 +1202,7 @@ export default function SettingsPage() {
     } else {
       setResearchTeamModel(researchModel);
     }
-    
+
     // Set Trading Team (use provider ID if available and valid, otherwise fallback to name matching)
     let tradingProviderId = apiSettings.trading_team_provider_id;
     if (!tradingProviderId) {
@@ -1240,7 +1223,7 @@ export default function SettingsPage() {
     } else {
       setTradingTeamModel(tradingModel);
     }
-    
+
     // Set Risk Team (use provider ID if available and valid, otherwise fallback to name matching)
     let riskProviderId = apiSettings.risk_team_provider_id;
     if (!riskProviderId) {
@@ -1261,7 +1244,7 @@ export default function SettingsPage() {
     } else {
       setRiskTeamModel(riskModel);
     }
-    
+
     // Set Portfolio Manager
     let portfolioManagerProviderIdValue = '1';
     if (apiSettings.portfolio_manager_ai) {
@@ -1275,7 +1258,7 @@ export default function SettingsPage() {
         setPortfolioManagerModel(pmModel);
       }
     }
-    
+
     // Set Opportunity Agent (use provider ID if available, otherwise fallback to name matching)
     let opportunityProviderId = apiSettings.opportunity_agent_provider_id;
     if (!opportunityProviderId) {
@@ -1300,7 +1283,7 @@ export default function SettingsPage() {
     } else {
       setOpportunityAgentModel(opportunityModel);
     }
-    
+
     console.log('Team provider IDs set:', {
       analysis: analysisProviderId,
       research: researchProviderId,
@@ -1309,7 +1292,7 @@ export default function SettingsPage() {
       portfolioManager: portfolioManagerProviderIdValue,
       opportunity: opportunityProviderId
     });
-    
+
     // Mark that we've loaded the team settings
     setTeamSettingsLoaded(true);
   }, [apiSettings, aiProviders, teamSettingsLoaded]); // Run when either apiSettings or aiProviders changes
@@ -1397,7 +1380,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="container mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -1407,7 +1390,7 @@ export default function SettingsPage() {
           <p className="text-muted-foreground mt-2">
             Configure your API keys and trading preferences
           </p>
-          
+
           {/* Debug section */}
           {!user && (
             <Alert className="mt-4 border-orange-500">
@@ -1415,8 +1398,8 @@ export default function SettingsPage() {
               <AlertDescription>
                 <div className="flex items-center justify-between">
                   <span>User data not loaded. You may need to refresh.</span>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => initialize()}
                   >
@@ -1487,7 +1470,7 @@ export default function SettingsPage() {
               portfolioManagerProviderId={portfolioManagerProviderId}
               portfolioManagerModel={portfolioManagerModel}
               portfolioManagerCustomModel={portfolioManagerCustomModel}
-              newsSocialOptimization={newsSocialOptimization}
+              analysisOptimization={analysisOptimization}
               analysisHistoryDays={analysisHistoryDays}
               analysisMaxTokens={analysisMaxTokens}
               researchMaxTokens={researchMaxTokens}
@@ -1514,7 +1497,7 @@ export default function SettingsPage() {
               setPortfolioManagerProviderId={setPortfolioManagerProviderId}
               setPortfolioManagerModel={setPortfolioManagerModel}
               setPortfolioManagerCustomModel={setPortfolioManagerCustomModel}
-              setNewsSocialOptimization={setNewsSocialOptimization}
+              setAnalysisOptimization={setAnalysisOptimization}
               setAnalysisHistoryDays={setAnalysisHistoryDays}
               setAnalysisMaxTokens={setAnalysisMaxTokens}
               setResearchMaxTokens={setResearchMaxTokens}
@@ -1592,20 +1575,20 @@ export default function SettingsPage() {
         </Tabs>
 
         {/* Global Error Alert - only show if not already shown in a specific tab */}
-        {errors.save && 
-         !(['providers', 'rebalance'].includes(activeTab)) && (
-          <div className="mt-4 flex justify-end">
-            <Alert className="w-auto bg-red-50 border-red-200">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">
-                {errors.save}
-              </AlertDescription>
-            </Alert>
-          </div>
-        )}
-        
+        {errors.save &&
+          !(['providers', 'rebalance'].includes(activeTab)) && (
+            <div className="mt-4 flex justify-end">
+              <Alert className="w-auto bg-red-50 border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  {errors.save}
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
       </main>
-      
+
       {/* Error Dialog Modal */}
       <AlertDialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
         <AlertDialogContent>

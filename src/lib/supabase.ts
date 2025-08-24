@@ -153,8 +153,10 @@ export interface ApiSettings {
   // Portfolio Manager settings
   portfolio_manager_ai?: string;
   portfolio_manager_model?: string;
+  portfolio_manager_provider_id?: string;
   portfolio_manager_max_tokens?: number;
   // Analysis customization (Analysis team only)
+  analysis_optimization?: string;
   analysis_depth?: number;
   analysis_history_days?: number | string;  // Can be number or string like "1M", "3M", etc.
   // Max tokens settings

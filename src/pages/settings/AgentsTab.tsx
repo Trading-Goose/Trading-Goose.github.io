@@ -38,7 +38,7 @@ export default function AgentsTab({
   portfolioManagerProviderId,
   portfolioManagerModel,
   portfolioManagerCustomModel,
-  newsSocialOptimization,
+  analysisOptimization,
   analysisHistoryDays,
   analysisMaxTokens,
   researchMaxTokens,
@@ -65,7 +65,7 @@ export default function AgentsTab({
   setPortfolioManagerProviderId,
   setPortfolioManagerModel,
   setPortfolioManagerCustomModel,
-  setNewsSocialOptimization,
+  setAnalysisOptimization,
   setAnalysisHistoryDays,
   setAnalysisMaxTokens,
   setResearchMaxTokens,
@@ -170,10 +170,10 @@ export default function AgentsTab({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>News & Social Analysis Optimization</Label>
+              <Label>Analysis Optimization</Label>
               <Select 
-                value={newsSocialOptimization} 
-                onValueChange={setNewsSocialOptimization}
+                value={analysisOptimization} 
+                onValueChange={setAnalysisOptimization}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select optimization level" />
@@ -184,7 +184,7 @@ export default function AgentsTab({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Normal=Standard news/social analysis, Balanced=More thorough coverage
+                Normal=Standard analysis, Balanced=More thorough coverage for all analysis agents
               </p>
             </div>
             <div className="space-y-2">

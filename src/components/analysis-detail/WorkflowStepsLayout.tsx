@@ -115,7 +115,15 @@ export default function WorkflowStepsLayout({
     // First check agent_insights for completion and errors (most reliable)
     if (analysisData.agent_insights) {
       // Check for error conditions first
+      // Backend stores errors with lowercase keys without camelCase (e.g., "marketanalyst_error" not "marketAnalyst_error")
+      const errorKey = agentKey.toLowerCase() + '_error';
+      if (analysisData.agent_insights[errorKey]) {
+        console.log(`Found error for ${agentKey} at key ${errorKey}:`, analysisData.agent_insights[errorKey]);
+        return 'error';
+      }
+      // Also check the original format for backward compatibility
       if (analysisData.agent_insights[agentKey + '_error']) {
+        console.log(`Found error for ${agentKey} at legacy key ${agentKey + '_error'}:`, analysisData.agent_insights[agentKey + '_error']);
         return 'error';
       }
       // Then check for normal completion - allow completed agents to show even if cancelled
@@ -132,18 +140,19 @@ export default function WorkflowStepsLayout({
           const agentNameLower = a.name.toLowerCase().replace(/\s+/g, '');
           const keyLower = agentKey.toLowerCase();
           
-          // Direct name matching patterns
-          if (agentNameLower.includes('market') && keyLower.includes('market')) return true;
-          if (agentNameLower.includes('news') && keyLower.includes('news')) return true;
-          if (agentNameLower.includes('social') && keyLower.includes('social')) return true;
-          if (agentNameLower.includes('fundamentals') && keyLower.includes('fundamentals')) return true;
+          // More flexible name matching patterns
+          // Handle both camelCase keys and display names
+          if (agentNameLower.includes('marketanalyst') && keyLower.includes('market')) return true;
+          if (agentNameLower.includes('newsanalyst') && keyLower.includes('news')) return true;
+          if (agentNameLower.includes('socialmediaanalyst') && keyLower.includes('social')) return true;
+          if (agentNameLower.includes('fundamentalsanalyst') && keyLower.includes('fundamentals')) return true;
           if (agentNameLower.includes('bullresearcher') && keyLower.includes('bull')) return true;
           if (agentNameLower.includes('bearresearcher') && keyLower.includes('bear')) return true;
           if (agentNameLower.includes('researchmanager') && keyLower.includes('researchmanager')) return true;
           if (agentNameLower.includes('trader') && keyLower.includes('trader')) return true;
-          if (agentNameLower.includes('risky') && keyLower.includes('risky')) return true;
-          if (agentNameLower.includes('safe') && keyLower.includes('safe')) return true;
-          if (agentNameLower.includes('neutral') && keyLower.includes('neutral')) return true;
+          if (agentNameLower.includes('riskyanalyst') && keyLower.includes('risky')) return true;
+          if (agentNameLower.includes('safeanalyst') && keyLower.includes('safe')) return true;
+          if (agentNameLower.includes('neutralanalyst') && keyLower.includes('neutral')) return true;
           if (agentNameLower.includes('riskmanager') && keyLower.includes('riskmanager')) return true;
           if (agentNameLower.includes('portfoliomanager') && keyLower.includes('portfolio')) return true;
           
@@ -151,12 +160,13 @@ export default function WorkflowStepsLayout({
         });
         
         if (agent) {
-          // If cancelled, convert 'running' or 'processing' to 'pending', but keep 'completed'
+          // If cancelled, convert 'running' or 'processing' to 'pending', but keep 'completed' and 'error'
           if (isAnalysisCancelled && (agent.status === 'running' || agent.status === 'processing')) {
             return 'pending';
           }
-          // Only return workflow status if it's an active state (running/processing/error)
-          if (agent.status === 'running' || agent.status === 'processing' || agent.status === 'error') {
+          // Return workflow status for active states (running/processing/error/completed)
+          // This ensures error status is properly returned
+          if (agent.status === 'running' || agent.status === 'processing' || agent.status === 'error' || agent.status === 'completed') {
             return agent.status;
           }
         }
@@ -168,6 +178,12 @@ export default function WorkflowStepsLayout({
 
   // Get error details for an agent
   const getAgentError = (agentKey: string) => {
+    // Backend stores errors with lowercase keys (e.g., "marketanalyst_error")
+    const errorKey = agentKey.toLowerCase() + '_error';
+    if (analysisData.agent_insights?.[errorKey]) {
+      return analysisData.agent_insights[errorKey];
+    }
+    // Also check the original format for backward compatibility
     if (analysisData.agent_insights?.[agentKey + '_error']) {
       return analysisData.agent_insights[agentKey + '_error'];
     }

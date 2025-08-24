@@ -4,15 +4,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity, Clock } from "lucide-react";
+import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity, Clock, AlertCircle } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import {
   type RebalanceStatus,
   REBALANCE_STATUS,
-  isRebalanceActive
+  isRebalanceActive,
+  ANALYSIS_STATUS,
+  convertLegacyAnalysisStatus,
+  isAnalysisActive
 } from "@/lib/statusTypes";
 import RebalanceModal from "./RebalanceModal";
 import RebalanceDetailModal from "./RebalanceDetailModal";
@@ -47,6 +59,8 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   const [showScheduleListModal, setShowScheduleListModal] = useState(false);
   const [rebalancing, setRebalancing] = useState(false);
   const [runningRebalance, setRunningRebalance] = useState<string | null>(null); // Store rebalance_request_id
+  const [runningAnalysesCount, setRunningAnalysesCount] = useState(0);
+  const [showAnalysisAlert, setShowAnalysisAlert] = useState(false);
 
   // Use ref to track previous running rebalance
   const previousRunningRef = useRef<string | null>(null);
@@ -55,9 +69,15 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
     if (!isAuthenticated) {
       // This shouldn't happen since the button is in an authenticated area
       return;
-    } else {
-      setShowRebalanceModal(true);
     }
+    
+    // Check if there are running analyses
+    if (runningAnalysesCount > 0) {
+      setShowAnalysisAlert(true);
+      return;
+    }
+    
+    setShowRebalanceModal(true);
   };
 
   const fetchPositions = async () => {
@@ -157,6 +177,45 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
     const interval = setInterval(fetchPositions, 30000);
     return () => clearInterval(interval);
   }, [apiSettings]);
+
+  // Check for running analyses
+  useEffect(() => {
+    const checkRunningAnalyses = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('analysis_history')
+          .select('id, analysis_status, is_canceled')
+          .eq('user_id', user.id);
+
+        if (!error && data) {
+          const runningCount = data.filter(item => {
+            // Convert legacy numeric status if needed
+            const currentStatus = typeof item.analysis_status === 'number' 
+              ? convertLegacyAnalysisStatus(item.analysis_status)
+              : item.analysis_status;
+            
+            // Skip cancelled analyses
+            if (item.is_canceled || currentStatus === ANALYSIS_STATUS.CANCELLED) {
+              return false;
+            }
+            
+            // Use centralized logic to check if analysis is active
+            return isAnalysisActive(currentStatus);
+          }).length;
+          
+          setRunningAnalysesCount(runningCount);
+        }
+      } catch (error) {
+        console.error('Error checking running analyses:', error);
+      }
+    };
+
+    checkRunningAnalyses();
+    const interval = setInterval(checkRunningAnalyses, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Check for running rebalance requests
   useEffect(() => {
@@ -526,6 +585,32 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         isOpen={showScheduleListModal}
         onClose={() => setShowScheduleListModal(false)}
       />
+      
+      {/* Running Analyses Alert Dialog */}
+      <AlertDialog open={showAnalysisAlert} onOpenChange={setShowAnalysisAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-blue-500 animate-pulse" />
+              Active Analyses Detected
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                {runningAnalysesCount} {runningAnalysesCount === 1 ? 'analysis is' : 'analyses are'} currently running. 
+                Portfolio rebalancing is temporarily disabled while individual stock analyses are in progress.
+              </p>
+              <p>
+                Please wait for all analyses to complete before starting a portfolio rebalance.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowAnalysisAlert(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -55,6 +55,5 @@ export function isRebalanceFinished(status: RebalanceStatus): boolean {
  */
 export function isRebalanceActive(status: RebalanceStatus): boolean {
   return status === REBALANCE_STATUS.RUNNING || 
-         status === REBALANCE_STATUS.PENDING ||
-         status === REBALANCE_STATUS.AWAITING_APPROVAL;
+         status === REBALANCE_STATUS.PENDING;
 }

@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   TrendingUp,
@@ -9,11 +10,19 @@ import {
   FileText,
   Home,
   RefreshCw,
-  UserPlus
+  UserPlus,
+  Activity
 } from "lucide-react";
 import { useAuth, hasRequiredApiKeys } from "@/lib/auth";
 import { useRBAC } from "@/hooks/useRBAC";
 import { RoleBadge, RoleGate } from "@/components/RoleBasedAccess";
+import { supabase } from "@/lib/supabase";
+import { 
+  ANALYSIS_STATUS,
+  convertLegacyAnalysisStatus,
+  isAnalysisActive,
+  isRebalanceActive
+} from "@/lib/statusTypes";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,13 +35,66 @@ import {
 export default function Header() {
   const navigate = useNavigate();
   const { user, profile, isAuthenticated, logout, apiSettings } = useAuth();
-
+  const { getMaxParallelAnalysis } = useRBAC();
+  const [runningAnalyses, setRunningAnalyses] = useState(0);
+  const [runningRebalances, setRunningRebalances] = useState(0);
 
   const hasApiKeys = hasRequiredApiKeys(apiSettings);
+  const maxParallelAnalysis = getMaxParallelAnalysis();
+
+  // Check for running analyses and rebalances
+  useEffect(() => {
+    const checkRunningTasks = async () => {
+      if (!user) return;
+
+      try {
+        // Check running analyses
+        const { data: analysisData } = await supabase
+          .from('analysis_history')
+          .select('id, analysis_status, is_canceled')
+          .eq('user_id', user.id);
+
+        if (analysisData) {
+          const runningCount = analysisData.filter(item => {
+            const currentStatus = typeof item.analysis_status === 'number' 
+              ? convertLegacyAnalysisStatus(item.analysis_status)
+              : item.analysis_status;
+            
+            if (item.is_canceled || currentStatus === ANALYSIS_STATUS.CANCELLED) {
+              return false;
+            }
+            
+            return isAnalysisActive(currentStatus);
+          }).length;
+          setRunningAnalyses(runningCount);
+        }
+
+        // Check running rebalances
+        const { data: rebalanceData } = await supabase
+          .from('rebalance_requests')
+          .select('id, status')
+          .eq('user_id', user.id);
+
+        if (rebalanceData) {
+          const runningCount = rebalanceData.filter(item => 
+            isRebalanceActive(item.status)
+          ).length;
+          setRunningRebalances(runningCount);
+        }
+      } catch (error) {
+        console.error('Error checking running tasks:', error);
+      }
+    };
+
+    checkRunningTasks();
+    const interval = setInterval(checkRunningTasks, 10000); // Check every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [user]);
 
   return (
-    <>
-      <header className="sticky top-0 z-50 border-b border-border bg-card/50 backdrop-blur-sm">
+    <div className="sticky top-0 z-50">
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-4">
@@ -193,6 +255,37 @@ export default function Header() {
           </div>
         </div>
       </header>
-    </>
+      
+      {/* Running tasks banner */}
+      {isAuthenticated && (runningAnalyses > 0 || runningRebalances > 0) && (
+        <div className="bg-primary/10 border-b border-primary/20 backdrop-blur-sm">
+          <div className="container mx-auto px-6 py-2">
+            <div className="flex items-center justify-center gap-4 text-sm">
+              {runningRebalances > 0 && (
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+                  <span className="font-medium">
+                    {runningRebalances === 1 ? 'Portfolio Rebalance is Running' : `${runningRebalances} Portfolio Rebalances Running`}
+                  </span>
+                </div>
+              )}
+              {runningAnalyses > 0 && (
+                <div className="flex items-center gap-2">
+                  <Activity className="h-3 w-3 animate-pulse text-primary" />
+                  <span className="font-medium">
+                    {runningAnalyses} Analysis{runningAnalyses > 1 ? 'es' : ''} Running
+                  </span>
+                  {maxParallelAnalysis > 1 && (
+                    <span className="text-xs text-muted-foreground">
+                      ({maxParallelAnalysis - runningAnalyses} slot{maxParallelAnalysis - runningAnalyses !== 1 ? 's' : ''} available)
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

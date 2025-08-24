@@ -5,16 +5,27 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import StockTickerAutocomplete from "@/components/StockTickerAutocomplete";
-import { Plus, X, TrendingUp, TrendingDown, Loader2, RefreshCw, Play, Eye } from "lucide-react";
+import { Plus, X, TrendingUp, TrendingDown, Loader2, RefreshCw, Play, Eye, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { useRBAC } from "@/hooks/useRBAC";
 import { alpacaAPI } from "@/lib/alpaca";
 import AnalysisDetailModal from "./AnalysisDetailModal";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { 
   AnalysisStatus, 
   ANALYSIS_STATUS,
   convertLegacyAnalysisStatus,
-  isAnalysisActive
+  isAnalysisActive,
+  isRebalanceActive
 } from "@/lib/statusTypes";
 
 interface WatchlistItem {
@@ -37,12 +48,18 @@ interface StandaloneWatchlistProps {
 
 export default function StandaloneWatchlist({ onSelectStock, selectedStock }: StandaloneWatchlistProps) {
   const { user, isAuthenticated, apiSettings } = useAuth();
+  const { getMaxParallelAnalysis } = useRBAC();
   const { toast } = useToast();
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [newTicker, setNewTicker] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [runningAnalyses, setRunningAnalyses] = useState<Set<string>>(new Set());
+  const [showLimitAlert, setShowLimitAlert] = useState(false);
+  const [showRebalanceAlert, setShowRebalanceAlert] = useState(false);
+  const [hasRunningRebalance, setHasRunningRebalance] = useState(false);
+  
+  const maxParallelAnalysis = getMaxParallelAnalysis();
 
   // Fetch stock data including description and price using Alpaca
   const fetchStockData = async (ticker: string) => {
@@ -215,6 +232,33 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
 
   // Use ref to track previous running analyses
   const previousRunningRef = useRef<Set<string>>(new Set());
+
+  // Check for running rebalances
+  useEffect(() => {
+    const checkRunningRebalance = async () => {
+      if (!user) return;
+
+      try {
+        const { data: rebalanceData } = await supabase
+          .from('rebalance_requests')
+          .select('id, status')
+          .eq('user_id', user.id);
+
+        if (rebalanceData) {
+          const hasRunning = rebalanceData.some(item => 
+            isRebalanceActive(item.status)
+          );
+          setHasRunningRebalance(hasRunning);
+        }
+      } catch (error) {
+        console.error('Error checking running rebalance:', error);
+      }
+    };
+
+    checkRunningRebalance();
+    const interval = setInterval(checkRunningRebalance, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Check for running analyses using unified logic
   useEffect(() => {
@@ -436,6 +480,18 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       // View existing running analysis
       setSelectedTicker(ticker);
     } else {
+      // Check if there's a running rebalance
+      if (hasRunningRebalance) {
+        setShowRebalanceAlert(true);
+        return;
+      }
+      
+      // Check if we've reached the parallel analysis limit
+      if (runningAnalyses.size >= maxParallelAnalysis) {
+        setShowLimitAlert(true);
+        return;
+      }
+      
       try {
         // Start analysis via analysis coordinator
         // Don't send any credentials from frontend - coordinator will fetch from database
@@ -652,6 +708,56 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           }}
         />
       )}
+      
+      {/* Limit Reached Alert Dialog */}
+      <AlertDialog open={showLimitAlert} onOpenChange={setShowLimitAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              Analysis Limit Reached
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                You have reached your maximum limit of {maxParallelAnalysis} parallel {maxParallelAnalysis === 1 ? 'analysis' : 'analyses'}.
+              </p>
+              <p>
+                Currently {runningAnalyses.size} {runningAnalyses.size === 1 ? 'analysis is' : 'analyses are'} running. Please wait for one to complete before starting another.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowLimitAlert(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Rebalance Running Alert Dialog */}
+      <AlertDialog open={showRebalanceAlert} onOpenChange={setShowRebalanceAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
+              Portfolio Rebalance in Progress
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                A portfolio rebalance is currently running. Individual stock analyses are temporarily disabled during rebalancing.
+              </p>
+              <p>
+                Please wait for the rebalance to complete before starting new analyses.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowRebalanceAlert(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

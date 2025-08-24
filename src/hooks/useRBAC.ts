@@ -7,7 +7,7 @@ export function useRBAC() {
   const { user, isAdmin } = useAuth();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [userRoles, setUserRoles] = useState<any[]>([]);
-  const [roleDetails, setRoleDetails] = useState<Map<string, { name: string; display_name: string; priority: number }>>(new Map());
+  const [roleDetails, setRoleDetails] = useState<Map<string, { name: string; display_name: string; priority: number; max_parallel_analysis?: number }>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -46,7 +46,8 @@ export function useRBAC() {
               roleMap.set(role.id, {
                 name: role.name,
                 display_name: role.display_name,
-                priority: role.priority || 0
+                priority: role.priority || 0,
+                max_parallel_analysis: role.max_parallel_analysis || 1
               });
             });
             setRoleDetails(roleMap);
@@ -126,6 +127,29 @@ export function useRBAC() {
     return perms.every(p => hasPermission(p));
   };
 
+  const hasRole = (roleName: string): boolean => {
+    if (!user) return false;
+    if (isAdmin) return true;
+    
+    return userRoles.some(ur => {
+      const roleDetail = roleDetails.get(ur.role_id);
+      return roleDetail?.name === roleName;
+    });
+  };
+
+  const hasAnyRole = (roleNames: string[]): boolean => {
+    return roleNames.some(r => hasRole(r));
+  };
+
+  const hasAllRoles = (roleNames: string[]): boolean => {
+    return roleNames.every(r => hasRole(r));
+  };
+
+  const canPerform = (resource: string, action: string): boolean => {
+    // Check if user has specific permission for resource.action
+    return hasPermission(`${resource}.${action}`);
+  };
+
   const getPrimaryRole = () => {
     console.log('[useRBAC] getPrimaryRole called. userRoles:', userRoles, 'roleDetails size:', roleDetails.size);
     
@@ -167,13 +191,35 @@ export function useRBAC() {
     return null;
   };
 
+  const getMaxParallelAnalysis = (): number => {
+    // Admin gets unlimited (show as 10 for practical purposes)
+    if (isAdmin) return 10;
+    
+    // Get the highest limit from all user roles
+    let maxLimit = 1; // Default to 1 if no roles found
+    
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      if (roleDetail && roleDetail.max_parallel_analysis) {
+        maxLimit = Math.max(maxLimit, roleDetail.max_parallel_analysis);
+      }
+    }
+    
+    return maxLimit;
+  };
+
   return {
     permissions,
     isLoading,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
+    hasRole,
+    hasAnyRole,
+    hasAllRoles,
+    canPerform,
     isAdmin,
-    getPrimaryRole
+    getPrimaryRole,
+    getMaxParallelAnalysis
   };
 }

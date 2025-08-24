@@ -9,6 +9,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import {
   TrendingUp,
   MessageSquare,
   Shield,
@@ -27,10 +36,13 @@ import {
   Info,
   Loader2,
   Play,
-  Briefcase
+  Briefcase,
+  RefreshCw
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth"; import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth"; 
+import { useRBAC } from "@/hooks/useRBAC";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { analysisManager } from "@/lib/analysisManager";
 import type { WorkflowStep as EngineWorkflowStep } from "@/lib/tradingEngine";
@@ -41,7 +53,8 @@ import {
   type AnalysisStatus,
   ANALYSIS_STATUS,
   convertLegacyAnalysisStatus,
-  isAnalysisActive
+  isAnalysisActive,
+  isRebalanceActive
 } from "@/lib/statusTypes";
 
 interface Agent {
@@ -309,6 +322,7 @@ const getStageStatusColor = (status: string) => {
 
 export default function HorizontalWorkflow() {
   const { user, apiSettings } = useAuth();
+  const { getMaxParallelAnalysis } = useRBAC();
   const { toast } = useToast();
   const [selectedStep, setSelectedStep] = useState<WorkflowStep | null>(null);
   const [expandedAgents, setExpandedAgents] = useState(false);
@@ -320,6 +334,39 @@ export default function HorizontalWorkflow() {
   const [showAnalysisDetail, setShowAnalysisDetail] = useState(false);
   const [isRebalanceContext, setIsRebalanceContext] = useState(false);
   const previousRunningRef = useRef<Set<string>>(new Set());
+  const [runningAnalysesCount, setRunningAnalysesCount] = useState(0);
+  const [showLimitAlert, setShowLimitAlert] = useState(false);
+  const [showRebalanceAlert, setShowRebalanceAlert] = useState(false);
+  const [hasRunningRebalance, setHasRunningRebalance] = useState(false);
+  
+  const maxParallelAnalysis = getMaxParallelAnalysis();
+
+  // Check for running rebalances
+  useEffect(() => {
+    const checkRunningRebalance = async () => {
+      if (!user) return;
+
+      try {
+        const { data: rebalanceData } = await supabase
+          .from('rebalance_requests')
+          .select('id, status')
+          .eq('user_id', user.id);
+
+        if (rebalanceData) {
+          const hasRunning = rebalanceData.some(item => 
+            isRebalanceActive(item.status)
+          );
+          setHasRunningRebalance(hasRunning);
+        }
+      } catch (error) {
+        console.error('Error checking running rebalance:', error);
+      }
+    };
+
+    checkRunningRebalance();
+    const interval = setInterval(checkRunningRebalance, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Handle starting a new analysis
   const handleStartAnalysis = async () => {
@@ -329,6 +376,18 @@ export default function HorizontalWorkflow() {
         description: !apiSettings ? "Please configure your API settings first" : "Please enter a stock ticker",
         variant: "destructive",
       });
+      return;
+    }
+
+    // Check if there's a running rebalance
+    if (hasRunningRebalance) {
+      setShowRebalanceAlert(true);
+      return;
+    }
+    
+    // Check if we've reached the parallel analysis limit
+    if (runningAnalysesCount >= maxParallelAnalysis) {
+      setShowLimitAlert(true);
       return;
     }
 
@@ -398,8 +457,7 @@ export default function HorizontalWorkflow() {
               }
               
               // Use centralized logic to check if analysis is active
-              const isRunning = isAnalysisActive(currentStatus) ||
-                (item.full_analysis && item.full_analysis.status === ANALYSIS_STATUS.RUNNING);
+              const isRunning = isAnalysisActive(currentStatus);
               return isRunning;
             });
 
@@ -407,13 +465,15 @@ export default function HorizontalWorkflow() {
             if (runningData.length > 0) {
               console.log('Running analyses from DB:', runningData.map(d => ({
                 ticker: d.ticker,
-                status: d.analysis_status,
-                fullAnalysisStatus: d.full_analysis?.status
+                status: d.analysis_status
               })));
             }
             for (const item of runningData) {
               running.add(item.ticker);
             }
+            
+            // Update the count of running analyses
+            setRunningAnalysesCount(running.size);
 
             // Use the most recent running analysis for display
             if (runningData.length > 0) {
@@ -579,7 +639,7 @@ export default function HorizontalWorkflow() {
   // Helper function to get agent status (hybrid approach)
   const getAgentStatus = (agentKey: string, stepId: string, analysis: any) => {
     // Check if analysis is cancelled
-    const isAnalysisCancelled = analysis.status === ANALYSIS_STATUS.CANCELLED || 
+    const isAnalysisCancelled = analysis.analysis_status === ANALYSIS_STATUS.CANCELLED || 
         analysis.is_canceled;
     
     const insights = analysis.agent_insights || {};
@@ -1109,6 +1169,56 @@ export default function HorizontalWorkflow() {
           analysisId={currentAnalysis?.id}
         />
       )}
+      
+      {/* Limit Reached Alert Dialog */}
+      <AlertDialog open={showLimitAlert} onOpenChange={setShowLimitAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              Analysis Limit Reached
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                You have reached your maximum limit of {maxParallelAnalysis} parallel {maxParallelAnalysis === 1 ? 'analysis' : 'analyses'}.
+              </p>
+              <p>
+                Currently {runningAnalysesCount} {runningAnalysesCount === 1 ? 'analysis is' : 'analyses are'} running. Please wait for one to complete before starting another.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowLimitAlert(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Rebalance Running Alert Dialog */}
+      <AlertDialog open={showRebalanceAlert} onOpenChange={setShowRebalanceAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
+              Portfolio Rebalance in Progress
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                A portfolio rebalance is currently running. Individual stock analyses are temporarily disabled during rebalancing.
+              </p>
+              <p>
+                Please wait for the rebalance to complete before starting new analyses.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowRebalanceAlert(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

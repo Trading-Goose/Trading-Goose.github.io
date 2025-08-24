@@ -550,6 +550,7 @@ export default function SettingsPage() {
           // Portfolio Manager settings
           portfolio_manager_ai: portfolioManagerProvider.provider,
           portfolio_manager_model: getModelValue(portfolioManagerProviderId, portfolioManagerModel, portfolioManagerCustomModel),
+          portfolio_manager_provider_id: portfolioManagerProviderId === '1' ? null : portfolioManagerProviderId,
           portfolio_manager_max_tokens: portfolioManagerMaxTokens,
           // Analysis customization
           news_social_optimization: newsSocialOptimization,
@@ -563,22 +564,10 @@ export default function SettingsPage() {
         
         console.log('Settings to save (before API keys):', settingsToSave);
         
-        // Also save the specific API keys for each team
-        if (analysisProvider.provider && analysisProvider.apiKey) {
-          settingsToSave[`${analysisProvider.provider}_api_key`] = analysisProvider.apiKey;
-        }
-        if (researchProvider.provider && researchProvider.apiKey) {
-          settingsToSave[`${researchProvider.provider}_api_key`] = researchProvider.apiKey;
-        }
-        if (tradingProvider.provider && tradingProvider.apiKey) {
-          settingsToSave[`${tradingProvider.provider}_api_key`] = tradingProvider.apiKey;
-        }
-        if (riskProvider.provider && riskProvider.apiKey) {
-          settingsToSave[`${riskProvider.provider}_api_key`] = riskProvider.apiKey;
-        }
-        if (portfolioManagerProvider.provider && portfolioManagerProvider.apiKey) {
-          settingsToSave[`${portfolioManagerProvider.provider}_api_key`] = portfolioManagerProvider.apiKey;
-        }
+        // DO NOT include API keys when saving agent configurations
+        // API keys should only be saved from the Providers tab
+        // This prevents the "Rejecting suspicious masked credential" error
+        // The agent teams will use the API keys from provider_configurations table
       } else if (tab === 'trading') {
         // Check if credentials have actually changed by comparing with backend masked values
         const { data: changeCheckData, error: changeCheckError } = await supabase.functions.invoke('settings-proxy', {
@@ -773,10 +762,9 @@ export default function SettingsPage() {
           opportunity_agent_provider_id: opportunityAgentProviderId === '1' ? null : opportunityAgentProviderId,
         };
         
-        // Also save the specific API key for opportunity agent (same as portfolio manager logic)
-        if (opportunityAgentProvider.provider && opportunityAgentProvider.apiKey && opportunityAgentProviderId !== '1') {
-          settingsToSave[`${opportunityAgentProvider.provider}_api_key`] = opportunityAgentProvider.apiKey;
-        }
+        // DO NOT include API keys when saving rebalance configurations
+        // API keys should only be saved from the Providers tab
+        // This prevents the "Rejecting suspicious masked credential" error
       }
 
       console.log(`Settings to save for ${tab}:`, settingsToSave);

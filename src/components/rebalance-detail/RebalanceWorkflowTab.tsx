@@ -201,7 +201,7 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                                 <div className="flex items-center gap-2">
                                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                                     <div
-                                      className="h-full bg-yellow-500 animate-pulse transition-all duration-300"
+                                      className="h-full bg-yellow-500 animate-pulse transition-all "
                                       style={{
                                         width: `${calculateAgentStepCompletion(step.stockAnalyses)}%`
                                       }}

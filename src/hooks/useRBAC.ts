@@ -31,23 +31,49 @@ export function useRBAC() {
           console.log('[useRBAC] User roles from RPC:', rolesData);
           console.log('[useRBAC] Role IDs to fetch:', roleIds);
 
-          // Get role details directly from roles table (same as AdminRoleManager)
+          // Get role details directly from roles table
           const { data: rolesDetail, error: roleDetailError } = await supabase
             .from('roles')
             .select('*')
             .in('id', roleIds);
 
           console.log('[useRBAC] Roles detail query result:', { rolesDetail, roleDetailError });
+          
+          // Get role limits from role_limits table
+          const { data: roleLimits, error: limitsError } = await supabase
+            .from('role_limits')
+            .select('*')
+            .in('role_id', roleIds);
+          
+          console.log('[useRBAC] Role limits query result:', { roleLimits, limitsError });
 
           if (rolesDetail) {
             const roleMap = new Map();
+            
+            // Create a map of role limits for quick lookup
+            const limitsMap = new Map();
+            if (roleLimits) {
+              roleLimits.forEach(limit => {
+                limitsMap.set(limit.role_id, limit);
+              });
+            }
+            
             rolesDetail.forEach(role => {
               console.log('[useRBAC] Adding role to map:', role);
+              
+              // Get limits from role_limits table
+              const limits = limitsMap.get(role.id);
+              console.log('[useRBAC] Role limits for', role.name, ':', limits);
+              
+              // Use limits from role_limits table, fallback to 1 if not found
+              const maxParallelAnalysis = limits?.max_parallel_analysis ? Number(limits.max_parallel_analysis) : 1;
+              console.log('[useRBAC] Final max_parallel_analysis for', role.name, ':', maxParallelAnalysis);
+              
               roleMap.set(role.id, {
                 name: role.name,
                 display_name: role.display_name,
                 priority: role.priority || 0,
-                max_parallel_analysis: role.max_parallel_analysis || 1
+                max_parallel_analysis: maxParallelAnalysis
               });
             });
             setRoleDetails(roleMap);
@@ -195,16 +221,22 @@ export function useRBAC() {
     // Admin gets unlimited (show as 10 for practical purposes)
     if (isAdmin) return 10;
     
+    console.log('[useRBAC] getMaxParallelAnalysis called. userRoles:', userRoles);
+    console.log('[useRBAC] roleDetails:', Array.from(roleDetails.entries()));
+    
     // Get the highest limit from all user roles
     let maxLimit = 1; // Default to 1 if no roles found
     
     for (const userRole of userRoles) {
       const roleDetail = roleDetails.get(userRole.role_id);
+      console.log('[useRBAC] Checking role:', userRole.role_id, 'Detail:', roleDetail);
       if (roleDetail && roleDetail.max_parallel_analysis) {
+        console.log('[useRBAC] Found max_parallel_analysis:', roleDetail.max_parallel_analysis);
         maxLimit = Math.max(maxLimit, roleDetail.max_parallel_analysis);
       }
     }
     
+    console.log('[useRBAC] Final maxLimit:', maxLimit);
     return maxLimit;
   };
 

@@ -649,6 +649,15 @@ export default function HorizontalWorkflow() {
 
     const insights = analysis.agent_insights || {};
 
+    // Debug logging for research agents
+    if (agentKey.toLowerCase().includes('bull') || agentKey.toLowerCase().includes('bear') || agentKey.toLowerCase().includes('research')) {
+      console.log(`Agent status check for ${agentKey}:`, {
+        hasInsight: !!insights[agentKey],
+        hasError: !!insights[agentKey + '_error'],
+        insightKeys: Object.keys(insights).filter(k => k.toLowerCase().includes(agentKey.toLowerCase().substring(0, 4)))
+      });
+    }
+
     // HYBRID APPROACH: Check agent_insights for completion (most reliable), workflow steps for running status
 
     // First check agent_insights for completion and errors (most reliable)
@@ -671,12 +680,18 @@ export default function HorizontalWorkflow() {
           const agentNameLower = a.name.toLowerCase().replace(/\s+/g, '');
           const keyLower = agentKey.toLowerCase();
 
+          // Debug logging for matching
+          if (step.id === 'research' || step.id === 'research-debate') {
+            console.log(`Matching agent in workflow: agent="${a.name}", agentNameLower="${agentNameLower}", keyLower="${keyLower}"`);
+          }
+
           // Direct name matching patterns
           if (agentNameLower.includes('macro') && keyLower.includes('macro')) return true;
           if (agentNameLower.includes('market') && keyLower.includes('market') && !keyLower.includes('macro')) return true;
           if (agentNameLower.includes('news') && keyLower.includes('news')) return true;
           if (agentNameLower.includes('social') && keyLower.includes('social')) return true;
           if (agentNameLower.includes('fundamentals') && keyLower.includes('fundamentals')) return true;
+          // Research debate agents - handle both with and without spaces
           if (agentNameLower.includes('bullresearcher') && keyLower.includes('bull')) return true;
           if (agentNameLower.includes('bearresearcher') && keyLower.includes('bear')) return true;
           if (agentNameLower.includes('researchmanager') && keyLower.includes('researchmanager')) return true;
@@ -791,6 +806,11 @@ export default function HorizontalWorkflow() {
           status === 'running' ? 'running' : 
           status === 'failed' ? 'error' : 'pending';
 
+        // Debug for research agents
+        if (step.id === 'research-debate') {
+          console.log(`Agent status for ${agent.name} (key: ${key}):`, status, '→', agentStatus);
+        }
+
         return {
           ...agent,
           status: agentStatus,
@@ -807,8 +827,25 @@ export default function HorizontalWorkflow() {
       const runningAgents = updatedAgents.filter(a => a.status === 'running').length;
       const totalAgents = updatedAgents.length;
 
+      // Debug logging for research-debate step
+      if (step.id === 'research-debate') {
+        console.log('Research Debate step status calculation:', {
+          stepId: step.id,
+          agents: updatedAgents.map(a => ({ name: a.name, status: a.status })),
+          completedAgents,
+          runningAgents,
+          totalAgents
+        });
+      }
+
+      // Improved step status logic:
+      // - If all agents are complete, step is complete
+      // - If any agents are running, step is running
+      // - If some agents are complete but not all (and none running), step is still running (in progress between agents)
+      // - Only if no agents have started is the step pending
       const stepStatus: WorkflowStep['status'] = completedAgents === totalAgents ? 'completed' :
-        runningAgents > 0 ? 'running' : 'pending';
+        runningAgents > 0 ? 'running' :
+        completedAgents > 0 ? 'running' : 'pending';
 
       return {
         ...step,
@@ -951,7 +988,7 @@ export default function HorizontalWorkflow() {
                         {getStatusIcon(step.status)}
                         {step.agents && (
                           <span className="text-[10px] text-muted-foreground">
-                            {step.agents.filter(a => a.progress === 100).length}/{step.agents.length}
+                            {step.agents.filter(a => a.status === 'completed').length}/{step.agents.length}
                           </span>
                         )}
                       </div>

@@ -197,7 +197,7 @@ export default function RebalanceInsightsTab({
                     }
 
                     return (
-                      <Card className="overflow-hidden">
+                      <Card id="insight-opportunityAgent" className="overflow-hidden">
                         <CardHeader className="bg-muted/30">
                           <CardTitle className="text-base flex items-center gap-2">
                             <Zap className="w-4 h-4" />
@@ -251,7 +251,7 @@ export default function RebalanceInsightsTab({
 
                   // If we can't extract anything meaningful, show a clean error message
                   return (
-                    <Card className="overflow-hidden">
+                    <Card id="insight-opportunityAgent" className="overflow-hidden">
                       <CardHeader className="bg-muted/30">
                         <CardTitle className="text-base flex items-center gap-2">
                           <Zap className="w-4 h-4" />
@@ -274,7 +274,7 @@ export default function RebalanceInsightsTab({
               }
 
               return (
-                <Card className="overflow-hidden">
+                <Card id="insight-opportunityAgent" className="overflow-hidden">
                   <CardHeader className="bg-muted/30">
                     <CardTitle className="text-base flex items-center gap-2">
                       <Zap className="w-4 h-4" />
@@ -442,7 +442,7 @@ export default function RebalanceInsightsTab({
             // Show insights if they exist, even if status isn't marked complete yet
             if (portfolioInsights) {
               return (
-                <Card className="overflow-hidden">
+                <Card id="insight-portfolioManager" className="overflow-hidden">
                   <CardHeader className="bg-muted/30">
                     <CardTitle className="text-base flex items-center gap-2">
                       <PieChart className="w-4 h-4" />

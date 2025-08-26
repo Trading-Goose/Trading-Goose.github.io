@@ -69,6 +69,8 @@ export default function ProvidersTab({
                       placeholder="e.g., Production API"
                       value={provider.nickname}
                       onChange={(e) => updateAiProvider(provider.id, 'nickname', e.target.value)}
+                      disabled={true}
+                      className="disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                   </div>
                   <div className="flex-1">

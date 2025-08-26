@@ -23,7 +23,6 @@ import { useAuth } from "@/lib/auth";
 import { formatDistanceToNow } from "date-fns";
 import AnalysisDetailModal from "./AnalysisDetailModal";
 import { useToast } from "@/hooks/use-toast";
-import { analysisManager } from "@/lib/analysisManager";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -263,8 +262,7 @@ export default function UnifiedAnalysisHistory() {
 
     setCancelling(true);
     try {
-      await analysisManager.cancelAnalysis(ticker, user.id);
-
+      // Cancel the analysis by updating database status
       // First get the current analysis to preserve existing messages
       const { data: currentAnalysis } = await supabase
         .from('analysis_history')
@@ -282,15 +280,18 @@ export default function UnifiedAnalysisHistory() {
           analysis_status: ANALYSIS_STATUS.CANCELLED,
           full_analysis: {
             ...currentAnalysis?.full_analysis,
+            status: 'error',
+            completedAt: new Date().toISOString(),
             canceledAt: new Date().toISOString(),
             currentPhase: 'Canceled by user',
+            error: 'Analysis cancelled by user',
             messages: [
               ...existingMessages,
               {
                 agent: 'System',
                 message: 'Analysis was canceled by user',
                 timestamp: new Date().toISOString(),
-                type: 'info'
+                type: 'error'
               }
             ]
           }

@@ -329,6 +329,7 @@ export default function SettingsPage() {
               if (provider.apiKey) {
                 settingsToSave.ai_api_key = provider.apiKey;
               }
+              // Don't save nickname for default AI provider (no column in database)
               settingsToSave.ai_model = defaultAiModel === 'custom' ? defaultCustomModel : (defaultAiModel || getModelOptions(provider.provider)[0]);
             } else {
               // Save additional providers via settings-proxy for masking support
@@ -959,7 +960,7 @@ export default function SettingsPage() {
       if (maskedSettings?.ai_provider || apiSettings?.ai_provider) {
         providers.push({
           id: '1',
-          nickname: 'Default AI',
+          nickname: 'Default AI', // Fixed nickname for default provider
           provider: maskedSettings?.ai_provider || apiSettings?.ai_provider || 'openrouter',
           apiKey: maskedSettings?.ai_api_key || ''
         });
@@ -967,7 +968,7 @@ export default function SettingsPage() {
         // Empty default provider
         providers.push({
           id: '1',
-          nickname: 'Default AI',
+          nickname: 'Default AI', // Fixed nickname for default provider
           provider: 'openrouter',
           apiKey: ''
         });

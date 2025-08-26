@@ -515,17 +515,29 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               }
             });
 
-            // Handle Supabase function errors (HTTP level)
+            // Check for Supabase client errors (network, auth, etc)
             if (error) {
               console.error('HTTP-level error from rebalance function:', error);
+              // If there's data with an error message, use that instead of the generic error
+              if (data?.error) {
+                throw new Error(data.error);
+              }
               throw error;
             }
 
-            // Handle Edge Function errors (response body level)
-            if (data?.success === false) {
-              const errorMsg = data?.error || data?.message || 'Failed to initiate rebalance';
-              console.error('Edge Function returned error:', errorMsg, data);
-              throw new Error(errorMsg);
+            // Check for function-level errors
+            if (!data?.success) {
+              const errorMessage = data?.error || data?.message || 'Failed to initiate rebalance';
+              console.error('Edge Function returned error:', errorMessage, data);
+              
+              // Check if it's a configuration issue
+              if (errorMessage.includes('API settings not found') || 
+                  errorMessage.includes('not configured') || 
+                  errorMessage.includes('No provider configuration found')) {
+                throw new Error('Please configure your AI provider settings in the Settings page');
+              }
+              
+              throw new Error(errorMessage);
             }
 
             // Handle successful response

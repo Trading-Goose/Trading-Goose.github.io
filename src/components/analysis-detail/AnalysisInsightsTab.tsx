@@ -11,10 +11,18 @@ import {
   TrendingDown,
   TrendingUp,
   Users,
-  PieChart
+  PieChart,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import MarkdownRenderer from "../MarkdownRenderer";
 import MarketAnalystInsight from "./MarketAnalystInsight";
 import FundamentalsAnalystInsight from "./FundamentalsAnalystInsight";
@@ -24,14 +32,31 @@ interface AnalysisInsightsTabProps {
   getMessageIcon: (type: string) => any;
   getAgentIcon: (agent: string) => React.ReactNode;
   formatAgentName: (agent: string) => string;
+  collapsedCards: Set<string>;
+  setCollapsedCards: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 export default function AnalysisInsightsTab({
   analysisData,
   getMessageIcon,
   getAgentIcon,
-  formatAgentName
+  formatAgentName,
+  collapsedCards,
+  setCollapsedCards
 }: AnalysisInsightsTabProps) {
+
+  // Toggle collapse state for a card
+  const toggleCollapse = (agentKey: string) => {
+    setCollapsedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(agentKey)) {
+        newSet.delete(agentKey);
+      } else {
+        newSet.add(agentKey);
+      }
+      return newSet;
+    });
+  };
   console.log('Insights tab - analysisData.agent_insights:', analysisData.agent_insights);
   console.log('Market Analyst insight:', analysisData.agent_insights?.marketAnalyst);
   console.log('Fundamentals Analyst insight:', analysisData.agent_insights?.fundamentalsAnalyst);
@@ -83,6 +108,12 @@ export default function AnalysisInsightsTab({
     entries = entries.filter(([agent]) => agent !== 'portfolioManager');
   }
 
+  // Filter out standalone Bull and Bear Researcher entries if Research Debate exists
+  const hasResearchDebate = analysisData.agent_insights?.researchDebate;
+  if (hasResearchDebate) {
+    entries = entries.filter(([agent]) => agent !== 'bullResearcher' && agent !== 'bearResearcher');
+  }
+
   // Add missing agents that have messages but no insights
   const missingAgents = ['fundamentalsAnalyst', 'safeAnalyst'];
   missingAgents.forEach(agentKey => {
@@ -113,43 +144,76 @@ export default function AnalysisInsightsTab({
         // Handle debate rounds specially
         if ((agent === 'researchDebate' || agent === 'riskDebate') && Array.isArray(insight)) {
           const isResearchDebate = agent === 'researchDebate';
+          
+          // Debug: Log the debate rounds to check for duplicates
+          console.log(`${agent} rounds:`, insight);
+          insight.forEach((round: any, idx: number) => {
+            console.log(`Round ${idx + 1}:`, {
+              round: round.round,
+              bullLength: round.bull?.length,
+              bearLength: round.bear?.length,
+              bullPreview: round.bull?.substring(0, 100),
+              bearPreview: round.bear?.substring(0, 100)
+            });
+          });
+          
+          const isCollapsed = collapsedCards.has(agent);
+          
           return (
-            <Card key={agent} className="overflow-hidden">
-              <CardHeader className="bg-muted/30">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  {isResearchDebate ? 'Research' : 'Risk'} Debate
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {insight.map((round: any, index: number) => (
-                  <div key={index} className={index > 0 ? "border-t" : ""}>
-                    <div className="p-4 bg-muted/10">
-                      <h4 className="font-medium text-sm">Round {round.round}</h4>
-                    </div>
-                    <div className="p-4 space-y-3">
-                      {isResearchDebate ? (
-                        <>
-                          <div className="rounded-lg border bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10 p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
-                              <span className="text-sm font-medium">
-                                Bull Researcher
-                              </span>
-                            </div>
-                            <MarkdownRenderer content={round.bull} className="text-sm" />
-                          </div>
-                          <div className="rounded-lg border bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10 p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              <TrendingDown className="w-4 h-4 text-red-600 dark:text-red-400" />
-                              <span className="text-sm font-medium">
-                                Bear Researcher
-                              </span>
-                            </div>
-                            <MarkdownRenderer content={round.bear} className="text-sm" />
-                          </div>
-                        </>
-                      ) : (
+            <Collapsible key={agent} open={!isCollapsed}>
+              <Card id={`insight-${agent}`} className="overflow-hidden">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        {isResearchDebate ? 'Research' : 'Risk'} Debate
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCollapse(agent);
+                        }}
+                      >
+                        {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="p-0">
+                    {/* Show debate rounds only */}
+                    {insight.map((round: any, index: number) => (
+                      <div key={index} className={index > 0 ? "border-t" : ""} id={index === 0 ? "insight-bullResearcher" : undefined}>
+                        <div className="p-4 bg-muted/10">
+                          <h4 className="font-medium text-sm">Round {round.round}</h4>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          {isResearchDebate ? (
+                            <>
+                              <div className="rounded-lg border bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10 p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                  <span className="text-sm font-medium">
+                                    Bull Researcher
+                                  </span>
+                                </div>
+                                <MarkdownRenderer content={round.bull} className="text-sm" />
+                              </div>
+                              <div className="rounded-lg border bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10 p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <TrendingDown className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                  <span className="text-sm font-medium">
+                                    Bear Researcher
+                                  </span>
+                                </div>
+                                <MarkdownRenderer content={round.bear} className="text-sm" />
+                              </div>
+                            </>
+                          ) : (
                         <>
                           <div className="rounded-lg border bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10 p-4">
                             <div className="flex items-center gap-2 mb-2">
@@ -183,8 +247,10 @@ export default function AnalysisInsightsTab({
                     </div>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           );
         }
 
@@ -251,81 +317,178 @@ export default function AnalysisInsightsTab({
 
         // Special styling for bull and bear researchers
         if (agent === 'bullResearcher') {
+          const isCollapsed = collapsedCards.has(agent);
           return (
-            <Card key={agent} className="overflow-hidden">
-              <CardHeader className="bg-muted/30">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Bull Researcher
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="rounded-lg border bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10 p-4">
-                  <MarkdownRenderer content={insightContent} className="text-sm" />
-                </div>
-              </CardContent>
-            </Card>
+            <Collapsible key={agent} open={!isCollapsed}>
+              <Card id={`insight-${agent}`} className="overflow-hidden">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4" />
+                        Bull Researcher
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCollapse(agent);
+                        }}
+                      >
+                        {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-4">
+                    <div className="rounded-lg border bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10 p-4">
+                      <MarkdownRenderer content={insightContent} className="text-sm" />
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           );
         }
 
         if (agent === 'bearResearcher') {
+          const isCollapsed = collapsedCards.has(agent);
           return (
-            <Card key={agent} className="overflow-hidden">
-              <CardHeader className="bg-muted/30">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingDown className="w-4 h-4" />
-                  Bear Researcher
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="rounded-lg border bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10 p-4">
-                  <MarkdownRenderer content={insightContent} className="text-sm" />
-                </div>
-              </CardContent>
-            </Card>
+            <Collapsible key={agent} open={!isCollapsed}>
+              <Card id={`insight-${agent}`} className="overflow-hidden">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingDown className="w-4 h-4" />
+                        Bear Researcher
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCollapse(agent);
+                        }}
+                      >
+                        {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-4">
+                    <div className="rounded-lg border bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10 p-4">
+                      <MarkdownRenderer content={insightContent} className="text-sm" />
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           );
         }
 
         // Special rendering for Market Analyst with data, historical chart, and indicators
         if (agent === 'marketAnalyst') {
-          return <MarketAnalystInsight key={agent} insight={insight} insightContent={insightContent} additionalData={additionalData} />;
+          const isCollapsed = collapsedCards.has(agent);
+          return <MarketAnalystInsight 
+            key={agent} 
+            id={`insight-${agent}`} 
+            insight={insight} 
+            insightContent={insightContent} 
+            additionalData={additionalData}
+            isCollapsed={isCollapsed}
+            onToggleCollapse={() => toggleCollapse(agent)}
+          />;
         }
 
         // Special rendering for Fundamentals Analyst with data
         if (agent === 'fundamentalsAnalyst' && additionalData) {
-          return <FundamentalsAnalystInsight key={agent} insightContent={insightContent} additionalData={additionalData} />;
+          const isCollapsed = collapsedCards.has(agent);
+          return <FundamentalsAnalystInsight 
+            key={agent} 
+            id={`insight-${agent}`} 
+            insightContent={insightContent} 
+            additionalData={additionalData}
+            isCollapsed={isCollapsed}
+            onToggleCollapse={() => toggleCollapse(agent)}
+          />;
         }
 
         // Special rendering for Portfolio Manager - simple format like RebalanceDetailModal
         if (agent === 'portfolioManager') {
+          const isCollapsed = collapsedCards.has(agent);
           return (
-            <Card key={agent} className="overflow-hidden">
-              <CardHeader className="bg-muted/30">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <PieChart className="w-4 h-4" />
-                  Portfolio Manager Analysis
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <MarkdownRenderer content={insightContent} />
-              </CardContent>
-            </Card>
+            <Collapsible key={agent} open={!isCollapsed}>
+              <Card id={`insight-${agent}`} className="overflow-hidden">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <PieChart className="w-4 h-4" />
+                        Portfolio Manager Analysis
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCollapse(agent);
+                        }}
+                      >
+                        {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-4">
+                    <MarkdownRenderer content={insightContent} />
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           );
         }
 
         // Default rendering for all other agents
+        const isCollapsed = collapsedCards.has(agent);
         return (
-          <Card key={agent} className="overflow-hidden">
-            <CardHeader className="bg-muted/30">
-              <CardTitle className="text-base flex items-center gap-2">
-                {getAgentIcon(agent)}
-                {formatAgentName(agent)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <MarkdownRenderer content={insightContent} />
-            </CardContent>
-          </Card>
+          <Collapsible key={agent} open={!isCollapsed}>
+            <Card id={`insight-${agent}`} className="overflow-hidden">
+              <CollapsibleTrigger asChild>
+                <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {getAgentIcon(agent)}
+                      {formatAgentName(agent)}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCollapse(agent);
+                      }}
+                    >
+                      {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-4">
+                  <MarkdownRenderer content={insightContent} />
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         );
       })}
     </>

@@ -4,7 +4,18 @@
  */
 
 import { supabase } from './supabase';
-import type { AnalysisState } from './analysisManager';
+
+export interface AnalysisState {
+  id?: string;
+  ticker: string;
+  status: 'running' | 'completed' | 'error';
+  startedAt: string;
+  completedAt?: string;
+  messages: any[];
+  workflowSteps: any[];
+  result?: any;
+  error?: string;
+}
 
 export interface ServerAnalysisOptions {
   useServerExecution?: boolean;

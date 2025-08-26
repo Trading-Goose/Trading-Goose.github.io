@@ -23,9 +23,16 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
   const [error, setError] = useState<string | null>(null);
   const [isLiveAnalysis, setIsLiveAnalysis] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | undefined>();
+  const lastDatabaseUpdateRef = useRef<string | null>(null); // Track the actual DB updated_at
 
   useEffect(() => {
-    if (!isOpen || (!ticker && !analysisId) || !user) return;
+    if (!isOpen || (!ticker && !analysisId) || !user) {
+      // Reset the ref when modal closes
+      if (!isOpen) {
+        lastDatabaseUpdateRef.current = null;
+      }
+      return;
+    }
 
     let mounted = true;
 
@@ -186,6 +193,23 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
           console.log('analysisToLoad.agent_insights:', analysisToLoad.agent_insights);
           console.log('analysisToLoad.full_analysis:', analysisToLoad.full_analysis);
 
+          // Track the database updated_at value
+          const currentDbUpdatedAt = analysisToLoad.updated_at;
+          
+          // Only update our ref if the database value actually changed
+          if (lastDatabaseUpdateRef.current === null) {
+            // First load - initialize with current value
+            lastDatabaseUpdateRef.current = currentDbUpdatedAt;
+            console.log('Initial database updated_at:', currentDbUpdatedAt);
+          } else if (currentDbUpdatedAt !== lastDatabaseUpdateRef.current) {
+            // Database was actually updated
+            console.log('Database updated_at changed:', {
+              old: lastDatabaseUpdateRef.current,
+              new: currentDbUpdatedAt
+            });
+            lastDatabaseUpdateRef.current = currentDbUpdatedAt;
+          }
+
           setAnalysisData({
             ...analysisToLoad,
             status,
@@ -193,7 +217,9 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
             workflowSteps: analysisToLoad.full_analysis?.workflowSteps || [],
             tradeOrder: tradeOrderData,
             // Explicitly include agent_insights
-            agent_insights: analysisToLoad.agent_insights || {}
+            agent_insights: analysisToLoad.agent_insights || {},
+            // Always use the actual database updated_at for staleness check
+            updated_at: analysisToLoad.updated_at
           });
 
           if (messageResult.success && messageResult.queueCount > 0) {

@@ -81,11 +81,42 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
   const [selectedAnalysis, setSelectedAnalysis] = useState<{
     ticker: string;
     date: string;
+    analysisId?: string;
+    initialTab?: string;
   } | null>(null);
 
   const [executedTickers, setExecutedTickers] = useState<Set<string>>(new Set());
   const [rejectedTickers, setRejectedTickers] = useState<Set<string>>(new Set());
   const [orderStatuses, setOrderStatuses] = useState<Map<string, { status: string, alpacaOrderId?: string, alpacaStatus?: string }>>(new Map());
+
+  // Navigation handlers for RebalanceWorkflowTab
+  const handleNavigateToInsight = (agentKey: string) => {
+    // Switch to insights tab
+    setActiveTab("insights");
+    // Wait for tab content to render then scroll to the specific insight
+    setTimeout(() => {
+      const elementId = `insight-${agentKey}`;
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
+
+  const handleOpenAnalysisModal = (ticker: string, analysisId: string) => {
+    // Find the analysis data from relatedAnalyses
+    const analysis = rebalanceData?.relatedAnalyses?.find(
+      (a: any) => a.ticker === ticker && a.id === analysisId
+    );
+    if (analysis) {
+      setSelectedAnalysis({
+        ticker: ticker,
+        date: analysis.created_at,
+        analysisId: analysisId,
+        initialTab: 'workflow'  // Open to workflow tab for analysis step cards
+      });
+    }
+  };
 
   // Load rebalance data
   useEffect(() => {
@@ -405,15 +436,18 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             // Determine individual analysis status based on analysis_status field using centralized system
             let analysisStatus: AnalysisStatus = ANALYSIS_STATUS.PENDING;
 
-            // Be very explicit about the status checking - convert legacy numeric status
-            if (analysis.analysis_status === 1) {
+            // Check for both string and numeric status values for compatibility
+            if (analysis.analysis_status === ANALYSIS_STATUS.COMPLETED || analysis.analysis_status === 1) {
               analysisStatus = ANALYSIS_STATUS.COMPLETED;
-            } else if (analysis.analysis_status === 0) {
+            } else if (analysis.analysis_status === ANALYSIS_STATUS.RUNNING || analysis.analysis_status === 0) {
               // Analysis is still running (Portfolio Manager will mark it as complete)
               analysisStatus = ANALYSIS_STATUS.RUNNING;
-            } else if (analysis.analysis_status === -1 || analysis.is_canceled) {
+            } else if (analysis.analysis_status === ANALYSIS_STATUS.ERROR || analysis.analysis_status === 'error' || analysis.analysis_status === -1) {
+              // Backend stores 'error' string, but check for -1 for legacy compatibility
+              analysisStatus = ANALYSIS_STATUS.ERROR;
+            } else if (analysis.analysis_status === ANALYSIS_STATUS.CANCELLED || analysis.is_canceled) {
               analysisStatus = ANALYSIS_STATUS.CANCELLED;
-            } else if (analysis.analysis_status === null || analysis.analysis_status === undefined) {
+            } else if (analysis.analysis_status === ANALYSIS_STATUS.PENDING || analysis.analysis_status === null || analysis.analysis_status === undefined) {
               // If no status is set, check if we have any agent insights to determine if it's running
               const insights = analysis.agent_insights || {};
               const hasAnyInsights = Object.keys(insights).length > 0;
@@ -473,6 +507,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             }
 
             return {
+              id: analysis.id, // Include the analysis ID for navigation
               ticker: analysis.ticker,
               status: analysisStatus,
               agents,
@@ -487,21 +522,28 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           // An analysis is ONLY complete when analysis_status === 1
           const completedAnalyses = stockAnalyses.filter((sa: any) => sa.status === ANALYSIS_STATUS.COMPLETED).length;
           const runningAnalyses = stockAnalyses.filter((sa: any) => sa.status === ANALYSIS_STATUS.RUNNING).length;
-          // Note: pendingAnalyses count available if needed for future features
+          const failedAnalyses = stockAnalyses.filter((sa: any) => sa.status === ANALYSIS_STATUS.ERROR).length;
+          const cancelledAnalyses = stockAnalyses.filter((sa: any) => sa.status === ANALYSIS_STATUS.CANCELLED).length;
 
           // Determine overall status for the stock analysis step
           // Be very strict about when to mark as completed
           let stockAnalysisStatus: AnalysisStatus = ANALYSIS_STATUS.PENDING;
 
-          if (completedAnalyses === rebalanceAnalyses.length && completedAnalyses > 0) {
+          if (failedAnalyses === rebalanceAnalyses.length && failedAnalyses > 0) {
+            // ALL analyses have failed
+            stockAnalysisStatus = ANALYSIS_STATUS.ERROR;
+          } else if (completedAnalyses === rebalanceAnalyses.length && completedAnalyses > 0) {
             // ALL analyses must be complete
             stockAnalysisStatus = ANALYSIS_STATUS.COMPLETED;
           } else if (runningAnalyses > 0) {
             // If ANY are running, the step is running
             stockAnalysisStatus = ANALYSIS_STATUS.RUNNING;
-          } else if (completedAnalyses > 0) {
-            // If some are complete but none are running, still mark as running (waiting for others to start)
+          } else if (completedAnalyses > 0 || failedAnalyses > 0) {
+            // If some are complete/failed but none are running, still mark as running (waiting for others to start)
             stockAnalysisStatus = ANALYSIS_STATUS.RUNNING;
+          } else if (cancelledAnalyses > 0) {
+            // If we have cancelled analyses but nothing else, mark as cancelled
+            stockAnalysisStatus = ANALYSIS_STATUS.CANCELLED;
           } else {
             // Otherwise it's pending
             stockAnalysisStatus = ANALYSIS_STATUS.PENDING;
@@ -545,32 +587,9 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           completedAt: rebalanceAgentStep.data?.completedAt || portfolioManagerStep.data?.completedAt || rebalanceRequest.plan_generated_at
         });
 
-        // Check if the portfolio manager is complete using centralized status system
-        const portfolioManagerComplete = portfolioManagerStatus === ANALYSIS_STATUS.COMPLETED || rebalanceRequest.rebalance_plan;
-
-        // Overall workflow status should be 'completed' when portfolio manager is done, even if orders are pending
-        let overallStatus: RebalanceStatus;
-        if (isFailed) {
-          // If the rebalance is marked as failed, use that status
-          overallStatus = REBALANCE_STATUS.ERROR;
-        } else if (portfolioManagerComplete && !isRunning) {
-          // Portfolio manager is done and no agents are running - mark as complete
-          overallStatus = REBALANCE_STATUS.COMPLETED;
-        } else if (isCompleted) {
-          overallStatus = REBALANCE_STATUS.COMPLETED;
-        } else if (isPendingApproval) {
-          overallStatus = REBALANCE_STATUS.AWAITING_APPROVAL;
-        } else if (isRunning) {
-          overallStatus = REBALANCE_STATUS.RUNNING;
-        } else if (isCancelled) {
-          overallStatus = REBALANCE_STATUS.CANCELLED;
-        } else {
-          overallStatus = status;
-        }
-
         const rebalanceData = {
           id: rebalanceRequest.id,
-          status: overallStatus,
+          status: status, // Use the status from the database directly
           startedAt: rebalanceRequest.created_at,
           completedAt: rebalanceRequest.completed_at,
 
@@ -764,7 +783,11 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                   />
                 </TabsContent>
 
-                <RebalanceWorkflowTab workflowData={rebalanceData} />
+                <RebalanceWorkflowTab 
+                  workflowData={rebalanceData}
+                  onNavigateToInsight={handleNavigateToInsight}
+                  onOpenAnalysisModal={handleOpenAnalysisModal}
+                />
 
                 <RebalanceInsightsTab 
                   rebalanceData={rebalanceData}
@@ -782,6 +805,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         <AnalysisDetailModal
           ticker={selectedAnalysis.ticker}
           analysisDate={selectedAnalysis.date}
+          initialTab={selectedAnalysis.initialTab}
           isOpen={true}
           onClose={() => setSelectedAnalysis(null)}
         />

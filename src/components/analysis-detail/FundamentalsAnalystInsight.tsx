@@ -1,26 +1,57 @@
 import React from "react";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import MarkdownRenderer from "../MarkdownRenderer";
 
 interface FundamentalsAnalystInsightProps {
   insightContent: string;
   additionalData: any;
+  id?: string;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export default function FundamentalsAnalystInsight({ 
   insightContent,
-  additionalData 
+  additionalData,
+  id,
+  isCollapsed = false,
+  onToggleCollapse
 }: FundamentalsAnalystInsightProps) {
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="bg-muted/30">
-        <CardTitle className="text-base flex items-center gap-2">
-          <TrendingUp className="w-4 h-4" />
-          Fundamentals Analyst
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-4 space-y-4">
+    <Collapsible open={!isCollapsed}>
+      <Card id={id} className="overflow-hidden">
+        <CollapsibleTrigger asChild>
+          <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+            <CardTitle className="text-base flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Fundamentals Analyst
+              </div>
+              {onToggleCollapse && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleCollapse();
+                  }}
+                >
+                  {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                </Button>
+              )}
+            </CardTitle>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-4 space-y-4">
         {/* Display fundamental data if available */}
         {additionalData && (
           <div className="grid grid-cols-2 gap-3 p-3 bg-muted/50 rounded-lg text-sm">
@@ -64,6 +95,8 @@ export default function FundamentalsAnalystInsight({
         )}
         <MarkdownRenderer content={insightContent} />
       </CardContent>
-    </Card>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }

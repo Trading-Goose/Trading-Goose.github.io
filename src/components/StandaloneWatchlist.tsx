@@ -503,18 +503,33 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           }
         });
 
-        if (error) throw error;
-        if (!data.success) {
+        // Check for Supabase client errors (network, auth, etc)
+        if (error) {
+          // If there's data with an error message, use that instead of the generic error
+          if (data?.error) {
+            throw new Error(data.error);
+          }
+          throw error;
+        }
+        
+        // Check for function-level errors
+        if (!data?.success) {
+          const errorMessage = data?.error || 'Analysis failed';
+          
           // Check if it's a configuration issue
-          if (data.error?.includes('API settings not found') || data.error?.includes('not configured')) {
+          if (errorMessage.includes('API settings not found') || 
+              errorMessage.includes('not configured') || 
+              errorMessage.includes('No provider configuration found')) {
             toast({
               title: "Configuration Required",
-              description: "Please configure your API settings in the Settings page",
+              description: "Please configure your AI provider settings in the Settings page",
               variant: "destructive",
             });
             return;
           }
-          throw new Error(data.error);
+          
+          // Show the actual error message from the function
+          throw new Error(errorMessage);
         }
 
         // Immediately add to running analyses

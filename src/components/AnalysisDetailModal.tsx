@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,9 @@ import {
   X,
   PieChart,
   RefreshCw,
-  PlayCircle
+  PlayCircle,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -63,6 +65,7 @@ interface AnalysisDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   analysisDate?: string; // Optional: for viewing historical analyses
+  initialTab?: string; // Optional: which tab to open initially
 }
 
 // Import extracted components
@@ -75,7 +78,7 @@ import { useOrderActions } from "./analysis-detail/hooks/useOrderActions";
 import { getStatusIcon, getDecisionIcon, getDecisionVariant } from "./analysis-detail/utils/statusHelpers";
 
 
-export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClose, analysisDate }: AnalysisDetailModalProps) {
+export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClose, analysisDate, initialTab }: AnalysisDetailModalProps) {
   // Use extracted custom hooks
   const { analysisData, loading, error, isLiveAnalysis, updateAnalysisData, setError } = useAnalysisData({
     ticker,
@@ -91,13 +94,58 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
 
   const { toast } = useToast();
   const [isRetrying, setIsRetrying] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("");
+  const [collapsedCards, setCollapsedCards] = useState<Set<string>>(new Set());
+
+  // Set initial tab value
+  useEffect(() => {
+    if (!activeTab && isOpen) {
+      // Use initialTab if provided, otherwise default based on live status
+      setActiveTab(initialTab || (isLiveAnalysis ? "actions" : "insights"));
+    }
+  }, [isLiveAnalysis, isOpen, activeTab, initialTab]);
+
+  // Handle navigation to insight tab for a specific agent
+  const handleNavigateToInsight = (agentKey: string) => {
+    setActiveTab("insights");
+    // Optionally, we could scroll to the specific agent's insight
+    // This would require adding an id to each insight card and using scrollIntoView
+    setTimeout(() => {
+      let elementId = `insight-${agentKey}`;
+      
+      // Special handling for Bull/Bear Researcher - navigate to Research Debate if it exists
+      if ((agentKey === 'bullResearcher' || agentKey === 'bearResearcher') && 
+          analysisData?.agent_insights?.researchDebate) {
+        // Navigate to Research Debate instead (first round has the bull researcher ID)
+        elementId = agentKey === 'bullResearcher' ? 'insight-bullResearcher' : 'insight-researchDebate';
+      }
+      
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
 
   // Check if analysis is stale (no update in 5+ minutes)
   const isAnalysisStale = () => {
-    if (!analysisData?.updated_at) return false;
+    if (!analysisData?.updated_at) {
+      console.log('No updated_at field in analysisData:', analysisData);
+      return false;
+    }
     const lastUpdate = new Date(analysisData.updated_at);
     const timeSinceUpdate = Date.now() - lastUpdate.getTime();
-    return timeSinceUpdate > 5 * 60 * 1000; // 5 minutes
+    const isStale = timeSinceUpdate > 5 * 60 * 1000; // 5 minutes
+    
+    console.log('Staleness check:', {
+      updated_at: analysisData.updated_at,
+      lastUpdate: lastUpdate.toISOString(),
+      timeSinceUpdate: Math.round(timeSinceUpdate / 1000) + 's',
+      isStale,
+      status: analysisData.status
+    });
+    
+    return isStale;
   };
 
   // Handle retry for error status
@@ -299,23 +347,34 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                   </Button>
                 )}
                 
-                {(analysisData.status === ANALYSIS_STATUS.RUNNING || analysisData.status === ANALYSIS_STATUS.PENDING) && isAnalysisStale() && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleReactivate}
-                    disabled={isRetrying}
-                    className="flex items-center gap-2"
-                    title={`Last updated ${formatDistanceToNow(new Date(analysisData.updated_at))} ago`}
-                  >
-                    {isRetrying ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <PlayCircle className="w-4 h-4" />
-                    )}
-                    Reactivate
-                  </Button>
-                )}
+                {(() => {
+                  const shouldShowReactivate = (analysisData.status === ANALYSIS_STATUS.RUNNING || analysisData.status === ANALYSIS_STATUS.PENDING) && isAnalysisStale();
+                  console.log('Reactivate button check:', {
+                    status: analysisData.status,
+                    isRunningOrPending: analysisData.status === ANALYSIS_STATUS.RUNNING || analysisData.status === ANALYSIS_STATUS.PENDING,
+                    isStale: isAnalysisStale(),
+                    shouldShow: shouldShowReactivate,
+                    ANALYSIS_STATUS
+                  });
+                  
+                  return shouldShowReactivate && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleReactivate}
+                      disabled={isRetrying}
+                      className="flex items-center gap-2"
+                      title={`Last updated ${formatDistanceToNow(new Date(analysisData.updated_at))} ago`}
+                    >
+                      {isRetrying ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <PlayCircle className="w-4 h-4" />
+                      )}
+                      Reactivate
+                    </Button>
+                  );
+                })()}
               </>
             )}
           </div>
@@ -392,31 +451,67 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                 );
               })()}
 
-              <Tabs defaultValue={isLiveAnalysis ? "actions" : "insights"} className="flex-1">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
                 <div className="px-6 pt-4 pb-4">
-                  <TabsList className="grid w-full grid-cols-3 max-w-3xl mx-auto">
-                    <TabsTrigger
-                      value="actions"
-                      className="flex items-center gap-2"
-                    >
-                      <CheckSquare className="w-4 h-4" />
-                      Actions
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="workflow"
-                      className="flex items-center gap-2"
-                    >
-                      <Activity className="w-4 h-4" />
-                      Workflow
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="insights"
-                      className="flex items-center gap-2"
-                    >
-                      <Brain className="w-4 h-4" />
-                      Insights
-                    </TabsTrigger>
-                  </TabsList>
+                  <div className="relative flex items-center justify-center">
+                    <TabsList className="grid w-full grid-cols-3 max-w-3xl">
+                      <TabsTrigger
+                        value="actions"
+                        className="flex items-center gap-2"
+                      >
+                        <CheckSquare className="w-4 h-4" />
+                        Actions
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="workflow"
+                        className="flex items-center gap-2"
+                      >
+                        <Activity className="w-4 h-4" />
+                        Workflow
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="insights"
+                        className="flex items-center gap-2"
+                      >
+                        <Brain className="w-4 h-4" />
+                        Insights
+                      </TabsTrigger>
+                    </TabsList>
+                    {activeTab === "insights" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (collapsedCards.size === 0) {
+                            // Collapse all - need to get all agent keys
+                            const allAgentKeys = new Set<string>();
+                            if (analysisData?.agent_insights) {
+                              Object.keys(analysisData.agent_insights).forEach(key => {
+                                allAgentKeys.add(key);
+                              });
+                            }
+                            setCollapsedCards(allAgentKeys);
+                          } else {
+                            // Expand all
+                            setCollapsedCards(new Set());
+                          }
+                        }}
+                        className="text-xs absolute right-0"
+                      >
+                        {collapsedCards.size === 0 ? (
+                          <>
+                            <ChevronUp className="h-3 w-3 mr-1" />
+                            Collapse All
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3 w-3 mr-1" />
+                            Expand All
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <ScrollArea className="h-[calc(90vh-280px)]">
@@ -439,6 +534,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                           onApproveOrder={handleApproveOrder}
                           onRejectOrder={handleRejectOrder}
                           isOrderExecuted={isOrderExecuted}
+                          onNavigateToInsight={handleNavigateToInsight}
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -454,6 +550,8 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                         getMessageIcon={getMessageIcon}
                         getAgentIcon={getAgentIcon}
                         formatAgentName={formatAgentName}
+                        collapsedCards={collapsedCards}
+                        setCollapsedCards={setCollapsedCards}
                       />
                     </TabsContent>
 

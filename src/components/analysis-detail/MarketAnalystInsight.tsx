@@ -2,10 +2,18 @@ import React from "react";
 import { 
   Activity,
   BarChart3,
-  FileText
+  FileText,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import MarkdownRenderer from "../MarkdownRenderer";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
@@ -13,12 +21,18 @@ interface MarketAnalystInsightProps {
   insight: any;
   insightContent: string;
   additionalData: any;
+  id?: string;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export default function MarketAnalystInsight({ 
   insight, 
   insightContent,
-  additionalData 
+  additionalData,
+  id,
+  isCollapsed = false,
+  onToggleCollapse
 }: MarketAnalystInsightProps) {
   // Get historical data and indicators from the insight
   const marketHistorical = insight?.market_historical || [];
@@ -49,19 +63,38 @@ export default function MarketAnalystInsight({
   })).filter((d: any) => d.close); // Filter out any invalid data points
   
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="bg-muted/30">
-        <CardTitle className="text-base flex items-center gap-2">
-          <BarChart3 className="w-4 h-4" />
-          Market Analyst
-          {analysisRange && (
-            <Badge variant="outline" className="ml-2 text-xs">
-              {analysisRange} • {dataPoints} points
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-4 space-y-6">
+    <Collapsible open={!isCollapsed}>
+      <Card id={id} className="overflow-hidden">
+        <CollapsibleTrigger asChild>
+          <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+            <CardTitle className="text-base flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Market Analyst
+                {analysisRange && (
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    {analysisRange} • {dataPoints} points
+                  </Badge>
+                )}
+              </div>
+              {onToggleCollapse && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleCollapse();
+                  }}
+                >
+                  {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                </Button>
+              )}
+            </CardTitle>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-4 space-y-6">
         {/* Display market data summary if available */}
         {additionalData && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/50 rounded-lg text-sm">
@@ -400,6 +433,8 @@ export default function MarketAnalystInsight({
           </div>
         )}
       </CardContent>
-    </Card>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }

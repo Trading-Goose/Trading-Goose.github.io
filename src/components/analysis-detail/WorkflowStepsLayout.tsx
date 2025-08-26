@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
+import { useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -14,9 +15,19 @@ import {
   TrendingUp,
   Users,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  AlertCircle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 // Import centralized status system
 import {
   type AnalysisStatus,
@@ -31,6 +42,7 @@ interface WorkflowStepsLayoutProps {
   onApproveOrder?: () => void;
   onRejectOrder?: () => void;
   isOrderExecuted?: boolean;
+  onNavigateToInsight?: (agentKey: string) => void;
 }
 
 // Enhanced Workflow Steps Layout Component
@@ -38,8 +50,17 @@ export default function WorkflowStepsLayout({
   analysisData,
   onApproveOrder,
   onRejectOrder,
-  isOrderExecuted
+  isOrderExecuted,
+  onNavigateToInsight
 }: WorkflowStepsLayoutProps) {
+  // State for error modal
+  const [errorModalOpen, setErrorModalOpen] = useState(false);
+  const [selectedAgentError, setSelectedAgentError] = useState<{
+    agentName: string;
+    error: string;
+    details?: any;
+  } | null>(null);
+
   // Check if this analysis is part of a rebalance request
   const isRebalanceAnalysis = !!analysisData.rebalance_request_id;
 
@@ -180,6 +201,15 @@ export default function WorkflowStepsLayout({
 
   // Get error details for an agent
   const getAgentError = (agentKey: string) => {
+    // First check if the agent insight itself contains an error field
+    if (analysisData.agent_insights?.[agentKey]?.error) {
+      return {
+        error: analysisData.agent_insights[agentKey].error,
+        analysis: analysisData.agent_insights[agentKey].analysis,
+        timestamp: analysisData.agent_insights[agentKey].timestamp
+      };
+    }
+    
     // Backend stores errors with lowercase keys (e.g., "marketanalyst_error")
     const errorKey = agentKey.toLowerCase() + '_error';
     if (analysisData.agent_insights?.[errorKey]) {
@@ -190,6 +220,28 @@ export default function WorkflowStepsLayout({
       return analysisData.agent_insights[agentKey + '_error'];
     }
     return null;
+  };
+
+  // Handle showing error details in modal
+  const handleShowError = (agentName: string, agentKey: string) => {
+    const errorData = getAgentError(agentKey);
+    if (errorData) {
+      setSelectedAgentError({
+        agentName,
+        error: typeof errorData === 'string' ? errorData : (errorData.error || 'Unknown error'),
+        details: typeof errorData === 'object' ? errorData : null
+      });
+      setErrorModalOpen(true);
+    }
+  };
+
+  // Handle clicking on a completed agent to navigate to its insight
+  const handleAgentClick = (status: string, agentName: string, agentKey: string) => {
+    if (status === 'error') {
+      handleShowError(agentName, agentKey);
+    } else if (status === 'completed' && onNavigateToInsight) {
+      onNavigateToInsight(agentKey);
+    }
   };
 
   const getStepTimestamp = (stepId: string) => {
@@ -485,14 +537,15 @@ export default function WorkflowStepsLayout({
                       <div
                         key={agent.key}
                         className={`relative rounded-lg border p-4 transition-all ${status === 'completed'
-                          ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
+                          ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5 cursor-pointer hover:border-green-500/50'
                           : status === 'error'
-                            ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5'
+                            ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5 cursor-pointer hover:border-red-500/50'
                             : status === 'running'
                               ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5 shadow-sm'
                               : 'border-border'
                           }`}
-                        title={status === 'error' && agentError ? `Error: ${agentError.error || 'Unknown error'}` : undefined}
+                        onClick={status === 'error' || status === 'completed' ? () => handleAgentClick(status, agent.name, agent.key) : undefined}
+                        title={status === 'error' ? 'Click to view error details' : status === 'completed' ? 'Click to view insight' : undefined}
                       >
                         <div className="flex flex-col items-center text-center space-y-2">
                           {/* Agent Icon */}
@@ -588,6 +641,73 @@ export default function WorkflowStepsLayout({
           </div>
         </div>
       </div>
+
+      {/* Error Details Modal */}
+      <Dialog open={errorModalOpen} onOpenChange={setErrorModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-500" />
+              {selectedAgentError?.agentName} - Error Details
+            </DialogTitle>
+            <DialogDescription>
+              The agent encountered an error during analysis
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Main Error Message */}
+            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+              <h4 className="font-medium text-sm mb-2 text-red-600 dark:text-red-400">Error Message</h4>
+              <p className="text-sm">{selectedAgentError?.error}</p>
+            </div>
+
+            {/* Additional Details if available */}
+            {selectedAgentError?.details && (
+              <>
+                {/* Timestamp */}
+                {selectedAgentError.details.timestamp && (
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-sm text-muted-foreground">Occurred At</h4>
+                    <p className="text-sm">
+                      {new Date(selectedAgentError.details.timestamp).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+
+                {/* Fallback Analysis if present */}
+                {selectedAgentError.details.analysis && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm text-muted-foreground">Fallback Analysis</h4>
+                    <ScrollArea className="h-[200px] rounded-lg border p-3">
+                      <p className="text-sm whitespace-pre-wrap">{selectedAgentError.details.analysis}</p>
+                    </ScrollArea>
+                  </div>
+                )}
+
+                {/* Additional metadata */}
+                {selectedAgentError.details.data && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm text-muted-foreground">Additional Information</h4>
+                    <div className="rounded-lg border p-3 bg-muted/30">
+                      <pre className="text-xs overflow-x-auto">
+                        {JSON.stringify(selectedAgentError.details.data, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={() => setErrorModalOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

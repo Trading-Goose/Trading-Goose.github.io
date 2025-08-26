@@ -10,13 +10,17 @@ import {
   BarChart3,
   Brain,
   Shield,
-  XCircle
+  XCircle,
+  TrendingUp,
+  Briefcase
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { isRebalanceActive, convertLegacyRebalanceStatus } from "@/lib/statusTypes";
 
 interface RebalanceWorkflowTabProps {
   workflowData: any;
+  onNavigateToInsight?: (agentKey: string) => void;
+  onOpenAnalysisModal?: (ticker: string, analysisId: string) => void;
 }
 
 // Calculate completion percentage based on agent step completion (same logic as RebalanceHistoryTable)
@@ -63,7 +67,15 @@ const calculateAgentStepCompletion = (stockAnalyses: any[]): number => {
 };
 
 // Workflow Steps Component
-function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
+function RebalanceWorkflowSteps({ 
+  workflowData, 
+  onNavigateToInsight,
+  onOpenAnalysisModal 
+}: { 
+  workflowData: any;
+  onNavigateToInsight?: (agentKey: string) => void;
+  onOpenAnalysisModal?: (ticker: string, analysisId: string) => void;
+}) {
   const getStepStatus = (step: any) => {
     // Check if step should be skipped
     if (step.id === 'threshold' && workflowData.skipThresholdCheck) {
@@ -117,14 +129,32 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
           <div key={step.id} className="relative">
             <div className="space-y-4">
               {/* Step Header */}
-              <div className={`rounded-lg border p-4 transition-all ${isCompleted
-                ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
-                : isError
-                  ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5'
-                  : isRunning
-                    ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5'
-                    : 'border-border'
-                }`}>
+              <div 
+                className={`rounded-lg border p-4 transition-all ${
+                  (step.id === 'opportunity' || step.id === 'portfolio') && onNavigateToInsight
+                    ? 'cursor-pointer hover:shadow-md'
+                    : ''
+                } ${isCompleted
+                  ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
+                  : isError
+                    ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5'
+                    : isRunning
+                      ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5'
+                      : 'border-border'
+                }`}
+                onClick={() => {
+                  // Handle clicks for opportunity and portfolio agents
+                  if (step.id === 'opportunity' && onNavigateToInsight) {
+                    onNavigateToInsight('opportunityAgent');
+                  } else if (step.id === 'portfolio' && onNavigateToInsight) {
+                    onNavigateToInsight('portfolioManager');
+                  }
+                }}
+                title={
+                  step.id === 'opportunity' || step.id === 'portfolio'
+                    ? 'Click to view insight'
+                    : undefined
+                }>
                 <div className="relative">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4 flex-1">
@@ -385,12 +415,19 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
                             return (
                               <div
                                 key={step.key}
-                                className={`relative rounded-lg border p-3 transition-all ${stepStatus === 'completed'
+                                className={`relative rounded-lg border p-3 transition-all cursor-pointer hover:shadow-md ${stepStatus === 'completed'
                                   ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
                                   : stepStatus === 'running'
                                     ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5 shadow-sm'
                                     : 'border-border'
                                   }`}
+                                onClick={() => {
+                                  // Open analysis modal for this stock at the specific workflow step
+                                  if (onOpenAnalysisModal && stockAnalysis.id) {
+                                    onOpenAnalysisModal(stockAnalysis.ticker, stockAnalysis.id);
+                                  }
+                                }}
+                                title="Click to view analysis details"
                               >
                                 <div className="flex flex-col items-center text-center space-y-2">
                                   <div className={`p-2 rounded-lg ${stepStatus === 'completed'
@@ -471,12 +508,20 @@ function RebalanceWorkflowSteps({ workflowData }: { workflowData: any }) {
   );
 }
 
-export default function RebalanceWorkflowTab({ workflowData }: RebalanceWorkflowTabProps) {
+export default function RebalanceWorkflowTab({ 
+  workflowData, 
+  onNavigateToInsight,
+  onOpenAnalysisModal 
+}: RebalanceWorkflowTabProps) {
   return (
     <TabsContent value="workflow" className="data-[state=active]:block hidden">
       <ScrollArea className="h-[calc(90vh-220px)] px-6 pt-6">
         <div className="pb-6">
-          <RebalanceWorkflowSteps workflowData={workflowData} />
+          <RebalanceWorkflowSteps 
+            workflowData={workflowData} 
+            onNavigateToInsight={onNavigateToInsight}
+            onOpenAnalysisModal={onOpenAnalysisModal}
+          />
         </div>
       </ScrollArea>
     </TabsContent>

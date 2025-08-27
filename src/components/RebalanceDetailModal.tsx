@@ -272,9 +272,12 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         // Fetch order statuses for all positions in this rebalance
         const { data: tradingActions } = await supabase
           .from('trading_actions')
-          .select('id, ticker, status, metadata')
+          .select('*')  // Select all fields including metadata
           .eq('rebalance_request_id', rebalanceId)
           .eq('user_id', user.id);
+        
+        // Store tradingActions for later use (even if empty)
+        let tradingActionsData = tradingActions || [];
 
         if (tradingActions && tradingActions.length > 0) {
           const newOrderStatuses = new Map();
@@ -650,7 +653,10 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           // Include opportunity reasoning for insights tab access
           opportunity_reasoning: rebalanceRequest.opportunity_reasoning,
 
-          relatedAnalyses: rebalanceAnalyses || []
+          relatedAnalyses: rebalanceAnalyses || [],
+          
+          // Include trading_actions data for proper status tracking
+          trading_actions: tradingActionsData
         };
 
         if (mounted) {

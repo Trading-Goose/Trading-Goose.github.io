@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity, Clock, AlertCircle, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity, Clock, AlertCircle, AlertTriangle, Lock } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useAlpacaConnectionStore } from "@/hooks/useAlpacaConnection";
+import { useRBAC } from "@/hooks/useRBAC";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -52,6 +53,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   const { apiSettings, isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const { isConnected: isAlpacaConnected } = useAlpacaConnectionStore();
+  const { hasRebalanceAccess } = useRBAC();
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +65,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   const [runningRebalance, setRunningRebalance] = useState<string | null>(null); // Store rebalance_request_id
   const [runningAnalysesCount, setRunningAnalysesCount] = useState(0);
   const [showAnalysisAlert, setShowAnalysisAlert] = useState(false);
+  const [showRebalanceAccessAlert, setShowRebalanceAccessAlert] = useState(false);
 
   // Use ref to track previous running rebalance
   const previousRunningRef = useRef<string | null>(null);
@@ -70,6 +73,12 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   const handleRebalanceClick = () => {
     if (!isAuthenticated) {
       // This shouldn't happen since the button is in an authenticated area
+      return;
+    }
+    
+    // Check if user has rebalance access
+    if (!hasRebalanceAccess()) {
+      setShowRebalanceAccessAlert(true);
       return;
     }
     
@@ -379,6 +388,11 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                       <AlertTriangle className="h-4 w-4 mr-1" />
                       Connection Error
                     </>
+                  ) : !hasRebalanceAccess() ? (
+                    <>
+                      <Lock className="h-4 w-4 mr-1" />
+                      Rebalance
+                    </>
                   ) : (
                     <>
                       <RefreshCw className="h-4 w-4 mr-1" />
@@ -662,6 +676,31 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowAnalysisAlert(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* No Rebalance Access Alert Dialog */}
+      <AlertDialog open={showRebalanceAccessAlert} onOpenChange={setShowRebalanceAccessAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-yellow-500" />
+              Rebalance Access Required
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Your current subscription plan doesn't include portfolio rebalancing features.
+              </p>
+              <p>
+                Please upgrade your plan to access portfolio rebalancing capabilities.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowRebalanceAccessAlert(false)}>
               OK
             </AlertDialogAction>
           </AlertDialogFooter>

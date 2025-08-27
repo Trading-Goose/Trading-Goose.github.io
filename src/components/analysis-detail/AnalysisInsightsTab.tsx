@@ -26,6 +26,7 @@ import {
 import MarkdownRenderer from "../MarkdownRenderer";
 import MarketAnalystInsight from "./MarketAnalystInsight";
 import FundamentalsAnalystInsight from "./FundamentalsAnalystInsight";
+import SourcesSection, { CompactSourceBadges } from "./SourcesSection";
 
 interface AnalysisInsightsTabProps {
   analysisData: any;
@@ -456,6 +457,10 @@ export default function AnalysisInsightsTab({
           );
         }
 
+        // Check if this agent has sources (News, Social Media, Fundamentals, Macro analysts)
+        const hasPerplefinaSources = ['newsAnalyst', 'socialMediaAnalyst', 'fundamentalsAnalyst', 'macroAnalyst'].includes(agent);
+        const sources = hasPerplefinaSources && insight?.sources ? insight.sources : null;
+
         // Default rendering for all other agents
         const isCollapsed = collapsedCards.has(agent);
         return (
@@ -464,14 +469,24 @@ export default function AnalysisInsightsTab({
               <CollapsibleTrigger asChild>
                 <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
                   <CardTitle className="text-base flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       {getAgentIcon(agent)}
-                      {formatAgentName(agent)}
+                      <span className="shrink-0">{formatAgentName(agent)}</span>
+                      
+                      {/* Show compact source badges when collapsed */}
+                      {isCollapsed && sources && sources.length > 0 && (
+                        <CompactSourceBadges 
+                          sources={sources} 
+                          agentName={formatAgentName(agent)}
+                          maxVisible={3}
+                          showLabels={false}
+                        />
+                      )}
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0"
+                      className="h-6 w-6 p-0 shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleCollapse(agent);
@@ -485,6 +500,14 @@ export default function AnalysisInsightsTab({
               <CollapsibleContent>
                 <CardContent className="pt-4">
                   <MarkdownRenderer content={insightContent} />
+                  
+                  {/* Show sources using the new compact component */}
+                  {sources && sources.length > 0 && (
+                    <SourcesSection 
+                      sources={sources} 
+                      agentName={formatAgentName(agent)} 
+                    />
+                  )}
                 </CardContent>
               </CollapsibleContent>
             </Card>

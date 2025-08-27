@@ -41,7 +41,16 @@ interface RebalancePosition {
 }
 
 interface RebalanceActionsTabProps {
-  rebalanceData: any;
+  rebalanceData: any & {
+    trading_actions?: Array<{
+      id: string;
+      status: string;
+      ticker?: string;
+      action_type?: string;
+      quantity?: number;
+      alpaca_order_id?: string;
+    }>;
+  };
   executedTickers: Set<string>;
   setExecutedTickers: (tickers: Set<string>) => void;
   rejectedTickers: Set<string>;
@@ -268,6 +277,18 @@ export default function RebalanceActionsTab({
 }: RebalanceActionsTabProps) {
   const { toast } = useToast();
   const [executingTicker, setExecutingTicker] = useState<string | null>(null);
+  
+  // Debug log to see what data we have
+  console.log('RebalanceActionsTab data:', {
+    hasRebalanceData: !!rebalanceData,
+    tradingActions: rebalanceData?.trading_actions,
+    recommendedPositions: rebalanceData?.recommendedPositions?.map((p: RebalancePosition) => ({
+      ticker: p.ticker,
+      tradeActionId: p.tradeActionId,
+      orderStatus: p.orderStatus,
+      shareChange: p.shareChange
+    }))
+  });
 
   const handleApproveOrder = async (ticker: string) => {
     if (!rebalanceData?.id) {
@@ -474,19 +495,44 @@ export default function RebalanceActionsTab({
     }
   };
 
-  // Calculate values only if rebalanceData is available
+  // Calculate values only if rebalanceData is available - SIMPLIFIED
   const pendingPositions = rebalanceData?.recommendedPositions
     ?.filter((p: RebalancePosition) => {
+      // Skip HOLD positions
+      if (p.shareChange === 0) return false;
+      
+      // Check if this position has been approved
+      if (rebalanceData.trading_actions && p.tradeActionId) {
+        const tradeAction = rebalanceData.trading_actions.find((ta: any) => 
+          ta.id === p.tradeActionId
+        );
+        if (tradeAction && tradeAction.status === 'approved') {
+          return false; // Not pending if approved
+        }
+        if (tradeAction && tradeAction.status === 'rejected') {
+          return false; // Not pending if rejected
+        }
+      }
+      
+      // Check local state
       const orderStatus = orderStatuses.get(p.ticker);
-      // Include positions that have share changes and either:
-      // 1. Have explicit 'pending' status, OR
-      // 2. Have no order status yet (new positions awaiting approval), OR  
-      // 3. Are not in executed or rejected sets and have no status
-      return p.shareChange !== 0 && (
-        orderStatus?.status === 'pending' ||
-        (!orderStatus && rebalanceData.status === 'pending_approval') ||
-        (!executedTickers.has(p.ticker) && !rejectedTickers.has(p.ticker) && !orderStatus?.status)
-      );
+      if (orderStatus?.status === 'approved') {
+        return false; // Not pending if approved
+      }
+      if (orderStatus?.status === 'rejected') {
+        return false; // Not pending if rejected
+      }
+      
+      // Check sets
+      if (executedTickers.has(p.ticker)) {
+        return false; // Not pending if executed
+      }
+      if (rejectedTickers.has(p.ticker)) {
+        return false; // Not pending if rejected
+      }
+      
+      // If we get here, it's pending
+      return true;
     }) || [];
 
   const totalBuyValue = pendingPositions
@@ -672,8 +718,8 @@ export default function RebalanceActionsTab({
             );
           }
 
-          // State 6: Has positions to show (including pending approval)
-          if (hasPositions || isPendingApproval) {
+          // State 6: Has positions to show (show for pending_approval, executing, completed, or when positions exist)
+          if (hasPositions || isPendingApproval || isExecuting || isCompleted) {
             return (
               <>
                 {/* Status Banner for pending approval state */}
@@ -791,46 +837,100 @@ export default function RebalanceActionsTab({
                   </Card>
                 </div>
 
-                {/* Executed Orders Section */}
-                {executedTickers.size > 0 && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-medium">Executed Orders</h3>
-                        <p className="text-xs text-muted-foreground">
-                          Orders that have been successfully submitted to your broker
-                        </p>
+                {/* Approved Orders Section - VERY SIMPLE */}
+                {(() => {
+                  // Check if we have any approved trading actions
+                  const approvedTradingActions = rebalanceData?.trading_actions?.filter((ta: any) => 
+                    ta.status === 'approved'
+                  ) || [];
+                  
+                  console.log('Checking for approved orders:', {
+                    tradingActions: rebalanceData?.trading_actions,
+                    approvedCount: approvedTradingActions.length
+                  });
+                  
+                  if (approvedTradingActions.length === 0) {
+                    return null;
+                  }
+                  
+                  // For each approved trading action, find the corresponding position
+                  const approvedPositions = approvedTradingActions.map((ta: any) => {
+                    // Find position by ticker
+                    const position = rebalanceData.recommendedPositions?.find((p: RebalancePosition) => 
+                      p.ticker === ta.ticker
+                    );
+                    
+                    if (!position) {
+                      // Create a position from the trading action data if not found
+                      return {
+                        ticker: ta.ticker,
+                        action: ta.action_type || ta.action || 'UNKNOWN',
+                        shareChange: ta.quantity || ta.shares || 0,
+                        currentShares: 0,
+                        currentValue: 0,
+                        currentAllocation: 0,
+                        targetAllocation: 0,
+                        recommendedShares: ta.quantity || ta.shares || 0,
+                        reasoning: ta.reasoning || '',
+                        tradeActionId: ta.id,
+                        alpacaOrderId: ta.metadata?.alpaca_order?.id || ta.alpaca_order_id
+                      };
+                    }
+                    
+                    return {
+                      ...position,
+                      tradeActionId: ta.id,
+                      alpacaOrderId: ta.metadata?.alpaca_order?.id || ta.alpaca_order_id || position.alpacaOrderId
+                    };
+                  }).filter(Boolean); // Remove any null entries
+                  
+                  if (approvedPositions.length === 0) {
+                    return null;
+                  }
+                  
+                  return (
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="font-medium">Approved Orders</h3>
+                          <p className="text-xs text-muted-foreground">
+                            Orders that have been approved for execution
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          {approvedPositions.length} approved
+                        </Badge>
                       </div>
-                      <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        {executedTickers.size} executed
-                      </Badge>
+                      <div className="space-y-3">
+                        {approvedPositions.map((position: RebalancePosition, index: number) => {
+                          // Find the trading action for metadata
+                          const tradeAction = approvedTradingActions.find((ta: any) => 
+                            ta.ticker === position.ticker
+                          );
+                          
+                          const effectiveOrderStatus = {
+                            status: 'approved',
+                            alpacaOrderId: tradeAction?.metadata?.alpaca_order?.id || tradeAction?.alpaca_order_id,
+                            alpacaStatus: tradeAction?.metadata?.alpaca_order?.status
+                          };
+                          
+                          return (
+                            <RebalancePositionCard
+                              key={`approved-${position.ticker}-${index}`}
+                              position={position}
+                              isExecuted={true}
+                              orderStatus={effectiveOrderStatus}
+                              isExecuting={false}
+                              onApprove={() => { }} // No action needed for approved orders
+                              onReject={() => { }} // No action needed for approved orders
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="space-y-3">
-                      {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
-                        const orderStatus = orderStatuses.get(position.ticker);
-                        const isExecuted = orderStatus?.status === 'executed' ||
-                          orderStatus?.status === 'approved' ||
-                          (orderStatus?.status === 'approved' && orderStatus?.alpacaStatus === 'filled') ||
-                          executedTickers.has(position.ticker);
-
-                        if (!isExecuted) return null;
-
-                        return (
-                          <RebalancePositionCard
-                            key={`executed-${position.ticker}`}
-                            position={position}
-                            isExecuted={isExecuted}
-                            orderStatus={orderStatus}
-                            isExecuting={false}
-                            onApprove={() => { }} // No action needed for executed orders
-                            onReject={() => { }} // No action needed for executed orders
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Section Header */}
                 {pendingPositions.length > 0 && (
@@ -850,29 +950,13 @@ export default function RebalanceActionsTab({
                 {/* Pending Orders (only show pending, not executed) */}
                 {pendingPositions.length > 0 && (
                   <div className="space-y-3 mb-6">
-                    {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
+                    {pendingPositions.map((position: RebalancePosition) => {
                       const orderStatus = orderStatuses.get(position.ticker);
-                      const isExecuted = orderStatus?.status === 'approved' ||
-                        orderStatus?.status === 'approved' ||
-                        (orderStatus?.status === 'approved' && orderStatus?.alpacaStatus === 'filled') ||
-                        executedTickers.has(position.ticker);
-                      const isRejected = orderStatus?.status === 'rejected' || rejectedTickers.has(position.ticker);
-                      // Updated pending logic to match pendingPositions calculation
-                      const isPending = orderStatus?.status === 'pending' ||
-                        (!orderStatus && rebalanceData.status === 'pending_approval') ||
-                        (!executedTickers.has(position.ticker) && !rejectedTickers.has(position.ticker) && !orderStatus?.status);
-
-                      // Only show pending orders in this section
-                      if (!isPending || isExecuted || isRejected) return null;
-
-                      // Don't show HOLD positions (no change needed)
-                      if (position.shareChange === 0) return null;
-
                       return (
                         <RebalancePositionCard
                           key={position.ticker}
                           position={position}
-                          isExecuted={isExecuted}
+                          isExecuted={false}
                           orderStatus={orderStatus}
                           isExecuting={executingTicker === position.ticker}
                           onApprove={() => handleApproveOrder(position.ticker)}
@@ -884,42 +968,52 @@ export default function RebalanceActionsTab({
                 )}
 
                 {/* Rejected Orders Section */}
-                {rejectedTickers.size > 0 && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-medium">Rejected Orders</h3>
-                        <p className="text-xs text-muted-foreground">
-                          Orders that were rejected
-                        </p>
+                {(() => {
+                  const rejectedPositions = rebalanceData?.recommendedPositions?.filter((position: RebalancePosition) => {
+                    // Skip HOLD positions
+                    if (position.shareChange === 0) return false;
+                    
+                    const orderStatus = orderStatuses.get(position.ticker);
+                    const isRejected = rejectedTickers.has(position.ticker) || 
+                                      orderStatus?.status === 'rejected';
+                    return isRejected;
+                  }) || [];
+
+                  if (rejectedPositions.length === 0) return null;
+
+                  return (
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="font-medium">Rejected Orders</h3>
+                          <p className="text-xs text-muted-foreground">
+                            Orders that were rejected
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-gray-600 border-gray-500/20">
+                          <XCircle className="w-3 h-3 mr-1" />
+                          {rejectedPositions.length} rejected
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="text-gray-600 border-gray-500/20">
-                        <XCircle className="w-3 h-3 mr-1" />
-                        {rejectedTickers.size} rejected
-                      </Badge>
+                      <div className="space-y-3">
+                        {rejectedPositions.map((position: RebalancePosition) => {
+                          const orderStatus = orderStatuses.get(position.ticker);
+                          return (
+                            <RebalancePositionCard
+                              key={`rejected-${position.ticker}`}
+                              position={position}
+                              isExecuted={false}
+                              orderStatus={{ ...orderStatus, status: 'rejected' }}
+                              isExecuting={false}
+                              onApprove={() => { }} // No action needed for rejected orders
+                              onReject={() => { }} // No action needed for rejected orders
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="space-y-3">
-                      {rebalanceData.recommendedPositions?.map((position: RebalancePosition) => {
-                        const orderStatus = orderStatuses.get(position.ticker);
-                        const isRejected = orderStatus?.status === 'rejected' || rejectedTickers.has(position.ticker);
-
-                        if (!isRejected) return null;
-
-                        return (
-                          <RebalancePositionCard
-                            key={`rejected-${position.ticker}`}
-                            position={position}
-                            isExecuted={false}
-                            orderStatus={{ ...orderStatus, status: 'rejected' }}
-                            isExecuting={false}
-                            onApprove={() => { }} // No action needed for rejected orders
-                            onReject={() => { }} // No action needed for rejected orders
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
               </>
             );
           }

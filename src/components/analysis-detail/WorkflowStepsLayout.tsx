@@ -257,11 +257,12 @@ export default function WorkflowStepsLayout({
     <div className="space-y-6">
       {/* Trade Decision Summary Card - Show at top if decision is made */}
       {(() => {
-        // For individual analysis, show Portfolio Manager's decision; for rebalance, show Risk Manager's decision
-        const isRebalanceAnalysis = !!analysisData.rebalance_request_id;
-        const displayDecision = isRebalanceAnalysis
-          ? analysisData.decision
-          : (analysisData.agent_insights?.portfolioManager?.finalDecision?.action || analysisData.decision);
+        // Always show Portfolio Manager's decision if available
+        const displayDecision = analysisData.tradeOrder?.action ||  // From actual trade order
+                               analysisData.agent_insights?.portfolioManager?.finalDecision?.action || 
+                               analysisData.agent_insights?.portfolioManager?.decision?.action ||
+                               analysisData.agent_insights?.portfolioManager?.action ||
+                               analysisData.decision;
 
         const shouldShow = displayDecision && displayDecision !== 'CANCELED' && 
           (analysisData.status === ANALYSIS_STATUS.COMPLETED || analysisData.status === REBALANCE_STATUS.COMPLETED) &&

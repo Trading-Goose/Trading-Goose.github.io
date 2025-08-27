@@ -500,11 +500,20 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
             <>
               {/* Analysis Summary Bar */}
               {(() => {
-                // Determine which decision to display based on analysis type
-                const isRebalanceAnalysis = !!analysisData.rebalance_request_id;
-                const displayDecision = isRebalanceAnalysis
-                  ? analysisData.decision
-                  : (analysisData.agent_insights?.portfolioManager?.finalDecision?.action || analysisData.decision);
+                // Debug to see what data we have
+                console.log('Analysis Summary Bar - agent_insights:', analysisData.agent_insights);
+                console.log('Analysis Summary Bar - portfolioManager:', analysisData.agent_insights?.portfolioManager);
+                console.log('Analysis Summary Bar - tradeOrder:', analysisData.tradeOrder);
+                
+                // Always show portfolio manager's decision if available, otherwise fall back to the main decision
+                // Check multiple possible locations for the portfolio manager's decision
+                const displayDecision = analysisData.tradeOrder?.action ||  // From actual trade order
+                                       analysisData.agent_insights?.portfolioManager?.finalDecision?.action || 
+                                       analysisData.agent_insights?.portfolioManager?.decision?.action ||
+                                       analysisData.agent_insights?.portfolioManager?.action ||
+                                       analysisData.decision;
+                
+                console.log('Display decision resolved to:', displayDecision);
 
                 const shouldShow = displayDecision || analysisData.confidence !== undefined || analysisData.startedAt;
 

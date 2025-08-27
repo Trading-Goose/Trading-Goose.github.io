@@ -42,12 +42,17 @@ export default function TradeOrderCard({
   isExecuted = false,
   isExecuting = false
 }: TradeOrderCardProps) {
-  const decision = analysisData.decision;
-  const confidence = analysisData.confidence;
-  const ticker = analysisData.ticker;
-
   // Use the actual trade order data if available (from trading_actions table)
   const tradeOrder = analysisData.tradeOrder;
+  
+  // Use Portfolio Manager's decision if available, preferring trade order action
+  const decision = tradeOrder?.action ||
+                   analysisData.agent_insights?.portfolioManager?.finalDecision?.action || 
+                   analysisData.agent_insights?.portfolioManager?.decision?.action ||
+                   analysisData.agent_insights?.portfolioManager?.action ||
+                   analysisData.decision;
+  const confidence = analysisData.confidence;
+  const ticker = analysisData.ticker;
 
   // For individual analysis, only use Portfolio Manager's finalDecision (not Risk Manager's decision)
   const portfolioManagerInsight = analysisData.agent_insights?.portfolioManager;
@@ -109,6 +114,7 @@ export default function TradeOrderCard({
   console.log('TradeOrderCard - Portfolio Manager insight:', portfolioManagerInsight);
   console.log('TradeOrderCard - Trade Order:', tradeOrder);
   console.log('TradeOrderCard - Final Decision:', finalDecision);
+  console.log('TradeOrderCard - Decision variable:', decision);
   console.log('TradeOrderCard - Allocations:', {
     beforeAllocation,
     afterAllocation,
@@ -121,13 +127,9 @@ export default function TradeOrderCard({
     afterValue
   });
 
-  // Check Portfolio Manager's final decision action (not Risk Manager's decision)
-  const portfolioManagerAction = portfolioManagerInsight?.finalDecision?.action ||
-    portfolioManagerInsight?.action ||
-    tradeOrder?.action;
-
-  // Don't show trade order if Portfolio Manager decided HOLD
-  if (portfolioManagerAction === 'HOLD') {
+  // If we have an actual trade order from the database, always show it
+  // Only show HOLD message if there's no trade order AND the decision is HOLD
+  if (!tradeOrder && !finalDecision && decision === 'HOLD') {
     return (
       <div className="rounded-lg border bg-muted/20 p-4 opacity-60">
         <div className="flex items-center gap-3">
@@ -139,7 +141,7 @@ export default function TradeOrderCard({
   }
 
   // Show different states based on Portfolio Manager's decision status
-  if (!finalDecision) {
+  if (!finalDecision && !tradeOrder) {
     if (confidence < 60) {
       return (
         <div className="rounded-lg border bg-orange-500/5 border-orange-500/20 p-4">
@@ -164,10 +166,14 @@ export default function TradeOrderCard({
 
   // Check the actual order status from database
   const orderStatus = tradeOrder?.status as TradeOrderStatus;
-  const isPending = isTradeOrderPending(orderStatus);
+  const isPending = !orderStatus || isTradeOrderPending(orderStatus);
   const isApproved = isTradeOrderApproved(orderStatus);
   const isRejected = isTradeOrderRejected(orderStatus);
   const isOrderExecuted = orderStatus === 'executed' || isExecuted;
+  
+  // Get Alpaca order details if available
+  const alpacaOrderId = tradeOrder?.alpacaOrderId;
+  const alpacaOrderStatus = tradeOrder?.alpacaOrderStatus;
 
   // Determine card background based on status and action
   const getCardClasses = () => {
@@ -195,11 +201,13 @@ export default function TradeOrderCard({
     <div className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${getCardClasses()}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex gap-3 flex-1">
-          <div className={`p-2 rounded-full h-fit ${decision === 'BUY' ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+          <div className={`p-2 rounded-full h-fit ${decision === 'BUY' ? 'bg-green-500/10' : decision === 'SELL' ? 'bg-red-500/10' : 'bg-gray-500/10'}`}>
             {decision === 'BUY' ? (
               <ArrowUpRight className="h-4 w-4 text-green-500" />
-            ) : (
+            ) : decision === 'SELL' ? (
               <ArrowDownRight className="h-4 w-4 text-red-500" />
+            ) : (
+              <Activity className="h-4 w-4 text-gray-500" />
             )}
           </div>
 
@@ -286,8 +294,23 @@ export default function TradeOrderCard({
             </div>
           )}
 
+          {/* Show status badge for approved/rejected orders */}
+          {isApproved && !alpacaOrderId && (
+            <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Approved
+            </Badge>
+          )}
+          
+          {isRejected && (
+            <Badge variant="outline" className="text-xs">
+              <XCircle className="h-3 w-3 mr-1" />
+              Rejected
+            </Badge>
+          )}
+
           {/* Only show action buttons for pending decisions */}
-          {isPending && (
+          {isPending && !isApproved && !isRejected && (
             <>
               <Button
                 size="sm"

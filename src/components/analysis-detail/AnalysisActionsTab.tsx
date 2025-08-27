@@ -39,26 +39,34 @@ export default function AnalysisActionsTab({
     );
   }
 
+  // Get the portfolio manager's decision - check all possible locations
+  const portfolioManagerDecision = analysisData.tradeOrder?.action ||  // From actual trade order
+                                   analysisData.agent_insights?.portfolioManager?.finalDecision?.action || 
+                                   analysisData.agent_insights?.portfolioManager?.decision?.action ||
+                                   analysisData.agent_insights?.portfolioManager?.action ||
+                                   analysisData.agent_insights?.portfolioManager?.decision || 
+                                   analysisData.decision;
+
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Decision</span>
-            {analysisData.decision === 'BUY' ? (
+            <span className="text-sm text-muted-foreground">Portfolio Decision</span>
+            {portfolioManagerDecision === 'BUY' ? (
               <TrendingUp className="w-4 h-4 text-green-500" />
-            ) : analysisData.decision === 'SELL' ? (
+            ) : portfolioManagerDecision === 'SELL' ? (
               <TrendingDown className="w-4 h-4 text-red-500" />
             ) : (
               <Activity className="w-4 h-4 text-gray-500" />
             )}
           </div>
-          <p className={`text-lg font-semibold ${analysisData.decision === 'BUY' ? 'text-green-600' :
-              analysisData.decision === 'SELL' ? 'text-red-600' :
+          <p className={`text-lg font-semibold ${portfolioManagerDecision === 'BUY' ? 'text-green-600' :
+              portfolioManagerDecision === 'SELL' ? 'text-red-600' :
                 'text-gray-600'
             }`}>
-            {analysisData.decision}
+            {portfolioManagerDecision || 'HOLD'}
           </p>
         </Card>
         <Card className="p-4">

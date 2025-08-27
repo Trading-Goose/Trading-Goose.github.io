@@ -169,13 +169,15 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
             const order = tradeOrders[0];
             tradeOrderData = {
               id: order.id,
+              action: order.action || order.action_type || order.metadata?.action,  // Include the action (BUY/SELL/HOLD)
+              ticker: order.ticker,
               shares: parseFloat(order.shares || 0),
               dollarAmount: parseFloat(order.dollar_amount || 0),
               status: order.status,
-              alpacaOrderId: order.alpaca_order_id,
-              alpacaOrderStatus: order.alpaca_order_status,
-              alpacaFilledQty: order.alpaca_filled_qty ? parseFloat(order.alpaca_filled_qty) : null,
-              alpacaFilledPrice: order.alpaca_filled_price ? parseFloat(order.alpaca_filled_price) : null,
+              alpacaOrderId: order.alpaca_order_id || order.metadata?.alpaca_order?.id,
+              alpacaOrderStatus: order.alpaca_order_status || order.metadata?.alpaca_order?.status,
+              alpacaFilledQty: order.alpaca_filled_qty ? parseFloat(order.alpaca_filled_qty) : (order.metadata?.alpaca_order?.filled_qty ? parseFloat(order.metadata.alpaca_order.filled_qty) : null),
+              alpacaFilledPrice: order.alpaca_filled_price ? parseFloat(order.alpaca_filled_price) : (order.metadata?.alpaca_order?.filled_avg_price ? parseFloat(order.metadata.alpaca_order.filled_avg_price) : null),
               createdAt: order.created_at,
               executedAt: order.executed_at,
               price: order.price,

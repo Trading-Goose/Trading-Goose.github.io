@@ -17,7 +17,7 @@ export default function RegisterPage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   // Check if public registration is enabled
-  const publicRegistrationEnabled = import.meta.env.ENABLE_PUBLIC_REGISTRATION !== 'false';
+  const publicRegistrationEnabled = import.meta.env.VITE_ENABLE_PUBLIC_REGISTRATION !== 'false';
 
   // Form state
   const [name, setName] = useState("");

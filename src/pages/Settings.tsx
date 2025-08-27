@@ -111,7 +111,7 @@ export default function SettingsPage() {
   const [riskCustomModel, setRiskCustomModel] = useState('');
 
   // Analysis optimization settings (for all analysis agents)
-  const [analysisOptimization, setAnalysisOptimization] = useState((apiSettings as any)?.analysis_optimization || 'normal');
+  const [analysisOptimization, setAnalysisOptimization] = useState((apiSettings as any)?.analysis_optimization || 'speed');
 
   // Historical data time ranges (separate from opportunity agent)
   const [analysisHistoryDays, setAnalysisHistoryDays] = useState((apiSettings as any)?.analysis_history_days || '1M');
@@ -196,10 +196,10 @@ export default function SettingsPage() {
       console.log('Settings useEffect - analysis_optimization:', {
         fromApiSettings: analysisOpt,
         currentState: analysisOptimization,
-        willSetTo: analysisOpt || 'normal'
+        willSetTo: analysisOpt || 'speed'
       });
       if (analysisOpt !== undefined) {
-        setAnalysisOptimization(analysisOpt || 'normal');
+        setAnalysisOptimization(analysisOpt || 'speed');
       }
 
       // Historical data time ranges
@@ -1471,8 +1471,8 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="agents" className="space-y-6">
-            {console.log('Settings passing to AgentsTab:', { 
-              analysisOptimization, 
+            {console.log('Settings passing to AgentsTab:', {
+              analysisOptimization,
               analysisHistoryDays,
               apiSettingsHasData: !!apiSettings,
               apiSettingsValues: {

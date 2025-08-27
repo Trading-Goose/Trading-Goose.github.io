@@ -78,7 +78,7 @@ export default function AgentsTab({
   getDefaultModelValue,
 }: AgentsTabProps) {
   const defaultProviderId = aiProviders.length > 0 ? aiProviders[0].id : '1';
-  
+
   // Debug logging
   console.log('AgentsTab received props:', {
     analysisOptimization,
@@ -185,7 +185,7 @@ export default function AgentsTab({
                   <SelectValue placeholder="Select optimization level" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="speed">Speed</SelectItem>
                   <SelectItem value="balanced">Balanced</SelectItem>
                 </SelectContent>
               </Select>

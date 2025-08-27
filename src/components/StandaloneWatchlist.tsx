@@ -49,7 +49,7 @@ interface StandaloneWatchlistProps {
 
 export default function StandaloneWatchlist({ onSelectStock, selectedStock }: StandaloneWatchlistProps) {
   const { user, isAuthenticated, apiSettings } = useAuth();
-  const { getMaxParallelAnalysis } = useRBAC();
+  const { getMaxParallelAnalysis, getMaxWatchlistStocks } = useRBAC();
   const { toast } = useToast();
   const { isConnected: isAlpacaConnected } = useAlpacaConnectionStore();
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -60,8 +60,16 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
   const [showLimitAlert, setShowLimitAlert] = useState(false);
   const [showRebalanceAlert, setShowRebalanceAlert] = useState(false);
   const [hasRunningRebalance, setHasRunningRebalance] = useState(false);
+  const [showWatchlistLimitAlert, setShowWatchlistLimitAlert] = useState(false);
 
   const maxParallelAnalysis = getMaxParallelAnalysis();
+  const maxWatchlistStocks = getMaxWatchlistStocks();
+
+  // Debug: Log the watchlist limit
+  useEffect(() => {
+    console.log('[StandaloneWatchlist] Max watchlist stocks:', maxWatchlistStocks);
+    console.log('[StandaloneWatchlist] Current watchlist length:', watchlist.length);
+  }, [maxWatchlistStocks, watchlist.length]);
 
   // Fetch stock data including description and price using Alpaca
   const fetchStockData = async (ticker: string) => {
@@ -331,6 +339,13 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
     if (!user || !newTicker) return;
 
     const ticker = newTicker.toUpperCase();
+    
+    // Check if user has reached watchlist limit first
+    if (watchlist.length >= maxWatchlistStocks && maxWatchlistStocks > 0) {
+      setShowWatchlistLimitAlert(true);
+      return;
+    }
+    
     if (watchlist.find(item => item.ticker === ticker)) {
       toast({
         title: "Already in watchlist",
@@ -591,7 +606,12 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Watchlist</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Watchlist</CardTitle>
+            <span className="text-sm text-muted-foreground">
+              ({watchlist.length}/{maxWatchlistStocks})
+            </span>
+          </div>
           <Button size="sm" variant="outline" onClick={refreshPrices}>
             <RefreshCw className="h-4 w-4 mr-1" />
             Refresh
@@ -605,14 +625,13 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                 value={newTicker}
                 onChange={setNewTicker}
                 placeholder="Add ticker to watchlist"
-                onKeyPress={(e: React.KeyboardEvent) => {
-                  if (e.key === 'Enter') {
-                    addToWatchlist();
-                  }
-                }}
               />
             </div>
-            <Button onClick={addToWatchlist} disabled={!newTicker}>
+            <Button 
+              onClick={addToWatchlist} 
+              disabled={!newTicker}
+              title="Add to watchlist"
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -820,6 +839,31 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowRebalanceAlert(false)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Watchlist Limit Alert Dialog */}
+      <AlertDialog open={showWatchlistLimitAlert} onOpenChange={setShowWatchlistLimitAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              Watchlist Limit Reached
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                You have reached your maximum limit of {maxWatchlistStocks} stocks in your watchlist.
+              </p>
+              <p>
+                Please remove some stocks from your watchlist before adding new ones.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowWatchlistLimitAlert(false)}>
               OK
             </AlertDialogAction>
           </AlertDialogFooter>

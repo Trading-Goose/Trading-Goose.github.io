@@ -7,7 +7,21 @@ export function useRBAC() {
   const { user, isAdmin } = useAuth();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [userRoles, setUserRoles] = useState<any[]>([]);
-  const [roleDetails, setRoleDetails] = useState<Map<string, { name: string; display_name: string; priority: number; max_parallel_analysis?: number }>>(new Map());
+  const [roleDetails, setRoleDetails] = useState<Map<string, {
+    name: string;
+    display_name: string;
+    priority: number;
+    max_parallel_analysis?: number;
+    max_watchlist_stocks?: number;
+    max_rebalance_stocks?: number;
+    max_scheduled_rebalances?: number;
+    schedule_resolution?: string;
+    rebalance_access?: boolean;
+    opportunity_agent_access?: boolean;
+    additional_provider_access?: boolean;
+    enable_live_trading?: boolean;
+    enable_auto_trading?: boolean;
+  }>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -38,18 +52,18 @@ export function useRBAC() {
             .in('id', roleIds);
 
           console.log('[useRBAC] Roles detail query result:', { rolesDetail, roleDetailError });
-          
+
           // Get role limits from role_limits table
           const { data: roleLimits, error: limitsError } = await supabase
             .from('role_limits')
             .select('*')
             .in('role_id', roleIds);
-          
+
           console.log('[useRBAC] Role limits query result:', { roleLimits, limitsError });
 
           if (rolesDetail) {
             const roleMap = new Map();
-            
+
             // Create a map of role limits for quick lookup
             const limitsMap = new Map();
             if (roleLimits) {
@@ -57,23 +71,42 @@ export function useRBAC() {
                 limitsMap.set(limit.role_id, limit);
               });
             }
-            
+
             rolesDetail.forEach(role => {
               console.log('[useRBAC] Adding role to map:', role);
-              
+
               // Get limits from role_limits table
               const limits = limitsMap.get(role.id);
               console.log('[useRBAC] Role limits for', role.name, ':', limits);
-              
-              // Use limits from role_limits table, fallback to 1 if not found
-              const maxParallelAnalysis = limits?.max_parallel_analysis ? Number(limits.max_parallel_analysis) : 1;
-              console.log('[useRBAC] Final max_parallel_analysis for', role.name, ':', maxParallelAnalysis);
-              
+
+              // Use limits from role_limits table - let database be the source of truth
+              const maxParallelAnalysis = limits?.max_parallel_analysis !== undefined ? Number(limits.max_parallel_analysis) : undefined;
+              const maxWatchlistStocks = limits?.max_watchlist_stocks !== undefined ? Number(limits.max_watchlist_stocks) : undefined;
+              const maxRebalanceStocks = limits?.max_rebalance_stocks !== undefined ? Number(limits.max_rebalance_stocks) : undefined;
+              const maxScheduledRebalances = limits?.max_scheduled_rebalances !== undefined ? Number(limits.max_scheduled_rebalances) : undefined;
+              const scheduleResolution = limits?.schedule_resolution || undefined;
+              const rebalanceAccess = limits?.rebalance_access ?? false;
+              const opportunityAgentAccess = limits?.opportunity_agent_access ?? false;
+              const additionalProviderAccess = limits?.additional_provider_access ?? false;
+              const enableLiveTrading = limits?.enable_live_trading ?? false;
+              const enableAutoTrading = limits?.enable_auto_trading ?? false;
+
+              console.log('[useRBAC] Role limits for', role.name, ':', limits);
+
               roleMap.set(role.id, {
                 name: role.name,
                 display_name: role.display_name,
                 priority: role.priority || 0,
-                max_parallel_analysis: maxParallelAnalysis
+                max_parallel_analysis: maxParallelAnalysis,
+                max_watchlist_stocks: maxWatchlistStocks,
+                max_rebalance_stocks: maxRebalanceStocks,
+                max_scheduled_rebalances: maxScheduledRebalances,
+                schedule_resolution: scheduleResolution,
+                rebalance_access: rebalanceAccess,
+                opportunity_agent_access: opportunityAgentAccess,
+                additional_provider_access: additionalProviderAccess,
+                enable_live_trading: enableLiveTrading,
+                enable_auto_trading: enableAutoTrading
               });
             });
             setRoleDetails(roleMap);
@@ -96,7 +129,7 @@ export function useRBAC() {
               .in('id', permIds);
 
             const userPermissions = perms?.map(p => p.name) || [];
-            
+
             // Admins have all permissions
             if (isAdmin) {
               setPermissions(['*']);
@@ -156,7 +189,7 @@ export function useRBAC() {
   const hasRole = (roleName: string): boolean => {
     if (!user) return false;
     if (isAdmin) return true;
-    
+
     return userRoles.some(ur => {
       const roleDetail = roleDetails.get(ur.role_id);
       return roleDetail?.name === roleName;
@@ -178,7 +211,7 @@ export function useRBAC() {
 
   const getPrimaryRole = () => {
     console.log('[useRBAC] getPrimaryRole called. userRoles:', userRoles, 'roleDetails size:', roleDetails.size);
-    
+
     if (userRoles && userRoles.length > 0) {
       // Sort roles by priority (highest first) to get the primary role
       const sortedRoles = [...userRoles].sort((a, b) => {
@@ -193,7 +226,7 @@ export function useRBAC() {
 
       const primaryRole = sortedRoles[0];
       console.log('[useRBAC] Primary role selected:', primaryRole);
-      
+
       const roleDetail = roleDetails.get(primaryRole.role_id);
       console.log('[useRBAC] Role detail from map:', roleDetail);
 
@@ -218,26 +251,177 @@ export function useRBAC() {
   };
 
   const getMaxParallelAnalysis = (): number => {
-    // Admin gets unlimited (show as 10 for practical purposes)
-    if (isAdmin) return 10;
-    
     console.log('[useRBAC] getMaxParallelAnalysis called. userRoles:', userRoles);
     console.log('[useRBAC] roleDetails:', Array.from(roleDetails.entries()));
-    
+
     // Get the highest limit from all user roles
-    let maxLimit = 1; // Default to 1 if no roles found
-    
+    let maxLimit = 0; // Start at 0 to get actual max from roles
+    let foundLimit = false;
+
     for (const userRole of userRoles) {
       const roleDetail = roleDetails.get(userRole.role_id);
       console.log('[useRBAC] Checking role:', userRole.role_id, 'Detail:', roleDetail);
-      if (roleDetail && roleDetail.max_parallel_analysis) {
+      if (roleDetail && typeof roleDetail.max_parallel_analysis === 'number') {
         console.log('[useRBAC] Found max_parallel_analysis:', roleDetail.max_parallel_analysis);
         maxLimit = Math.max(maxLimit, roleDetail.max_parallel_analysis);
+        foundLimit = true;
       }
     }
-    
+
+    // Only return 0 if no limits found - let the database be the source of truth
+    if (!foundLimit) {
+      console.log('[useRBAC] No max_parallel_analysis found in any role, returning 0');
+      return 0;
+    }
+
     console.log('[useRBAC] Final maxLimit:', maxLimit);
     return maxLimit;
+  };
+
+  const getMaxWatchlistStocks = (): number => {
+    console.log('[useRBAC] getMaxWatchlistStocks called. userRoles:', userRoles);
+    console.log('[useRBAC] roleDetails:', Array.from(roleDetails.entries()));
+
+    // Get the highest limit from all user roles
+    let maxLimit = 0; // Start at 0 to get actual max from roles
+    let foundLimit = false;
+
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      console.log('[useRBAC] Checking role:', userRole.role_id, 'Detail:', roleDetail);
+      if (roleDetail && typeof roleDetail.max_watchlist_stocks === 'number') {
+        console.log('[useRBAC] Found max_watchlist_stocks:', roleDetail.max_watchlist_stocks);
+        maxLimit = Math.max(maxLimit, roleDetail.max_watchlist_stocks);
+        foundLimit = true;
+      }
+    }
+
+    // Only return 0 if no limits found - let the database be the source of truth
+    if (!foundLimit) {
+      console.log('[useRBAC] No max_watchlist_stocks found in any role, returning 0');
+      return 0;
+    }
+
+    console.log('[useRBAC] Final maxLimit:', maxLimit);
+    return maxLimit;
+  };
+
+  const getMaxRebalanceStocks = (): number => {
+    // Get the highest limit from all user roles
+    let maxLimit = 0; // Start at 0 to get actual max from roles
+    let foundLimit = false;
+
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      if (roleDetail && typeof roleDetail.max_rebalance_stocks === 'number') {
+        maxLimit = Math.max(maxLimit, roleDetail.max_rebalance_stocks);
+        foundLimit = true;
+      }
+    }
+
+    // Only return 0 if no limits found - let the database be the source of truth
+    if (!foundLimit) {
+      return 0;
+    }
+
+    return maxLimit;
+  };
+
+  const getMaxScheduledRebalances = (): number => {
+    // Get the highest limit from all user roles
+    let maxLimit = 0; // Start at 0 to get actual max from roles
+    let foundLimit = false;
+
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      if (roleDetail && typeof roleDetail.max_scheduled_rebalances === 'number') {
+        maxLimit = Math.max(maxLimit, roleDetail.max_scheduled_rebalances);
+        foundLimit = true;
+      }
+    }
+
+    // Only return 0 if no limits found - let the database be the source of truth
+    if (!foundLimit) {
+      return 0;
+    }
+
+    return maxLimit;
+  };
+
+  const getScheduleResolution = (): string[] => {
+    // Collect all available resolutions from all user roles
+    const resolutions = new Set<string>();
+
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      if (roleDetail && roleDetail.schedule_resolution) {
+        // Split comma-separated values and add to set
+        roleDetail.schedule_resolution.split(',').forEach(res => resolutions.add(res.trim()));
+      }
+    }
+
+    // Return empty array if no resolutions found - let the database be the source of truth
+    return Array.from(resolutions);
+  };
+
+  const hasRebalanceAccess = (): boolean => {
+    // Check if any role has rebalance access
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      if (roleDetail && roleDetail.rebalance_access) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const hasOpportunityAgentAccess = (): boolean => {
+    // Check if any role has opportunity agent access
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      if (roleDetail && roleDetail.opportunity_agent_access) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const hasAdditionalProviderAccess = (): boolean => {
+    // Check if any role has additional provider access
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      if (roleDetail && roleDetail.additional_provider_access) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const canUseLiveTrading = (): boolean => {
+    // Check if any role has live trading enabled
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      if (roleDetail && roleDetail.enable_live_trading) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const canUseAutoTrading = (): boolean => {
+    // Check if any role has auto trading enabled
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      if (roleDetail && roleDetail.enable_auto_trading) {
+        return true;
+      }
+    }
+
+    return false;
   };
 
   return {
@@ -252,6 +436,15 @@ export function useRBAC() {
     canPerform,
     isAdmin,
     getPrimaryRole,
-    getMaxParallelAnalysis
+    getMaxParallelAnalysis,
+    getMaxWatchlistStocks,
+    getMaxRebalanceStocks,
+    getMaxScheduledRebalances,
+    getScheduleResolution,
+    hasRebalanceAccess,
+    hasOpportunityAgentAccess,
+    hasAdditionalProviderAccess,
+    canUseLiveTrading,
+    canUseAutoTrading
   };
 }

@@ -50,7 +50,7 @@ SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy rebal
 
 # Deploy invites
 echo "📦 Deploying send-invitation..."
-SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy send-invitation --project-ref $SUPABASE_PROJECT_REF
+SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy send-invitation --project-ref $SUPABASE_PROJECT_REF --no-verify-jwt
 
 
 # Deploy process-scheduled-rebalances

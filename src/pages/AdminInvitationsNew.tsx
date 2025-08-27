@@ -151,7 +151,7 @@ export default function AdminInvitationsNew() {
       }
 
       const response = await fetch(
-        `${import.meta.env.SUPABASE_URL}/functions/v1/send-invitation`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invitation`,
         {
           method: 'POST',
           headers: {

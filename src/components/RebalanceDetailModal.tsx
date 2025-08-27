@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   RefreshCw,
@@ -17,7 +19,10 @@ import {
   Target,
   Brain,
   Activity,
-  XCircle
+  XCircle,
+  X,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
@@ -66,7 +71,26 @@ interface RebalancePosition {
   tradeActionId?: string;
 }
 
-
+// Custom DialogContent without the default close button
+const DialogContentNoClose = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <DialogPrimitive.Portal>
+    <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </DialogPrimitive.Content>
+  </DialogPrimitive.Portal>
+));
+DialogContentNoClose.displayName = "DialogContentNoClose";
 
 export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, rebalanceDate }: RebalanceDetailModalProps) {
   const { user } = useAuth();
@@ -76,6 +100,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLiveRebalance, setIsLiveRebalance] = useState(false);
+  const [collapsedCards, setCollapsedCards] = useState<Set<string>>(new Set());
   const intervalRef = useRef<NodeJS.Timeout | undefined>();
 
   const [selectedAnalysis, setSelectedAnalysis] = useState<{
@@ -682,7 +707,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
   return (
     <>
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
-        <DialogContent className="max-w-7xl max-h-[90vh] p-0">
+        <DialogContentNoClose className="max-w-7xl max-h-[90vh] p-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -715,6 +740,16 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                   </Badge>
                 )}
               </div>
+              
+              {/* Close button */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="border border-slate-700"
+                onClick={() => onClose()}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
             <DialogDescription className="mt-2 flex justify-between items-center">
               <span>
@@ -734,20 +769,82 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
             <div className="px-6 pt-4 pb-4">
-              <TabsList className="grid w-full grid-cols-3 max-w-3xl mx-auto">
-                <TabsTrigger value="actions" className="flex items-center gap-2">
-                  <Target className="w-4 h-4" />
-                  Actions
-                </TabsTrigger>
-                <TabsTrigger value="workflow" className="flex items-center gap-2">
-                  <Activity className="w-4 h-4" />
-                  Workflow
-                </TabsTrigger>
-                <TabsTrigger value="insights" className="flex items-center gap-2">
-                  <Brain className="w-4 h-4" />
-                  Insights
-                </TabsTrigger>
-              </TabsList>
+              <div className="relative flex items-center justify-center">
+                <TabsList className="grid w-full grid-cols-3 max-w-3xl">
+                  <TabsTrigger value="actions" className="flex items-center gap-2">
+                    <Target className="w-4 h-4" />
+                    Actions
+                  </TabsTrigger>
+                  <TabsTrigger value="workflow" className="flex items-center gap-2">
+                    <Activity className="w-4 h-4" />
+                    Workflow
+                  </TabsTrigger>
+                  <TabsTrigger value="insights" className="flex items-center gap-2">
+                    <Brain className="w-4 h-4" />
+                    Insights
+                  </TabsTrigger>
+                </TabsList>
+                {activeTab === "insights" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (collapsedCards.size === 0) {
+                        // Collapse all - need to get all card keys
+                        const allCardKeys = new Set<string>();
+                        
+                        // Add threshold card if it exists
+                        if (!rebalanceData?.skipThresholdCheck) {
+                          const thresholdStep = rebalanceData?.workflowSteps?.find((s: any) => s.id === 'threshold');
+                          if (thresholdStep?.insights) {
+                            allCardKeys.add('threshold');
+                          }
+                        }
+                        
+                        // Add opportunity card if it exists
+                        if (!rebalanceData?.skipOpportunityAgent) {
+                          const opportunityStep = rebalanceData?.workflowSteps?.find((s: any) => s.id === 'opportunity');
+                          if (opportunityStep?.insights || opportunityStep?.data) {
+                            allCardKeys.add('opportunity');
+                          }
+                        }
+                        
+                        // Add portfolio manager card if it exists
+                        const portfolioInsights =
+                          rebalanceData?.rebalance_plan?.portfolioManagerAnalysis ||
+                          rebalanceData?.rebalance_plan?.portfolioManagerInsights ||
+                          rebalanceData?.rebalance_plan?.rebalance_agent_insight ||
+                          rebalanceData?.rebalance_plan?.agentInsights?.portfolioManager ||
+                          rebalanceData?.rebalance_plan?.agentInsights?.rebalanceAgent ||
+                          rebalanceData?.agentInsights?.portfolioManager ||
+                          rebalanceData?.agentInsights?.rebalanceAgent;
+                        
+                        if (portfolioInsights) {
+                          allCardKeys.add('portfolioManager');
+                        }
+                        
+                        setCollapsedCards(allCardKeys);
+                      } else {
+                        // Expand all
+                        setCollapsedCards(new Set());
+                      }
+                    }}
+                    className="text-xs absolute right-0"
+                  >
+                    {collapsedCards.size === 0 ? (
+                      <>
+                        <ChevronUp className="h-3 w-3 mr-1" />
+                        Collapse All
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3 w-3 mr-1" />
+                        Expand All
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {error ? (
@@ -790,11 +887,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                   rebalanceData={rebalanceData}
                   selectedAnalysis={selectedAnalysis}
                   setSelectedAnalysis={setSelectedAnalysis}
+                  collapsedCards={collapsedCards}
+                  setCollapsedCards={setCollapsedCards}
                 />
               </>
             )}
           </Tabs>
-        </DialogContent>
+        </DialogContentNoClose>
       </Dialog>
 
       {/* Analysis Detail Modal */}

@@ -513,15 +513,15 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
           }
           throw error;
         }
-        
+
         // Check for function-level errors
         if (!data?.success) {
           const errorMessage = data?.error || 'Analysis failed';
-          
+
           // Check if it's a configuration issue
-          if (errorMessage.includes('API settings not found') || 
-              errorMessage.includes('not configured') || 
-              errorMessage.includes('No provider configuration found')) {
+          if (errorMessage.includes('API settings not found') ||
+            errorMessage.includes('not configured') ||
+            errorMessage.includes('No provider configuration found')) {
             toast({
               title: "Configuration Required",
               description: "Please configure your AI provider settings in the Settings page",
@@ -529,7 +529,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
             });
             return;
           }
-          
+
           // Show the actual error message from the function
           throw new Error(errorMessage);
         }
@@ -746,7 +746,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                     </Button>
                     <Button
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                       className="border border-slate-700"
                       onClick={(e) => {
                         e.stopPropagation();

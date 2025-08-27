@@ -138,6 +138,7 @@ export default function RecentTrades() {
       console.log('Alpaca order map:', alpacaOrderMap);
 
       // Convert Alpaca orders to AIDecision format
+      // Only include orders that have an associated analysis or rebalance request
       const decisions: AIDecision[] = recentOrders.map(order => {
         // Use filled quantity if available, otherwise use order quantity
         const quantity = parseFloat(order.filled_qty || order.qty || '0');
@@ -206,6 +207,9 @@ export default function RecentTrades() {
         });
 
         return decision;
+      }).filter(decision => {
+        // Only include orders that have either an analysis or rebalance link
+        return decision.analysisId || decision.rebalanceRequestId;
       });
 
       // Add trade orders from database that don't have Alpaca orders yet

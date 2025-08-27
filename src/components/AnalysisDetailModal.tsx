@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -77,6 +78,26 @@ import { useAnalysisData } from "./analysis-detail/hooks/useAnalysisData";
 import { useOrderActions } from "./analysis-detail/hooks/useOrderActions";
 import { getDecisionIcon, getDecisionVariant } from "./analysis-detail/utils/statusHelpers";
 
+// Custom DialogContent without the default close button
+const DialogContentNoClose = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <DialogPrimitive.Portal>
+    <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </DialogPrimitive.Content>
+  </DialogPrimitive.Portal>
+));
+DialogContentNoClose.displayName = "DialogContentNoClose";
 
 export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClose, analysisDate, initialTab }: AnalysisDetailModalProps) {
   // Use extracted custom hooks
@@ -337,7 +358,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
 
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-7xl max-h-[90vh] p-0">
+      <DialogContentNoClose className="max-w-7xl max-h-[90vh] p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -377,56 +398,69 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
               )}
             </div>
 
-            {/* Retry/Reactivate Button */}
-            {analysisData && (
-              <>
-                {analysisData.status === ANALYSIS_STATUS.ERROR && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRetry}
-                    disabled={isRetrying}
-                    className="flex items-center gap-2"
-                  >
-                    {isRetrying ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4" />
-                    )}
-                    Retry Analysis
-                  </Button>
-                )}
-
-                {(() => {
-                  const shouldShowReactivate = analysisData.status === ANALYSIS_STATUS.RUNNING && isAnalysisStale();
-                  console.log('Reactivate button check:', {
-                    status: analysisData.status,
-                    isRunning: analysisData.status === ANALYSIS_STATUS.RUNNING,
-                    isStale: isAnalysisStale(),
-                    shouldShow: shouldShowReactivate,
-                    ANALYSIS_STATUS
-                  });
-
-                  return shouldShowReactivate && (
+            {/* Action buttons container */}
+            <div className="flex items-center gap-2">
+              {/* Retry/Reactivate Button */}
+              {analysisData && (
+                <>
+                  {analysisData.status === ANALYSIS_STATUS.ERROR && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={handleReactivate}
+                      onClick={handleRetry}
                       disabled={isRetrying}
                       className="flex items-center gap-2"
-                      title={`Last updated ${formatDistanceToNow(new Date(analysisData.updated_at))} ago`}
                     >
                       {isRetrying ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <PlayCircle className="w-4 h-4" />
+                        <RefreshCw className="w-4 h-4" />
                       )}
-                      Reactivate
+                      Retry Analysis
                     </Button>
-                  );
-                })()}
-              </>
-            )}
+                  )}
+
+                  {(() => {
+                    const shouldShowReactivate = analysisData.status === ANALYSIS_STATUS.RUNNING && isAnalysisStale();
+                    console.log('Reactivate button check:', {
+                      status: analysisData.status,
+                      isRunning: analysisData.status === ANALYSIS_STATUS.RUNNING,
+                      isStale: isAnalysisStale(),
+                      shouldShow: shouldShowReactivate,
+                      ANALYSIS_STATUS
+                    });
+
+                    return shouldShowReactivate && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleReactivate}
+                        disabled={isRetrying}
+                        className="flex items-center gap-2"
+                        title={`Last updated ${formatDistanceToNow(new Date(analysisData.updated_at))} ago`}
+                      >
+                        {isRetrying ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <PlayCircle className="w-4 h-4" />
+                        )}
+                        Reactivate
+                      </Button>
+                    );
+                  })()}
+                </>
+              )}
+              
+              {/* Close button */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="border border-slate-700"
+                onClick={() => onClose()}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           <DialogDescription className="mt-2 flex justify-between items-center">
             <span>
@@ -630,7 +664,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
             </div>
           )}
         </div>
-      </DialogContent>
+      </DialogContentNoClose>
     </Dialog>
   );
 }

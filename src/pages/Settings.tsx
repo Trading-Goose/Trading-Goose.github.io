@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -112,10 +111,10 @@ export default function SettingsPage() {
   const [riskCustomModel, setRiskCustomModel] = useState('');
 
   // Analysis optimization settings (for all analysis agents)
-  const [analysisOptimization, setAnalysisOptimization] = useState(apiSettings?.analysis_optimization || 'normal');
+  const [analysisOptimization, setAnalysisOptimization] = useState((apiSettings as any)?.analysis_optimization || 'normal');
 
   // Historical data time ranges (separate from opportunity agent)
-  const [analysisHistoryDays, setAnalysisHistoryDays] = useState(apiSettings?.analysis_history_days || '1M');
+  const [analysisHistoryDays, setAnalysisHistoryDays] = useState((apiSettings as any)?.analysis_history_days || '1M');
 
   // Max tokens settings for each workflow step
   const [analysisMaxTokens, setAnalysisMaxTokens] = useState(apiSettings?.analysis_max_tokens || 2000);
@@ -183,77 +182,96 @@ export default function SettingsPage() {
   }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
-    // Only load settings once when they first become available or when user logs in
-    if ((apiSettings || isAuthenticated) && !initialLoadComplete) {
-      console.log('Loading initial settings...', { hasApiSettings: !!apiSettings, isAuthenticated });
+    // Load settings when apiSettings changes - but only on initial load
+    if (apiSettings && !initialLoadComplete) {
+      console.log('Loading settings from apiSettings...', { hasApiSettings: !!apiSettings, isAuthenticated });
+      console.log('Full apiSettings object:', JSON.stringify(apiSettings, null, 2));
 
-      // If we have apiSettings, use them for non-credential settings
-      if (apiSettings) {
-        // Default settings (ai_provider is handled by provider configuration loading)
+      // Check specific fields
+      console.log('analysis_optimization value:', (apiSettings as any).analysis_optimization);
+      console.log('analysis_history_days value:', (apiSettings as any).analysis_history_days);
 
-        // Check if the default model is a custom one (not in the preset list)
-        const savedDefaultModel = apiSettings.ai_model || 'gpt-4';
-        const availableModels = getModelOptions(apiSettings.ai_provider || 'openrouter');
-        console.log('Loading default model:', {
-          savedModel: savedDefaultModel,
-          provider: apiSettings.ai_provider,
-          availableModels: availableModels,
-          isCustom: !availableModels.includes(savedDefaultModel)
-        });
-
-        if (savedDefaultModel && !availableModels.includes(savedDefaultModel)) {
-          setDefaultAiModel('custom');
-          setDefaultCustomModel(savedDefaultModel);
-          console.log('Set as custom model:', savedDefaultModel);
-        } else {
-          setDefaultAiModel(savedDefaultModel);
-          setDefaultCustomModel(''); // Clear custom model if using preset
-        }
-
-        // Non-credential settings from apiSettings
-        setAlpacaPaperTrading(apiSettings.alpaca_paper_trading ?? true);
-        setAutoExecuteTrades(apiSettings.auto_execute_trades ?? false);
-        setUserRiskLevel(apiSettings.user_risk_level || 'moderate');
-        setDefaultPositionSizeDollars(apiSettings.default_position_size_dollars || 1000);
-
-        // Team-specific settings
-        setResearchDebateRounds(apiSettings.research_debate_rounds || 2);
-
-        // NOTE: Team provider IDs will be set after providers are loaded (see separate useEffect below)
-
-        // Analysis optimization settings (for all analysis agents)
-        setAnalysisOptimization(apiSettings.analysis_optimization || 'normal');
-
-        // Historical data time ranges (separate from opportunity agent)
-        setAnalysisHistoryDays(apiSettings.analysis_history_days || '1M');
-
-        // Max tokens settings
-        setAnalysisMaxTokens(apiSettings.analysis_max_tokens || 2000);
-        setResearchMaxTokens(apiSettings.research_max_tokens || 3000);
-        setTradingMaxTokens(apiSettings.trading_max_tokens || 1500);
-        setRiskMaxTokens(apiSettings.risk_max_tokens || 2000);
-
-        // Rebalance settings
-        setRebalanceThreshold(apiSettings.rebalance_threshold || apiSettings.default_rebalance_threshold || 10);
-        setRebalanceMinPositionSize(apiSettings.rebalance_min_position_size || apiSettings.default_min_position_size || 100);
-        setRebalanceMaxPositionSize(apiSettings.rebalance_max_position_size || apiSettings.default_max_position_size || 10000);
-        setTargetStockAllocation(apiSettings.target_stock_allocation || 80);
-        setTargetCashAllocation(apiSettings.target_cash_allocation || 20);
-
-        // Portfolio Manager settings
-        setPortfolioManagerModel(apiSettings.portfolio_manager_model || 'gpt-4');
-        setPortfolioManagerMaxTokens(apiSettings.portfolio_manager_max_tokens || 2000);
-
-        // Opportunity Agent settings will be loaded after providers are loaded
-        setOpportunityMaxTokens(apiSettings.opportunity_max_tokens || 2000);
-        setOpportunityMarketRange(apiSettings.opportunity_market_range || '1M');
+      // Analysis optimization settings
+      const analysisOpt = (apiSettings as any).analysis_optimization;
+      console.log('Settings useEffect - analysis_optimization:', {
+        fromApiSettings: analysisOpt,
+        currentState: analysisOptimization,
+        willSetTo: analysisOpt || 'normal'
+      });
+      if (analysisOpt !== undefined) {
+        setAnalysisOptimization(analysisOpt || 'normal');
       }
+
+      // Historical data time ranges
+      const historyDays = (apiSettings as any).analysis_history_days;
+      console.log('Settings useEffect - analysis_history_days:', {
+        fromApiSettings: historyDays,
+        currentState: analysisHistoryDays,
+        willSetTo: historyDays || '1M'
+      });
+      if (historyDays !== undefined) {
+        setAnalysisHistoryDays(historyDays || '1M');
+      }
+
+      // Load all other settings once to avoid overwriting user changes
+      // Default settings (ai_provider is handled by provider configuration loading)
+
+      // Check if the default model is a custom one (not in the preset list)
+      const savedDefaultModel = apiSettings.ai_model || 'gpt-4';
+      const availableModels = getModelOptions(apiSettings.ai_provider || 'openrouter');
+      console.log('Loading default model:', {
+        savedModel: savedDefaultModel,
+        provider: apiSettings.ai_provider,
+        availableModels: availableModels,
+        isCustom: !availableModels.includes(savedDefaultModel)
+      });
+
+      if (savedDefaultModel && !availableModels.includes(savedDefaultModel)) {
+        setDefaultAiModel('custom');
+        setDefaultCustomModel(savedDefaultModel);
+        console.log('Set as custom model:', savedDefaultModel);
+      } else {
+        setDefaultAiModel(savedDefaultModel);
+        setDefaultCustomModel(''); // Clear custom model if using preset
+      }
+
+      // Non-credential settings from apiSettings
+      setAlpacaPaperTrading(apiSettings.alpaca_paper_trading ?? true);
+      setAutoExecuteTrades(apiSettings.auto_execute_trades ?? false);
+      setUserRiskLevel(apiSettings.user_risk_level || 'moderate');
+      setDefaultPositionSizeDollars(apiSettings.default_position_size_dollars || 1000);
+
+      // Team-specific settings
+      setResearchDebateRounds(apiSettings.research_debate_rounds || 2);
+
+      // NOTE: Team provider IDs will be set after providers are loaded (see separate useEffect below)
+
+      // Max tokens settings
+      setAnalysisMaxTokens(apiSettings.analysis_max_tokens || 2000);
+      setResearchMaxTokens(apiSettings.research_max_tokens || 3000);
+      setTradingMaxTokens(apiSettings.trading_max_tokens || 1500);
+      setRiskMaxTokens(apiSettings.risk_max_tokens || 2000);
+
+      // Rebalance settings
+      setRebalanceThreshold(apiSettings.rebalance_threshold || apiSettings.default_rebalance_threshold || 10);
+      setRebalanceMinPositionSize(apiSettings.rebalance_min_position_size || apiSettings.default_min_position_size || 100);
+      setRebalanceMaxPositionSize(apiSettings.rebalance_max_position_size || apiSettings.default_max_position_size || 10000);
+      setTargetStockAllocation(apiSettings.target_stock_allocation || 80);
+      setTargetCashAllocation(apiSettings.target_cash_allocation || 20);
+
+      // Portfolio Manager settings
+      setPortfolioManagerModel(apiSettings.portfolio_manager_model || 'gpt-4');
+      setPortfolioManagerMaxTokens(apiSettings.portfolio_manager_max_tokens || 2000);
+
+      // Opportunity Agent settings will be loaded after providers are loaded
+      setOpportunityMaxTokens(apiSettings.opportunity_max_tokens || 2000);
+      setOpportunityMarketRange(apiSettings.opportunity_market_range || '1M');
 
       // Mark initial load as complete and reset team settings loaded flag
       setInitialLoadComplete(true);
       setTeamSettingsLoaded(false); // Reset so team settings can be loaded
     }
-  }, [apiSettings?.id, isAuthenticated]); // Re-run when apiSettings or auth state changes
+  }, [apiSettings, initialLoadComplete]); // Only runs when apiSettings first becomes available
 
 
   const handleSaveTab = async (tab: string) => {
@@ -1453,6 +1471,15 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="agents" className="space-y-6">
+            {console.log('Settings passing to AgentsTab:', { 
+              analysisOptimization, 
+              analysisHistoryDays,
+              apiSettingsHasData: !!apiSettings,
+              apiSettingsValues: {
+                optimization: (apiSettings as any)?.analysis_optimization,
+                historyDays: (apiSettings as any)?.analysis_history_days
+              }
+            })}
             <AgentsTab
               aiProviders={aiProviders}
               researchDebateRounds={researchDebateRounds}
@@ -1575,18 +1602,6 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Global Error Alert - only show if not already shown in a specific tab */}
-        {errors.save &&
-          !(['providers', 'rebalance'].includes(activeTab)) && (
-            <div className="mt-4 flex justify-end">
-              <Alert className="w-auto bg-red-50 border-red-200">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-800">
-                  {errors.save}
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
 
       </main>
 

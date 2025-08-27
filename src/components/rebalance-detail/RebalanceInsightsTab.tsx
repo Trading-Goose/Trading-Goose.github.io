@@ -1,8 +1,14 @@
+import React, { useState } from "react";
 import { TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   TrendingUp,
   TrendingDown,
@@ -13,7 +19,9 @@ import {
   CheckCircle,
   Loader2,
   XCircle,
-  FileText
+  FileText,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import MarkdownRenderer from "../MarkdownRenderer";
@@ -25,6 +33,8 @@ interface RebalanceInsightsTabProps {
     date: string;
   } | null;
   setSelectedAnalysis: (analysis: { ticker: string; date: string } | null) => void;
+  collapsedCards: Set<string>;
+  setCollapsedCards: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 // Helper functions for analysis card rendering
@@ -55,8 +65,23 @@ const getConfidenceColor = (confidence: number) => {
 export default function RebalanceInsightsTab({ 
   rebalanceData, 
   selectedAnalysis, 
-  setSelectedAnalysis 
+  setSelectedAnalysis,
+  collapsedCards,
+  setCollapsedCards
 }: RebalanceInsightsTabProps) {
+  // Toggle collapse state for a card
+  const toggleCollapse = (cardKey: string) => {
+    setCollapsedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(cardKey)) {
+        newSet.delete(cardKey);
+      } else {
+        newSet.add(cardKey);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <TabsContent value="insights" className="data-[state=active]:block hidden">
       <ScrollArea className="h-[calc(90vh-220px)] px-6 pt-6">
@@ -65,15 +90,33 @@ export default function RebalanceInsightsTab({
           {!rebalanceData.skipThresholdCheck && (() => {
             const thresholdStep = rebalanceData.workflowSteps?.find((s: any) => s.id === 'threshold');
             if (thresholdStep?.insights) {
+              const isCollapsed = collapsedCards.has('threshold');
               return (
-                <Card className="overflow-hidden">
-                  <CardHeader className="bg-muted/30">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4" />
-                      Threshold Check Analysis
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4 space-y-3">
+                <Collapsible key="threshold" open={!isCollapsed}>
+                  <Card className="overflow-hidden">
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                        <CardTitle className="text-base flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            Threshold Check Analysis
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCollapse('threshold');
+                            }}
+                          >
+                            {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                          </Button>
+                        </CardTitle>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent className="pt-4 space-y-3">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">Rebalance Threshold</p>
@@ -110,8 +153,10 @@ export default function RebalanceInsightsTab({
                     <div className="border-t pt-3">
                       <MarkdownRenderer content={thresholdStep.insights.reasoning} className="text-sm text-muted-foreground italic" />
                     </div>
-                  </CardContent>
-                </Card>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
               );
             }
             return null;
@@ -196,15 +241,33 @@ export default function RebalanceInsightsTab({
                       }
                     }
 
+                    const isCollapsed = collapsedCards.has('opportunity');
                     return (
-                      <Card id="insight-opportunityAgent" className="overflow-hidden">
-                        <CardHeader className="bg-muted/30">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <Zap className="w-4 h-4" />
-                            Opportunity Analysis
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4 space-y-3">
+                      <Collapsible key="opportunity" open={!isCollapsed}>
+                        <Card id="insight-opportunityAgent" className="overflow-hidden">
+                          <CollapsibleTrigger asChild>
+                            <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                              <CardTitle className="text-base flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Zap className="w-4 h-4" />
+                                  Opportunity Analysis
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleCollapse('opportunity');
+                                  }}
+                                >
+                                  {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                                </Button>
+                              </CardTitle>
+                            </CardHeader>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <CardContent className="pt-4 space-y-3">
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                               <p className="text-sm text-muted-foreground">Recommendation</p>
@@ -244,21 +307,41 @@ export default function RebalanceInsightsTab({
                               <p className="text-sm text-muted-foreground italic">{reasoningMatch[1]}</p>
                             </div>
                           )}
-                        </CardContent>
-                      </Card>
+                            </CardContent>
+                          </CollapsibleContent>
+                        </Card>
+                      </Collapsible>
                     );
                   }
 
                   // If we can't extract anything meaningful, show a clean error message
+                  const isCollapsedError = collapsedCards.has('opportunity');
                   return (
-                    <Card id="insight-opportunityAgent" className="overflow-hidden">
-                      <CardHeader className="bg-muted/30">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Zap className="w-4 h-4" />
-                          Opportunity Analysis
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-4">
+                    <Collapsible key="opportunity" open={!isCollapsedError}>
+                      <Card id="insight-opportunityAgent" className="overflow-hidden">
+                        <CollapsibleTrigger asChild>
+                          <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                            <CardTitle className="text-base flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Zap className="w-4 h-4" />
+                                Opportunity Analysis
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCollapse('opportunity');
+                                }}
+                              >
+                                {isCollapsedError ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                              </Button>
+                            </CardTitle>
+                          </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <CardContent className="pt-4">
                         <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
                           <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
                             ⚠️ Unable to display opportunity analysis details
@@ -267,21 +350,41 @@ export default function RebalanceInsightsTab({
                             The opportunity agent response could not be properly formatted. The analysis may still have been completed successfully.
                           </p>
                         </div>
-                      </CardContent>
-                    </Card>
+                          </CardContent>
+                        </CollapsibleContent>
+                      </Card>
+                    </Collapsible>
                   );
                 }
               }
 
+              const isCollapsed = collapsedCards.has('opportunity');
               return (
-                <Card id="insight-opportunityAgent" className="overflow-hidden">
-                  <CardHeader className="bg-muted/30">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Zap className="w-4 h-4" />
-                      Opportunity Analysis
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4 space-y-3">
+                <Collapsible key="opportunity" open={!isCollapsed}>
+                  <Card id="insight-opportunityAgent" className="overflow-hidden">
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                        <CardTitle className="text-base flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Zap className="w-4 h-4" />
+                            Opportunity Analysis
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCollapse('opportunity');
+                            }}
+                          >
+                            {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                          </Button>
+                        </CardTitle>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent className="pt-4 space-y-3">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">Recommendation</p>
@@ -334,8 +437,10 @@ export default function RebalanceInsightsTab({
                     <div className="border-t pt-3">
                       <MarkdownRenderer content={parsedInsights.reasoning} className="text-sm text-muted-foreground italic" />
                     </div>
-                  </CardContent>
-                </Card>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
               );
             }
             return null;
@@ -441,18 +546,38 @@ export default function RebalanceInsightsTab({
 
             // Show insights if they exist, even if status isn't marked complete yet
             if (portfolioInsights) {
+              const isCollapsed = collapsedCards.has('portfolioManager');
               return (
-                <Card id="insight-portfolioManager" className="overflow-hidden">
-                  <CardHeader className="bg-muted/30">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <PieChart className="w-4 h-4" />
-                      Portfolio Manager Analysis
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <MarkdownRenderer content={portfolioInsights} />
-                  </CardContent>
-                </Card>
+                <Collapsible key="portfolioManager" open={!isCollapsed}>
+                  <Card id="insight-portfolioManager" className="overflow-hidden">
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors">
+                        <CardTitle className="text-base flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <PieChart className="w-4 h-4" />
+                            Portfolio Manager Analysis
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCollapse('portfolioManager');
+                            }}
+                          >
+                            {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                          </Button>
+                        </CardTitle>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent className="pt-4">
+                        <MarkdownRenderer content={portfolioInsights} />
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
               );
             }
             return null;

@@ -11,9 +11,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { 
-  Bot, 
-  Save, 
+import {
+  Bot,
+  Save,
   AlertCircle,
   Check,
   Info,
@@ -79,6 +79,12 @@ export default function AgentsTab({
 }: AgentsTabProps) {
   const defaultProviderId = aiProviders.length > 0 ? aiProviders[0].id : '1';
   
+  // Debug logging
+  console.log('AgentsTab received props:', {
+    analysisOptimization,
+    analysisHistoryDays
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -123,8 +129,8 @@ export default function AgentsTab({
               <Label>Model</Label>
               {analysisTeamProviderId === defaultProviderId ? (
                 <div>
-                  <Select 
-                    disabled 
+                  <Select
+                    disabled
                     value={getDefaultModelValue()}
                   >
                     <SelectTrigger>
@@ -137,8 +143,8 @@ export default function AgentsTab({
                 </div>
               ) : (
                 <div>
-                  <Select 
-                    value={analysisTeamModel} 
+                  <Select
+                    value={analysisTeamModel}
                     onValueChange={setAnalysisTeamModel}
                   >
                     <SelectTrigger>
@@ -171,8 +177,8 @@ export default function AgentsTab({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Analysis Optimization</Label>
-              <Select 
-                value={analysisOptimization} 
+              <Select
+                value={analysisOptimization}
                 onValueChange={setAnalysisOptimization}
               >
                 <SelectTrigger>
@@ -184,13 +190,13 @@ export default function AgentsTab({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Normal=Standard analysis, Balanced=More thorough coverage for all analysis agents
+                Normal: Standard analysis Balanced: More thorough coverage for all analysis agents
               </p>
             </div>
             <div className="space-y-2">
               <Label>Historical Data Range</Label>
-              <Select 
-                value={analysisHistoryDays} 
+              <Select
+                value={analysisHistoryDays}
                 onValueChange={setAnalysisHistoryDays}
               >
                 <SelectTrigger>
@@ -253,8 +259,8 @@ export default function AgentsTab({
               <Label>Model</Label>
               {researchTeamProviderId === defaultProviderId ? (
                 <div>
-                  <Select 
-                    disabled 
+                  <Select
+                    disabled
                     value={getDefaultModelValue()}
                   >
                     <SelectTrigger>
@@ -267,8 +273,8 @@ export default function AgentsTab({
                 </div>
               ) : (
                 <div>
-                  <Select 
-                    value={researchTeamModel} 
+                  <Select
+                    value={researchTeamModel}
                     onValueChange={setResearchTeamModel}
                   >
                     <SelectTrigger>
@@ -360,8 +366,8 @@ export default function AgentsTab({
               <Label>Model</Label>
               {tradingTeamProviderId === defaultProviderId ? (
                 <div>
-                  <Select 
-                    disabled 
+                  <Select
+                    disabled
                     value={getDefaultModelValue()}
                   >
                     <SelectTrigger>
@@ -374,8 +380,8 @@ export default function AgentsTab({
                 </div>
               ) : (
                 <div>
-                  <Select 
-                    value={tradingTeamModel} 
+                  <Select
+                    value={tradingTeamModel}
                     onValueChange={setTradingTeamModel}
                   >
                     <SelectTrigger>
@@ -450,8 +456,8 @@ export default function AgentsTab({
               <Label>Model</Label>
               {riskTeamProviderId === defaultProviderId ? (
                 <div>
-                  <Select 
-                    disabled 
+                  <Select
+                    disabled
                     value={getDefaultModelValue()}
                   >
                     <SelectTrigger>
@@ -464,8 +470,8 @@ export default function AgentsTab({
                 </div>
               ) : (
                 <div>
-                  <Select 
-                    value={riskTeamModel} 
+                  <Select
+                    value={riskTeamModel}
                     onValueChange={setRiskTeamModel}
                   >
                     <SelectTrigger>
@@ -543,8 +549,8 @@ export default function AgentsTab({
               <Label>Model</Label>
               {portfolioManagerProviderId === defaultProviderId ? (
                 <div>
-                  <Select 
-                    disabled 
+                  <Select
+                    disabled
                     value={getDefaultModelValue()}
                   >
                     <SelectTrigger>
@@ -557,8 +563,8 @@ export default function AgentsTab({
                 </div>
               ) : (
                 <div>
-                  <Select 
-                    value={portfolioManagerModel} 
+                  <Select
+                    value={portfolioManagerModel}
                     onValueChange={setPortfolioManagerModel}
                   >
                     <SelectTrigger>
@@ -613,8 +619,8 @@ export default function AgentsTab({
 
         {/* Save Button for Agents Tab */}
         <div className="flex justify-end pt-4">
-          <Button 
-            onClick={() => handleSaveTab('agents')} 
+          <Button
+            onClick={() => handleSaveTab('agents')}
             size="lg"
           >
             <Save className="w-4 h-4 mr-2" />

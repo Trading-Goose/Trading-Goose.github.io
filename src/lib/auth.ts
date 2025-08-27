@@ -99,7 +99,7 @@ export const useAuth = create<AuthState>()(
         try {
           // Get current session with refresh if needed
           let { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          
+
           // If we have a session, try to refresh it to ensure it's valid
           if (session && !sessionError) {
             const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
@@ -167,9 +167,15 @@ export const useAuth = create<AuthState>()(
                 action: 'get_settings'
               }
             });
-            
+
             if (!proxyError && proxyData.settings) {
               apiSettings = proxyData.settings;
+              console.log('🔐 Auth: Loaded settings from proxy:', {
+                analysis_optimization: apiSettings.analysis_optimization,
+                analysis_history_days: apiSettings.analysis_history_days,
+                hasOptimization: 'analysis_optimization' in apiSettings,
+                hasHistoryDays: 'analysis_history_days' in apiSettings
+              });
             } else {
               console.log('No settings found via proxy, will create defaults');
             }
@@ -190,7 +196,7 @@ export const useAuth = create<AuthState>()(
                   }
                 }
               });
-              
+
               if (!createError && createData.success) {
                 apiSettings = createData.settings;
               }
@@ -544,7 +550,7 @@ export const initializeAuth = () => {
       // Token was refreshed, update the session
       if (session) {
         console.log('🔐 Token refreshed, updating session');
-        useAuth.setState({ 
+        useAuth.setState({
           session,
           user: session.user,
           isAuthenticated: true

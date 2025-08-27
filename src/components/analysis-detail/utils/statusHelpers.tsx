@@ -33,9 +33,6 @@ export const getStatusIcon = (status: AnalysisStatus | RebalanceStatus | string)
     case ANALYSIS_STATUS.PENDING:
     case REBALANCE_STATUS.PENDING:
       return <Clock className="w-4 h-4 text-gray-400" />;
-    case ANALYSIS_STATUS.AWAITING_APPROVAL:
-    case REBALANCE_STATUS.AWAITING_APPROVAL:
-      return <Clock className="w-4 h-4 text-yellow-500" />;
     default:
       return <Clock className="w-4 h-4 text-gray-400" />;
   }

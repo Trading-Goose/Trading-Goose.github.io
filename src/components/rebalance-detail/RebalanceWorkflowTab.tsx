@@ -415,11 +415,13 @@ function RebalanceWorkflowSteps({
                             return (
                               <div
                                 key={step.key}
-                                className={`relative rounded-lg border p-3 transition-all cursor-pointer hover:shadow-md ${stepStatus === 'completed'
-                                  ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
+                                className={`relative rounded-lg border p-3 transition-all cursor-pointer ${stepStatus === 'completed'
+                                  ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5 hover:shadow-md'
                                   : stepStatus === 'running'
-                                    ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5 shadow-sm'
-                                    : 'border-border'
+                                    ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5 shadow-sm hover:shadow-md'
+                                    : stepStatus === 'error'
+                                      ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5 hover:border-red-500/50'
+                                      : 'border-border hover:shadow-md'
                                   }`}
                                 onClick={() => {
                                   // Open analysis modal for this stock at the specific workflow step
@@ -427,14 +429,16 @@ function RebalanceWorkflowSteps({
                                     onOpenAnalysisModal(stockAnalysis.ticker, stockAnalysis.id);
                                   }
                                 }}
-                                title="Click to view analysis details"
+                                title={stepStatus === 'error' ? "Click to view error details" : "Click to view analysis details"}
                               >
                                 <div className="flex flex-col items-center text-center space-y-2">
                                   <div className={`p-2 rounded-lg ${stepStatus === 'completed'
                                     ? 'bg-green-500/10 dark:bg-green-500/5 text-green-600 dark:text-green-400'
                                     : stepStatus === 'running'
                                       ? 'bg-yellow-500/10 dark:bg-yellow-500/5 text-yellow-600 dark:text-yellow-400'
-                                      : 'bg-muted text-muted-foreground'
+                                      : stepStatus === 'error'
+                                        ? 'bg-red-500/10 dark:bg-red-500/5 text-red-600 dark:text-red-400'
+                                        : 'bg-muted text-muted-foreground'
                                     }`}>
                                     <StepIcon className="w-4 h-4" />
                                   </div>
@@ -452,8 +456,9 @@ function RebalanceWorkflowSteps({
                                   >
                                     {stepStatus === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
                                     {stepStatus === 'running' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                                    {stepStatus === 'error' && <XCircle className="w-3 h-3 mr-1" />}
                                     {stepStatus === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                                    {stepStatus.charAt(0).toUpperCase() + stepStatus.slice(1)}
+                                    {stepStatus === 'error' ? 'Failed' : stepStatus.charAt(0).toUpperCase() + stepStatus.slice(1)}
                                   </Badge>
                                 </div>
                               </div>

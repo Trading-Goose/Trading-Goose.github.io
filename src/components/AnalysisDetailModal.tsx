@@ -75,7 +75,7 @@ import AnalysisActionsTab from "./analysis-detail/AnalysisActionsTab";
 import AnalysisInsightsTab from "./analysis-detail/AnalysisInsightsTab";
 import { useAnalysisData } from "./analysis-detail/hooks/useAnalysisData";
 import { useOrderActions } from "./analysis-detail/hooks/useOrderActions";
-import { getStatusIcon, getDecisionIcon, getDecisionVariant } from "./analysis-detail/utils/statusHelpers";
+import { getDecisionIcon, getDecisionVariant } from "./analysis-detail/utils/statusHelpers";
 
 
 export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClose, analysisDate, initialTab }: AnalysisDetailModalProps) {
@@ -112,14 +112,14 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
     // This would require adding an id to each insight card and using scrollIntoView
     setTimeout(() => {
       let elementId = `insight-${agentKey}`;
-      
+
       // Special handling for Bull/Bear Researcher - navigate to Research Debate if it exists
-      if ((agentKey === 'bullResearcher' || agentKey === 'bearResearcher') && 
-          analysisData?.agent_insights?.researchDebate) {
+      if ((agentKey === 'bullResearcher' || agentKey === 'bearResearcher') &&
+        analysisData?.agent_insights?.researchDebate) {
         // Navigate to Research Debate instead (first round has the bull researcher ID)
         elementId = agentKey === 'bullResearcher' ? 'insight-bullResearcher' : 'insight-researchDebate';
       }
-      
+
       const element = document.getElementById(elementId);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -136,7 +136,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
     const lastUpdate = new Date(analysisData.updated_at);
     const timeSinceUpdate = Date.now() - lastUpdate.getTime();
     const isStale = timeSinceUpdate > 5 * 60 * 1000; // 5 minutes
-    
+
     console.log('Staleness check:', {
       updated_at: analysisData.updated_at,
       lastUpdate: lastUpdate.toISOString(),
@@ -144,14 +144,14 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
       isStale,
       status: analysisData.status
     });
-    
+
     return isStale;
   };
 
   // Handle retry for error status
   const handleRetry = async () => {
     if (!analysisData?.id) return;
-    
+
     setIsRetrying(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -171,7 +171,26 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
         }
       });
 
-      if (error) throw error;
+      // Check for error in response body first (for 200 status with error)
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      if (error) {
+        // Try to extract error message from different sources
+        let errorMessage: string | undefined;
+        
+        // Check if error has response data (some Supabase versions expose this)
+        if ((error as any)?.response?.data?.error) {
+          errorMessage = (error as any).response.data.error;
+        } else if ((error as any)?.data?.error) {
+          errorMessage = (error as any).data.error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        throw new Error(errorMessage);
+      }
 
       toast({
         title: "Retry initiated",
@@ -199,7 +218,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
   // Handle reactivate for stale running status
   const handleReactivate = async () => {
     if (!analysisData?.id) return;
-    
+
     setIsRetrying(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -221,7 +240,26 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
         }
       });
 
-      if (error) throw error;
+      // Check for error in response body first (for 200 status with error)
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      if (error) {
+        // Try to extract error message from different sources
+        let errorMessage: string | undefined;
+        
+        // Check if error has response data (some Supabase versions expose this)
+        if ((error as any)?.response?.data?.error) {
+          errorMessage = (error as any).response.data.error;
+        } else if ((error as any)?.data?.error) {
+          errorMessage = (error as any).data.error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        throw new Error(errorMessage);
+      }
 
       toast({
         title: "Analysis reactivated",
@@ -307,26 +345,38 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
               <DialogTitle className="text-xl font-semibold">
                 {dialogTitle}
               </DialogTitle>
-              {analysisData && (
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(analysisData.status)}
-                  <span className={`text-sm capitalize ${analysisData.status === ANALYSIS_STATUS.CANCELLED || analysisData.status === REBALANCE_STATUS.CANCELLED
-                    ? 'text-orange-600 dark:text-orange-400'
-                    : 'text-muted-foreground'
-                    }`}>
-                    {analysisData.status === ANALYSIS_STATUS.CANCELLED || analysisData.status === REBALANCE_STATUS.CANCELLED
-                      ? 'Cancelled by User'
-                      : getStatusDisplayText(analysisData.status)}
-                  </span>
-                  {(analysisData.status === ANALYSIS_STATUS.CANCELLED || analysisData.status === REBALANCE_STATUS.CANCELLED) && analysisData.full_analysis?.canceledAt && (
-                    <span className="text-xs text-muted-foreground">
-                      • {formatDistanceToNow(new Date(analysisData.full_analysis.canceledAt))} ago
-                    </span>
-                  )}
-                </div>
+              {analysisData?.status === ANALYSIS_STATUS.RUNNING && (
+                <Badge variant="running" className="text-sm">
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  {getStatusDisplayText(ANALYSIS_STATUS.RUNNING)}
+                </Badge>
+              )}
+              {analysisData?.status === ANALYSIS_STATUS.PENDING && (
+                <Badge variant="pending" className="text-sm">
+                  <Clock className="w-3 h-3 mr-1" />
+                  {getStatusDisplayText(ANALYSIS_STATUS.PENDING)}
+                </Badge>
+              )}
+              {analysisData?.status === ANALYSIS_STATUS.COMPLETED && (
+                <Badge variant="completed" className="text-sm">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  {getStatusDisplayText(ANALYSIS_STATUS.COMPLETED)}
+                </Badge>
+              )}
+              {analysisData?.status === ANALYSIS_STATUS.ERROR && (
+                <Badge variant="error" className="text-sm">
+                  <XCircle className="w-3 h-3 mr-1" />
+                  {getStatusDisplayText(ANALYSIS_STATUS.ERROR)}
+                </Badge>
+              )}
+              {(analysisData?.status === ANALYSIS_STATUS.CANCELLED || analysisData?.status === REBALANCE_STATUS.CANCELLED) && (
+                <Badge variant="pending" className="text-sm">
+                  <XCircle className="w-3 h-3 mr-1" />
+                  {getStatusDisplayText(ANALYSIS_STATUS.CANCELLED)}
+                </Badge>
               )}
             </div>
-            
+
             {/* Retry/Reactivate Button */}
             {analysisData && (
               <>
@@ -346,17 +396,17 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
                     Retry Analysis
                   </Button>
                 )}
-                
+
                 {(() => {
-                  const shouldShowReactivate = (analysisData.status === ANALYSIS_STATUS.RUNNING || analysisData.status === ANALYSIS_STATUS.PENDING) && isAnalysisStale();
+                  const shouldShowReactivate = analysisData.status === ANALYSIS_STATUS.RUNNING && isAnalysisStale();
                   console.log('Reactivate button check:', {
                     status: analysisData.status,
-                    isRunningOrPending: analysisData.status === ANALYSIS_STATUS.RUNNING || analysisData.status === ANALYSIS_STATUS.PENDING,
+                    isRunning: analysisData.status === ANALYSIS_STATUS.RUNNING,
                     isStale: isAnalysisStale(),
                     shouldShow: shouldShowReactivate,
                     ANALYSIS_STATUS
                   });
-                  
+
                   return shouldShowReactivate && (
                     <Button
                       variant="outline"
@@ -378,20 +428,34 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
               </>
             )}
           </div>
-          <DialogDescription className="mt-2">
-            {isLiveAnalysis
-              ? "Real-time analysis progress and agent insights"
-              : analysisDate
-                ? `Historical analysis from ${new Date(analysisDate).toLocaleDateString()}`
-                : "Analysis details and agent insights"}
+          <DialogDescription className="mt-2 flex justify-between items-center">
+            <span>
+              {isLiveAnalysis
+                ? "Real-time analysis progress and agent insights"
+                : analysisDate
+                  ? `Historical analysis from ${new Date(analysisDate).toLocaleDateString()}`
+                  : "Analysis details and agent insights"}
+            </span>
+            {analysisData?.updated_at && (
+              <span className="text-xs text-muted-foreground">
+                Last updated: {formatDistanceToNow(new Date(analysisData.updated_at))} ago
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden">
           {error ? (
-            <div className="flex items-center gap-2 text-destructive p-6">
-              <AlertCircle className="w-5 h-5" />
-              <span>{error}</span>
+            <div className="p-6">
+              <div className="rounded-lg border border-red-500 bg-red-50 dark:bg-red-900/20 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-medium text-red-900 dark:text-red-400">Analysis Error</h3>
+                    <p className="text-sm text-red-800 dark:text-red-300 mt-1">{error}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : loading ? (
             <div className="flex flex-col items-center justify-center p-12 gap-4">

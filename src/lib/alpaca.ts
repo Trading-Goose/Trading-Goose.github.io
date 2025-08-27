@@ -177,12 +177,38 @@ class AlpacaAPI {
 
   // Account Methods
   async getAccount(): Promise<AlpacaAccount> {
-    return this.request<AlpacaAccount>('/v2/account');
+    // Use batch endpoint for better performance
+    const batchData = await this.getBatchAccountData();
+    if (!batchData.account) {
+      // Return a default account object if Alpaca is unavailable
+      console.warn('No account data received, returning default values');
+      return {
+        id: '',
+        account_number: '',
+        status: 'ACTIVE',
+        currency: 'USD',
+        buying_power: '0',
+        cash: '0',
+        portfolio_value: '0',
+        equity: '0',
+        last_equity: '0',
+        long_market_value: '0',
+        short_market_value: '0',
+        initial_margin: '0',
+        maintenance_margin: '0',
+        sma: '0',
+        daytrade_count: 0,
+        balance_asof: new Date().toISOString()
+      } as AlpacaAccount;
+    }
+    return batchData.account;
   }
 
   // Positions Methods
   async getPositions(): Promise<AlpacaPosition[]> {
-    return this.request<AlpacaPosition[]>('/v2/positions');
+    // Use batch endpoint for better performance
+    const batchData = await this.getBatchAccountData();
+    return batchData.positions || [];
   }
 
   async getPosition(symbol: string): Promise<AlpacaPosition> {
@@ -492,14 +518,88 @@ class AlpacaAPI {
     return data.data || {};
   }
 
+  // Batch method for account and positions data
+  async getBatchAccountData() {
+    const { data, error } = await supabase.functions.invoke('alpaca-batch', {
+      body: {
+        includeAccount: true,
+        includePositions: true
+      }
+    });
+
+    // Handle Supabase edge function errors
+    if (error) {
+      console.error('Edge function error:', error);
+      
+      // Try to extract the actual error message from the response
+      // Supabase wraps errors, so we need to check the context
+      if (error.context) {
+        try {
+          const errorResponse = await error.context.json();
+          if (errorResponse.error) {
+            // This is the actual error message from our edge function
+            throw new Error(errorResponse.error);
+          }
+        } catch (e) {
+          // If we can't parse the error, check for known patterns
+          if (error.message?.includes('503')) {
+            throw new Error('Alpaca services appear to be down. Please check https://app.alpaca.markets/dashboard/overview for status.');
+          } else if (error.message?.includes('504')) {
+            throw new Error('Unable to connect to Alpaca. Please check if Alpaca services are operational at https://app.alpaca.markets/dashboard/overview');
+          }
+        }
+      }
+      
+      // Fallback error message
+      throw new Error(`Failed to fetch account data: ${error.message}`);
+    }
+
+    if (!data) {
+      throw new Error('No account data received');
+    }
+
+    if (data.error) {
+      // Pass through the error message from edge function
+      throw new Error(data.error);
+    }
+
+    return data.data || {};
+  }
+
   // Portfolio Metrics Calculation
   async calculateMetrics() {
     try {
-      const [account, positions, history] = await Promise.all([
-        this.getAccount(),
-        this.getPositions(),
-        this.getPortfolioHistory('1D', '5Min')
+      // Use batch endpoint for account and positions
+      const [batchData, history] = await Promise.all([
+        this.getBatchAccountData().catch(err => {
+          console.warn('Failed to get batch account data:', err);
+          return { account: null, positions: [] };
+        }),
+        this.getPortfolioHistory('1D', '5Min').catch(err => {
+          console.warn('Failed to get portfolio history:', err);
+          return { timestamp: [], equity: [], profit_loss: [], profit_loss_pct: [] };
+        })
       ]);
+
+      const account = batchData.account;
+      const positions = batchData.positions || [];
+      
+      // If no account data, return default metrics
+      if (!account) {
+        console.warn('No account data available, returning default metrics');
+        return {
+          accountValue: 0,
+          cashAvailable: 0,
+          buyingPower: 0,
+          todayReturn: 0,
+          todayReturnPct: 0,
+          totalReturn: 0,
+          totalReturnPct: 0,
+          maxDrawdown: 0,
+          sharpeRatio: 0,
+          positions: []
+        };
+      }
 
       const currentEquity = parseFloat(account.equity);
       const lastEquity = parseFloat(account.last_equity);
@@ -568,7 +668,7 @@ class AlpacaAPI {
         totalReturnPct,
         maxDrawdown,
         sharpeRatio,
-        positions: positions.map(pos => ({
+        positions: positions.map((pos: any) => ({
           symbol: pos.symbol,
           shares: parseFloat(pos.qty),
           avgCost: parseFloat(pos.avg_entry_price),

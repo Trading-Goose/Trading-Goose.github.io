@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/AuthProvider";
+import { AlpacaConnectionErrorModal } from "@/components/AlpacaConnectionErrorModal";
+import { useAlpacaConnection } from "@/hooks/useAlpacaConnection";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import LoginPage from "./pages/LoginPage";
@@ -47,6 +49,19 @@ const AppRoutes = () => {
   );
 };
 
+// Wrapper component to use hooks inside the providers
+const AppContent = () => {
+  // Start monitoring Alpaca connection
+  useAlpacaConnection();
+  
+  return (
+    <>
+      <AlpacaConnectionErrorModal />
+      <AppRoutes />
+    </>
+  );
+};
+
 const App = () => {
   // Get basename from Vite's base configuration
   const basename = import.meta.env.BASE_URL || '/';
@@ -58,7 +73,7 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter basename={basename}>
-            <AppRoutes />
+            <AppContent />
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

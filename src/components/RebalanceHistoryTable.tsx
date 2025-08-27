@@ -166,12 +166,8 @@ export default function RebalanceHistoryTable() {
 
         if (status === REBALANCE_STATUS.ERROR || status === REBALANCE_STATUS.CANCELLED) {
           cancelled.push(item);
-        } else if (status === REBALANCE_STATUS.AWAITING_APPROVAL && item.rebalance_plan) {
-          // If status is awaiting approval with a rebalance plan, treat as completed
-          completed.push(item);
-        } else if (status === REBALANCE_STATUS.RUNNING ||
-          (status === REBALANCE_STATUS.AWAITING_APPROVAL && !item.rebalance_plan)) {
-          // Running or awaiting approval without plan (still analyzing)
+        } else if (status === REBALANCE_STATUS.RUNNING) {
+          // Running status means still analyzing
           running.push(item);
         } else if (status === REBALANCE_STATUS.COMPLETED) {
           completed.push(item);
@@ -330,7 +326,6 @@ export default function RebalanceHistoryTable() {
         return <AlertCircle className="h-3 w-3" />;
       case REBALANCE_STATUS.RUNNING:
         return <Loader2 className="h-3 w-3 animate-spin" />;
-      case REBALANCE_STATUS.AWAITING_APPROVAL:
       case REBALANCE_STATUS.PENDING:
         return <Clock className="h-3 w-3" />;
       default:
@@ -349,7 +344,6 @@ export default function RebalanceHistoryTable() {
       case REBALANCE_STATUS.ERROR:
         return 'destructive';
       case REBALANCE_STATUS.RUNNING:
-      case REBALANCE_STATUS.AWAITING_APPROVAL:
       case REBALANCE_STATUS.PENDING:
         return 'secondary';
       default:

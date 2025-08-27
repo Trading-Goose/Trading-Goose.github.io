@@ -34,9 +34,6 @@ export function getStatusDisplayText(status: AnalysisStatus | RebalanceStatus): 
     case ANALYSIS_STATUS.COMPLETED:
     case REBALANCE_STATUS.COMPLETED:
       return 'Completed';
-    case ANALYSIS_STATUS.AWAITING_APPROVAL:
-    case REBALANCE_STATUS.AWAITING_APPROVAL:
-      return 'Awaiting Approval';
     case ANALYSIS_STATUS.CANCELLED:
     case REBALANCE_STATUS.CANCELLED:
       return 'Cancelled';

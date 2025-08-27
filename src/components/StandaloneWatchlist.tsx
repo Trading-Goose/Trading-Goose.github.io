@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useAlpacaConnectionStore } from "@/hooks/useAlpacaConnection";
 import StockTickerAutocomplete from "@/components/StockTickerAutocomplete";
 import { Plus, X, TrendingUp, TrendingDown, Loader2, RefreshCw, Play, Eye, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -50,6 +51,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
   const { user, isAuthenticated, apiSettings } = useAuth();
   const { getMaxParallelAnalysis } = useRBAC();
   const { toast } = useToast();
+  const { isConnected: isAlpacaConnected } = useAlpacaConnectionStore();
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [newTicker, setNewTicker] = useState('');
   const [loading, setLoading] = useState(true);
@@ -688,12 +690,18 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                       size="sm"
                       variant="outline"
                       className="w-full border border-slate-700"
+                      disabled={!isAlpacaConnected && !runningAnalyses.has(item.ticker)}
                       onClick={(e) => {
                         e.stopPropagation();
                         openAnalysis(item.ticker);
                       }}
                     >
-                      {runningAnalyses.has(item.ticker) ? (
+                      {!isAlpacaConnected && !runningAnalyses.has(item.ticker) ? (
+                        <>
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          Connection Error
+                        </>
+                      ) : runningAnalyses.has(item.ticker) ? (
                         <>
                           <Eye className="h-4 w-4 mr-1" />
                           View Progress
@@ -713,12 +721,18 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                       size="sm"
                       variant="outline"
                       className="border border-slate-700"
+                      disabled={!isAlpacaConnected && !runningAnalyses.has(item.ticker)}
                       onClick={(e) => {
                         e.stopPropagation();
                         openAnalysis(item.ticker);
                       }}
                     >
-                      {runningAnalyses.has(item.ticker) ? (
+                      {!isAlpacaConnected && !runningAnalyses.has(item.ticker) ? (
+                        <>
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          Connection Error
+                        </>
+                      ) : runningAnalyses.has(item.ticker) ? (
                         <>
                           <Eye className="h-4 w-4 mr-1" />
                           View Progress

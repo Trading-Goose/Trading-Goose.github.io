@@ -3,7 +3,7 @@
  */
 
 // Core Analysis Status Types (string-based, replacing numeric system)
-export type AnalysisStatus = 'pending' | 'running' | 'completed' | 'error' | 'cancelled' | 'awaiting_approval';
+export type AnalysisStatus = 'pending' | 'running' | 'completed' | 'error' | 'cancelled';
 
 /**
  * Analysis Status Definitions
@@ -13,8 +13,7 @@ export const ANALYSIS_STATUS = {
   RUNNING: 'running' as const,      // Replaces numeric 0
   COMPLETED: 'completed' as const,  // Replaces numeric 1
   ERROR: 'error' as const,          // Replaces numeric -1
-  CANCELLED: 'cancelled' as const,  // Replaces is_canceled boolean
-  AWAITING_APPROVAL: 'awaiting_approval' as const // For manual approval workflows
+  CANCELLED: 'cancelled' as const   // Replaces is_canceled boolean
 } as const;
 
 /**

@@ -42,8 +42,8 @@ export function useWorkflowData(setIsRebalanceContext: (value: boolean) => void)
     }
 
     // Determine completion using simple analysis status
-    const isCompleted = currentStatus === ANALYSIS_STATUS.COMPLETED;
-    const isRunning = !isCompleted && (currentStatus === ANALYSIS_STATUS.RUNNING || currentStatus === ANALYSIS_STATUS.PENDING);
+    const isCompleted = currentStatus === ANALYSIS_STATUS.COMPLETED || currentStatus === ANALYSIS_STATUS.ERROR;
+    const isRunning = currentStatus === ANALYSIS_STATUS.RUNNING || currentStatus === ANALYSIS_STATUS.PENDING;
 
     // Build workflow steps using unified agent status checking
     let baseSteps = getInitialWorkflowSteps();

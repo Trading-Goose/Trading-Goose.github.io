@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity, Clock, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity, Clock, AlertCircle, AlertTriangle } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useAlpacaConnectionStore } from "@/hooks/useAlpacaConnection";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -50,6 +51,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   const navigate = useNavigate();
   const { apiSettings, isAuthenticated, user } = useAuth();
   const { toast } = useToast();
+  const { isConnected: isAlpacaConnected } = useAlpacaConnectionStore();
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,18 +87,50 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
     setError(null);
 
     try {
-      // Try to fetch positions via edge function
-      // The edge function will handle checking if Alpaca is configured
-      const alpacaPositions = await alpacaAPI.getPositions().catch(err => {
-        console.warn("Failed to get positions:", err);
+      // Use batch endpoint to get account and positions together
+      const accountBatchData = await alpacaAPI.getBatchAccountData().catch(err => {
+        console.warn("Failed to get account/positions:", err);
         // Check if it's a configuration error
-        if (err.message?.includes('API settings not found') || err.message?.includes('not configured')) {
+        if (err.message?.includes('API settings not found') || 
+            err.message?.includes('not configured')) {
           console.log("Alpaca API not configured, showing empty positions");
           setError(null);
-          return [];
+          return { positions: [] };
         }
-        throw err;
+        // Check for timeout or connection issues - likely Alpaca is down
+        if (err.message?.includes('timeout') ||
+            err.message?.includes('504') ||
+            err.message?.includes('503') ||
+            err.message?.includes('Unable to connect to Alpaca') ||
+            err.message?.includes('Alpaca services appear to be down') ||
+            err.message?.includes('Alpaca rate limit') ||
+            err.message?.includes('https://app.alpaca.markets/dashboard/overview')) {
+          console.log("Alpaca API appears to be down or rate limited:", err.message);
+          
+          // Extract the meaningful error message
+          let errorMessage = err.message;
+          if (err.message?.includes('https://app.alpaca.markets/dashboard/overview')) {
+            // Already has the full message with link
+            errorMessage = err.message;
+          } else if (err.message?.includes('503') || err.message?.includes('504')) {
+            errorMessage = "Unable to connect to Alpaca. Please check if Alpaca services are operational at https://app.alpaca.markets/dashboard/overview";
+          }
+          
+          toast({
+            title: "Alpaca Connection Error",
+            description: errorMessage,
+            variant: "destructive",
+            duration: 10000, // Show for 10 seconds
+          });
+          setError(null);
+          return { positions: [] };
+        }
+        // For other errors, still return empty data instead of throwing
+        console.error("Error fetching account data, continuing with empty positions:", err);
+        return { positions: [] };
       });
+
+      const alpacaPositions = accountBatchData.positions || [];
 
       // If we got an empty array due to configuration, just return
       if (!alpacaPositions || alpacaPositions.length === 0) {
@@ -106,7 +140,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       }
 
       // Get batch data for all positions to get today's open prices
-      const symbols = alpacaPositions.map(pos => pos.symbol);
+      const symbols = alpacaPositions.map((pos: any) => pos.symbol);
       let batchData: any = {};
 
       if (symbols.length > 0) {
@@ -120,7 +154,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         }
       }
 
-      const formattedPositions: Position[] = alpacaPositions.map(pos => {
+      const formattedPositions: Position[] = alpacaPositions.map((pos: any) => {
         const currentPrice = parseFloat(pos.current_price);
         let dayChangePercent = parseFloat(pos.change_today); // Default to API value
 
@@ -239,14 +273,11 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         // Filter for active rebalances using correct logic
         const activeRebalances = allRebalances?.filter(rebalance => {
           const status = rebalance.status as RebalanceStatus;
-          // A rebalance is active if:
-          // - It's running or pending
-          // - It's awaiting approval BUT doesn't have a rebalance plan yet (still analyzing)
+          // A rebalance is active if it's running or pending
           const isActive = status === REBALANCE_STATUS.RUNNING || 
-                          status === REBALANCE_STATUS.PENDING ||
-                          (status === REBALANCE_STATUS.AWAITING_APPROVAL && !rebalance.rebalance_plan);
+                          status === REBALANCE_STATUS.PENDING;
           
-          console.log(`Rebalance ${rebalance.id}: status="${rebalance.status}", has_plan=${!!rebalance.rebalance_plan} → active=${isActive}`);
+          console.log(`Rebalance ${rebalance.id}: status="${rebalance.status}" → active=${isActive}`);
           return isActive;
         }) || [];
 
@@ -339,12 +370,21 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               ) : (
                 <Button
                   onClick={handleRebalanceClick}
-                  disabled={loading}
+                  disabled={loading || !isAlpacaConnected}
                   size="sm"
                   variant="default"
                 >
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                  Rebalance
+                  {!isAlpacaConnected ? (
+                    <>
+                      <AlertTriangle className="h-4 w-4 mr-1" />
+                      Connection Error
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Rebalance
+                    </>
+                  )}
                 </Button>
               )}
               <Button
@@ -483,13 +523,17 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
             // Use portfolio data from modal if available, otherwise calculate from positions
             const portfolioData = modalPortfolioData || {
               totalValue: positions.reduce((sum, p) => sum + (p.marketValue || 0), 0),
-              positions: selectedPositions.map(pos => ({
-                ticker: pos.ticker,
-                value: pos.currentValue || 0,
-                costBasis: pos.costBasis || (pos.currentShares * pos.averageCost) || 0,
-                dayChangePercent: pos.dayChangePercent || 0,
-                shares: pos.currentShares || 0
-              }))
+              positions: selectedPositions.map(pos => {
+                // Find the matching position from the actual positions array to get full data
+                const actualPosition = positions.find(p => p.symbol === pos.ticker);
+                return {
+                  ticker: pos.ticker,
+                  value: pos.currentValue || 0,
+                  costBasis: (pos.currentShares * (pos.avgPrice || 0)) || 0,
+                  dayChangePercent: actualPosition?.dayChange || 0,
+                  shares: pos.currentShares || 0
+                };
+              })
             };
 
             console.log('Sending to coordinator:', {

@@ -47,13 +47,6 @@ export function WorkflowSteps({
                 <div className={`p-1.5 rounded-full ${getStatusColor(step.status)}`}>
                   <Icon className="w-3 h-3" />
                 </div>
-                {step.status === 'running' && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
-                    <div className="text-[10px] font-medium text-primary">
-                      {getStepProgress(step)}%
-                    </div>
-                  </div>
-                )}
               </div>
               <span className="text-xs font-medium text-center leading-tight mt-1">{step.name}</span>
               <div className="flex items-center gap-0.5">

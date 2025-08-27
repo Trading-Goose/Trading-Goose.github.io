@@ -3,7 +3,7 @@
  */
 
 // Core Rebalance Status Types (simplified from complex state machine)
-export type RebalanceStatus = 'pending' | 'running' | 'awaiting_approval' | 'completed' | 'cancelled' | 'error';
+export type RebalanceStatus = 'pending' | 'running' | 'completed' | 'cancelled' | 'error';
 
 /**
  * Rebalance Status Definitions
@@ -11,7 +11,6 @@ export type RebalanceStatus = 'pending' | 'running' | 'awaiting_approval' | 'com
 export const REBALANCE_STATUS = {
   PENDING: 'pending' as const,              // New, for not started
   RUNNING: 'running' as const,              // Consolidates: initializing, opportunity_evaluation, analyzing, executing
-  AWAITING_APPROVAL: 'awaiting_approval' as const, // Replaces pending_approval
   COMPLETED: 'completed' as const,          // Keep as-is
   CANCELLED: 'cancelled' as const,          // Keep as-is
   ERROR: 'error' as const                   // Replaces failed
@@ -26,7 +25,7 @@ export const LEGACY_REBALANCE_STATUS_MAP = {
   'portfolio_management_started': REBALANCE_STATUS.RUNNING,
   'analyzing': REBALANCE_STATUS.RUNNING,
   'executing': REBALANCE_STATUS.RUNNING,
-  'pending_approval': REBALANCE_STATUS.AWAITING_APPROVAL,
+  'pending_approval': REBALANCE_STATUS.COMPLETED,  // Now maps to completed since orders have their own status
   'completed': REBALANCE_STATUS.COMPLETED,
   'cancelled': REBALANCE_STATUS.CANCELLED,
   'failed': REBALANCE_STATUS.ERROR

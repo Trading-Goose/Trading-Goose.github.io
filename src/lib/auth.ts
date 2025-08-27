@@ -22,9 +22,11 @@ export interface ApiSettings {
   ai_api_key: string;
   ai_model: string;
   polygon_api_key?: string;
-  alpaca_api_key?: string;
-  alpaca_api_secret?: string;
-  alpaca_is_paper?: boolean;
+  alpaca_paper_api_key?: string;
+  alpaca_paper_secret_key?: string;
+  alpaca_live_api_key?: string;
+  alpaca_live_secret_key?: string;
+  alpaca_paper_trading?: boolean;
   created_at?: string;
   updated_at?: string;
 }

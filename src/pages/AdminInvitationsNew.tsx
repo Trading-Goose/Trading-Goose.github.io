@@ -18,12 +18,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { 
-  Loader2, 
-  Mail, 
-  Send, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  Loader2,
+  Mail,
+  Send,
+  AlertCircle,
+  CheckCircle2,
   Clock,
   User,
   Calendar,
@@ -52,13 +52,13 @@ interface Invitation {
 export default function AdminInvitationsNew() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { 
-    isAuthenticated, 
-    isAdmin, 
-    isLoading: authLoading, 
+  const {
+    isAuthenticated,
+    isAdmin,
+    isLoading: authLoading,
     profile
   } = useAuth();
-  
+
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -80,7 +80,7 @@ export default function AdminInvitationsNew() {
   // Fetch existing invitations
   const fetchInvitations = async () => {
     if (!isAdmin) return;
-    
+
     setIsFetchingInvitations(true);
     try {
       // Use the new function that checks last_sign_in_at
@@ -95,7 +95,7 @@ export default function AdminInvitationsNew() {
           .select('*')
           .order('created_at', { ascending: false })
           .limit(50);
-        
+
         if (!fallbackError && fallbackData) {
           setInvitations(fallbackData as Invitation[]);
           const confirmed = fallbackData.filter(inv => inv.confirmed_user_id != null).length;
@@ -114,11 +114,11 @@ export default function AdminInvitationsNew() {
 
       if (data) {
         setInvitations(data as Invitation[]);
-        
+
         // Calculate stats - use is_truly_confirmed for accurate confirmation status
         const confirmed = data.filter(inv => inv.is_truly_confirmed === true).length;
         const pending = data.filter(inv => !inv.is_truly_confirmed && inv.status !== 'expired').length;
-        
+
         setStats({
           totalSent: data.length,
           confirmed,
@@ -151,7 +151,7 @@ export default function AdminInvitationsNew() {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invitation`,
+        `${import.meta.env.SUPABASE_URL}/functions/v1/send-invitation`,
         {
           method: 'POST',
           headers: {
@@ -166,7 +166,7 @@ export default function AdminInvitationsNew() {
       );
 
       const result = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.error || 'Failed to send invitation');
       }
@@ -174,22 +174,22 @@ export default function AdminInvitationsNew() {
       if (result.success) {
         // Show appropriate message based on whether email was sent
         let description = result.message || `Invitation created for ${email}`;
-        
+
         // If email wasn't sent, show the registration URL
         if (result.invitation && !result.emailSent) {
           description += `. Registration URL: ${result.invitation.registrationUrl}`;
         }
-        
+
         toast({
           title: "Success",
           description: description,
           duration: result.emailSent ? 3000 : 10000, // Show longer if manual action needed
         });
-        
+
         // Clear form
         setEmail("");
         setName("");
-        
+
         // Refresh invitations list
         fetchInvitations();
       } else {
@@ -209,12 +209,12 @@ export default function AdminInvitationsNew() {
 
   const getStatusBadge = (invitation: Invitation) => {
     // Check if user has actually signed in (truly confirmed)
-    const actualStatus = invitation.is_truly_confirmed === true ? 'confirmed' : 
-                        invitation.is_truly_confirmed === false ? 'sent' :
-                        // Fallback for old data without is_truly_confirmed field
-                        invitation.confirmed_user_id ? 'sent' : 
-                        (invitation.status === 'confirmed' && !invitation.confirmed_user_id ? 'pending' : invitation.status);
-    
+    const actualStatus = invitation.is_truly_confirmed === true ? 'confirmed' :
+      invitation.is_truly_confirmed === false ? 'sent' :
+        // Fallback for old data without is_truly_confirmed field
+        invitation.confirmed_user_id ? 'sent' :
+          (invitation.status === 'confirmed' && !invitation.confirmed_user_id ? 'pending' : invitation.status);
+
     switch (actualStatus) {
       case 'confirmed':
         return <Badge variant="success" className="flex items-center gap-1">
@@ -369,8 +369,8 @@ export default function AdminInvitationsNew() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={isLoading || !email}
                   >
                     {isLoading ? (
@@ -501,7 +501,7 @@ export default function AdminInvitationsNew() {
                     Provide the user's email address
                   </p>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-semibold">
@@ -513,7 +513,7 @@ export default function AdminInvitationsNew() {
                     System sends secure magic link
                   </p>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-semibold">
@@ -525,7 +525,7 @@ export default function AdminInvitationsNew() {
                     Clicks link to activate account
                   </p>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-semibold">

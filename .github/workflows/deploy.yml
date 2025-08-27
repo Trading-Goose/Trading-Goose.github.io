@@ -39,7 +39,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           # Disable public registration for production
-          VITE_ENABLE_PUBLIC_REGISTRATION: 'false'
+          ENABLE_PUBLIC_REGISTRATION: 'false'
           # Set to production to enable console stripping
           NODE_ENV: production
         run: npm run build

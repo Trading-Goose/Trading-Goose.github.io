@@ -178,13 +178,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         let status: RebalanceStatus = convertLegacyRebalanceStatus(rebalanceRequest.status);
         
         // If we're in legacy pending_trades state but have a rebalance plan (portfolio manager is done), 
-        // consider it as awaiting_approval since the planning is complete
+        // consider it as completed since the planning is complete
         if (rebalanceRequest.status === 'pending_trades' && rebalanceRequest.rebalance_plan) {
-          status = REBALANCE_STATUS.AWAITING_APPROVAL;
+          status = REBALANCE_STATUS.COMPLETED;
         }
         
         const isRunning = isRebalanceActive(status);
-        const isPendingApproval = status === REBALANCE_STATUS.AWAITING_APPROVAL;
+        const isPendingApproval = false; // No longer using AWAITING_APPROVAL status
         const isCompleted = status === REBALANCE_STATUS.COMPLETED;
         const isCancelled = status === REBALANCE_STATUS.CANCELLED;
         const isFailed = status === REBALANCE_STATUS.ERROR;
@@ -696,12 +696,6 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                     {getStatusDisplayText(REBALANCE_STATUS.RUNNING)}
                   </Badge>
                 )}
-                {rebalanceData?.status === REBALANCE_STATUS.AWAITING_APPROVAL && (
-                  <Badge variant="pending" className="text-sm">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {getStatusDisplayText(REBALANCE_STATUS.AWAITING_APPROVAL)}
-                  </Badge>
-                )}
                 {rebalanceData?.status === REBALANCE_STATUS.COMPLETED && (
                   <Badge variant="completed" className="text-sm">
                     <CheckCircle className="w-3 h-3 mr-1" />
@@ -721,17 +715,20 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                   </Badge>
                 )}
               </div>
-              {rebalanceData?.completedAt && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="w-4 h-4" />
-                  Completed {formatDistanceToNow(new Date(rebalanceData.completedAt))} ago
-                </div>
-              )}
             </div>
-            <DialogDescription className="mt-2">
-              {isLiveRebalance
-                ? "Real-time rebalancing progress and portfolio adjustments"
-                : "Review rebalancing recommendations and related analyses"}
+            <DialogDescription className="mt-2 flex justify-between items-center">
+              <span>
+                {isLiveRebalance
+                  ? "Real-time rebalancing progress and portfolio adjustments"
+                  : "Review rebalancing recommendations and related analyses"}
+              </span>
+              {rebalanceData && (rebalanceData.completedAt || rebalanceData.updated_at || rebalanceData.created_at) && (
+                <span className="text-xs text-muted-foreground">
+                  Last updated: {formatDistanceToNow(
+                    new Date(rebalanceData.completedAt || rebalanceData.updated_at || rebalanceData.created_at)
+                  )} ago
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 

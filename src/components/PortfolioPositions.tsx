@@ -404,7 +404,13 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowScheduleListModal(true)}
+                onClick={() => {
+                  if (!hasRebalanceAccess()) {
+                    setShowRebalanceAccessAlert(true);
+                    return;
+                  }
+                  setShowScheduleListModal(true);
+                }}
               >
                 <Clock className="h-4 w-4" />
               </Button>

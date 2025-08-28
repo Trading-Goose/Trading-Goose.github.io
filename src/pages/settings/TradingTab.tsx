@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -10,16 +11,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  TrendingUp, 
+import {
+  TrendingUp,
   TrendingDown,
-  Save, 
+  Save,
   AlertCircle,
   Check,
   Eye,
   EyeOff,
   RefreshCw,
   DollarSign,
+  Lock,
 } from "lucide-react";
 import type { TradingTabProps } from "./types";
 
@@ -46,6 +48,8 @@ export default function TradingTab({
   setDefaultPositionSizeDollars,
   toggleShowKey,
   handleSaveTab,
+  canUseLiveTrading = true,
+  canUseAutoTrading = true,
 }: TradingTabProps) {
   return (
     <Card>
@@ -84,19 +88,35 @@ export default function TradingTab({
 
           {/* Trading Mode Toggle */}
           <div className="rounded-lg border bg-muted/30 p-4">
-            <div className="flex items-start space-x-3">
+            {!canUseLiveTrading && (
+              <Alert className="mb-3">
+                <Lock className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Live trading requires a higher subscription plan. Paper trading is available for testing.
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className={`flex items-start space-x-3 ${!canUseLiveTrading ? 'opacity-50' : ''}`} >
               <div className="flex items-center h-5">
                 <input
                   type="checkbox"
                   id="paper-trading"
                   checked={alpacaPaperTrading}
-                  onChange={(e) => setAlpacaPaperTrading(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-2 focus:ring-2 focus:ring-offset-background transition-all cursor-pointer"
+                  onChange={(e) => {
+                    // If trying to switch to live trading, check permission
+                    if (!e.target.checked && !canUseLiveTrading) {
+                      return; // Don't allow switching to live trading
+                    }
+                    setAlpacaPaperTrading(e.target.checked);
+                  }}
+                  disabled={!canUseLiveTrading && !alpacaPaperTrading}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-2 focus:ring-2 focus:ring-offset-background transition-all cursor-pointer disabled:cursor-not-allowed"
                 />
               </div>
               <div className="flex-1">
-                <Label htmlFor="paper-trading" className="text-base font-medium cursor-pointer leading-none">
+                <Label htmlFor="paper-trading" className="text-base font-medium cursor-pointer leading-none flex items-center gap-2">
                   Use Paper Trading
+                  {!canUseLiveTrading && !alpacaPaperTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
                 </Label>
                 <p className="text-sm text-muted-foreground mt-1">
                   Recommended for testing strategies with simulated money
@@ -112,7 +132,7 @@ export default function TradingTab({
             <RefreshCw className="h-4 w-4" />
             Trade Execution Settings
           </h3>
-          
+
           {/* User Risk Level */}
           <div className="space-y-2">
             <Label htmlFor="risk-level">Risk Tolerance Level</Label>
@@ -142,18 +162,18 @@ export default function TradingTab({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {userRiskLevel === 'conservative' && 
+              {userRiskLevel === 'conservative' &&
                 "Lower position sizes, focuses on capital preservation and steady growth"
               }
-              {userRiskLevel === 'moderate' && 
+              {userRiskLevel === 'moderate' &&
                 "Balanced approach between risk and reward, suitable for most investors"
               }
-              {userRiskLevel === 'aggressive' && 
+              {userRiskLevel === 'aggressive' &&
                 "Larger position sizes, maximizes growth potential with higher risk tolerance"
               }
             </p>
           </div>
-          
+
           {/* Default Position Size */}
           <div className="space-y-2">
             <Label htmlFor="position-size">Default Position Size</Label>
@@ -173,27 +193,37 @@ export default function TradingTab({
               Base amount in dollars for each trade position. Will be adjusted based on confidence and risk level.
             </p>
           </div>
-          
+
           {/* Auto-Execute Trade Orders */}
-          <div className="rounded-lg border bg-muted/30 p-4">
-            <div className="flex items-start space-x-3">
+          <div className={`rounded-lg border bg-muted/30 p-4 `}>
+            {!canUseAutoTrading && (
+              <Alert className="mb-3">
+                <Lock className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Auto-execution requires a higher subscription plan. Upgrade to enable automatic trade execution.
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className={`flex items-start space-x-3 ${!canUseAutoTrading ? 'opacity-50' : ''}`} >
               <div className="flex items-center h-5">
                 <input
                   type="checkbox"
                   id="auto-execute"
                   checked={autoExecuteTrades}
                   onChange={(e) => setAutoExecuteTrades(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-2 focus:ring-2 focus:ring-offset-background transition-all cursor-pointer"
+                  disabled={!canUseAutoTrading}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-2 focus:ring-2 focus:ring-offset-background transition-all cursor-pointer disabled:cursor-not-allowed"
                 />
               </div>
               <div className="flex-1">
-                <Label htmlFor="auto-execute" className="text-base font-medium cursor-pointer leading-none">
+                <Label htmlFor="auto-execute" className="text-base font-medium cursor-pointer leading-none flex items-center gap-2">
                   Auto-Execute Trade Orders
+                  {!canUseAutoTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
                 </Label>
                 <p className="text-sm text-muted-foreground mt-1">
                   When enabled, approved trade recommendations will be automatically executed without manual confirmation
                 </p>
-                {autoExecuteTrades && (
+                {autoExecuteTrades && canUseAutoTrading && (
                   <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
                     <p className="text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
@@ -222,7 +252,7 @@ export default function TradingTab({
             <p className="text-sm text-muted-foreground mb-4">
               Test strategies safely with simulated money. No real funds at risk.
             </p>
-            
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
@@ -292,8 +322,18 @@ export default function TradingTab({
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
             Live Trading Credentials
+            {!canUseLiveTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
           </h3>
-          <div className="rounded-lg border bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10 p-4">
+
+          {!canUseLiveTrading ? (
+            <Alert>
+              <Lock className="h-4 w-4" />
+              <AlertDescription>
+                Live trading requires a higher subscription plan. Upgrade to enable real money trading capabilities.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          <div className={`rounded-lg border bg-red-500/10 dark:bg-red-500/5 border-red-500/20 dark:border-red-500/10 p-4 ${!canUseLiveTrading ? 'opacity-50' : ''}`}>
             <div className="flex items-center gap-2 mb-2">
               <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
               <span className="text-sm font-medium">
@@ -303,7 +343,6 @@ export default function TradingTab({
             <p className="text-sm text-muted-foreground mb-4">
               <strong>⚠️ Warning:</strong> These credentials will execute real trades with actual money. Use extreme caution and ensure you understand the risks.
             </p>
-            
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
@@ -321,6 +360,7 @@ export default function TradingTab({
                     placeholder="Enter your live trading API key"
                     value={alpacaLiveApiKey}
                     onChange={(e) => setAlpacaLiveApiKey(e.target.value)}
+                    disabled={!canUseLiveTrading}
                     className="font-mono text-sm"
                   />
                   <Button
@@ -329,6 +369,7 @@ export default function TradingTab({
                     size="icon"
                     className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
                     onClick={() => toggleShowKey('alpacaLiveApiKey')}
+                    disabled={!canUseLiveTrading}
                   >
                     {showKeys.alpacaLiveApiKey ? (
                       <EyeOff className="h-4 w-4" />
@@ -347,6 +388,7 @@ export default function TradingTab({
                     placeholder="Enter your live trading secret key"
                     value={alpacaLiveSecretKey}
                     onChange={(e) => setAlpacaLiveSecretKey(e.target.value)}
+                    disabled={!canUseLiveTrading}
                     className="font-mono text-sm"
                   />
                   <Button
@@ -355,6 +397,7 @@ export default function TradingTab({
                     size="icon"
                     className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
                     onClick={() => toggleShowKey('alpacaLiveSecretKey')}
+                    disabled={!canUseLiveTrading}
                   >
                     {showKeys.alpacaLiveSecretKey ? (
                       <EyeOff className="h-4 w-4" />
@@ -370,13 +413,11 @@ export default function TradingTab({
 
         {/* Save Button for Trading Tab */}
         <div className="flex justify-end pt-4">
-          <Button 
+          <Button
             onClick={() => {
               console.log('Button clicked - calling handleSaveTab for trading');
-              handleSaveTab('trading').catch(err => {
-                console.error('Error in handleSaveTab:', err);
-              });
-            }} 
+              handleSaveTab('trading');
+            }}
             size="lg"
           >
             <Save className="w-4 h-4 mr-2" />

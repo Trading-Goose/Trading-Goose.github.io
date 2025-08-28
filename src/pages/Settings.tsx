@@ -24,6 +24,7 @@ import { supabaseHelpers, supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import type { ApiSettings } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useRBAC } from "@/hooks/useRBAC";
 
 // Import tab components
 import ProvidersTab from "./settings/ProvidersTab";
@@ -75,6 +76,13 @@ export default function SettingsPage() {
   const [searchParams] = useSearchParams();
   const { user, apiSettings, updateApiSettings, isAuthenticated, isLoading, initialize } = useAuth();
   const { toast } = useToast();
+  const { 
+    hasRebalanceAccess, 
+    hasOpportunityAgentAccess, 
+    hasAdditionalProviderAccess,
+    canUseLiveTrading,
+    canUseAutoTrading
+  } = useRBAC();
 
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -1467,6 +1475,7 @@ export default function SettingsPage() {
               removeAiProvider={removeAiProvider}
               handleSaveTab={handleSaveTab}
               getModelOptions={getModelOptions}
+              hasAdditionalProviderAccess={hasAdditionalProviderAccess()}
             />
           </TabsContent>
 
@@ -1536,6 +1545,7 @@ export default function SettingsPage() {
               getModelOptions={getModelOptions}
               getConfiguredProviders={getConfiguredProviders}
               getDefaultModelValue={getDefaultModelValue}
+              hasAgentConfigAccess={hasAdditionalProviderAccess()}
             />
           </TabsContent>
 
@@ -1571,6 +1581,8 @@ export default function SettingsPage() {
               getModelOptions={getModelOptions}
               getConfiguredProviders={getConfiguredProviders}
               getDefaultModelValue={getDefaultModelValue}
+              hasOpportunityAgentAccess={hasOpportunityAgentAccess()}
+              hasRebalanceAccess={hasRebalanceAccess()}
             />
           </TabsContent>
 
@@ -1598,6 +1610,8 @@ export default function SettingsPage() {
               setDefaultPositionSizeDollars={setDefaultPositionSizeDollars}
               toggleShowKey={toggleShowKey}
               handleSaveTab={handleSaveTab}
+              canUseLiveTrading={canUseLiveTrading()}
+              canUseAutoTrading={canUseAutoTrading()}
             />
           </TabsContent>
         </Tabs>

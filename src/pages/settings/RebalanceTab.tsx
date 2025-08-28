@@ -11,12 +11,14 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { 
-  RefreshCw, 
-  Save, 
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  RefreshCw,
+  Save,
   AlertCircle,
   Check,
   Info,
+  Lock,
 } from "lucide-react";
 import type { RebalanceTabProps } from "./types";
 
@@ -51,9 +53,11 @@ export default function RebalanceTab({
   getModelOptions,
   getConfiguredProviders,
   getDefaultModelValue,
+  hasOpportunityAgentAccess = true,
+  hasRebalanceAccess = true,
 }: RebalanceTabProps) {
   const defaultProviderId = aiProviders.length > 0 ? aiProviders[0].id : '1';
-  
+
   return (
     <Card>
       <CardHeader>
@@ -66,10 +70,22 @@ export default function RebalanceTab({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {!hasRebalanceAccess && (
+          <Alert className="mb-6">
+            <Lock className="h-4 w-4" />
+            <AlertDescription>
+              Rebalance configuration requires a higher subscription plan. Upgrade to customize portfolio rebalancing settings.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Rebalance Settings */}
-        <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold">Rebalance Settings</h3>
-          
+        <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasRebalanceAccess ? 'opacity-50' : ''}`}>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            Rebalance Settings
+            {!hasRebalanceAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+          </h3>
+
           {/* Rebalance Threshold */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
@@ -84,6 +100,7 @@ export default function RebalanceTab({
                 max={20}
                 step={1}
                 className="flex-1"
+                disabled={!hasRebalanceAccess}
               />
               <span className="w-12 text-center font-medium">{rebalanceThreshold}%</span>
             </div>
@@ -91,7 +108,7 @@ export default function RebalanceTab({
               Trigger rebalance when portfolio drift exceeds this percentage
             </p>
           </div>
-          
+
           {/* Position Size Limits */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -102,6 +119,7 @@ export default function RebalanceTab({
                 onChange={(e) => setRebalanceMinPositionSize(Number(e.target.value))}
                 min={0}
                 step={100}
+                disabled={!hasRebalanceAccess}
               />
               <p className="text-xs text-muted-foreground">
                 Minimum dollar amount per position
@@ -115,13 +133,14 @@ export default function RebalanceTab({
                 onChange={(e) => setRebalanceMaxPositionSize(Number(e.target.value))}
                 min={0}
                 step={1000}
+                disabled={!hasRebalanceAccess}
               />
               <p className="text-xs text-muted-foreground">
                 Maximum dollar amount per position
               </p>
             </div>
           </div>
-          
+
           {/* Portfolio Allocation */}
           <div className="space-y-4">
             <div className="space-y-2">
@@ -139,6 +158,7 @@ export default function RebalanceTab({
                     max={100}
                     step={5}
                     className="w-full"
+                    disabled={!hasRebalanceAccess}
                   />
                 </div>
                 <div className="space-y-2">
@@ -155,17 +175,36 @@ export default function RebalanceTab({
           </div>
         </div>
 
+        {!hasOpportunityAgentAccess && hasRebalanceAccess && (
+          <Alert className="mb-4">
+            <Lock className="h-4 w-4" />
+            <AlertDescription>
+              Opportunity Agent access requires a higher subscription plan.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Opportunity Agent Configuration */}
-        <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold">Opportunity Agent</h3>
-          <p className="text-sm text-muted-foreground">
-            Identifies market opportunities when portfolio is within threshold
-          </p>
+        <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasOpportunityAgentAccess ? 'opacity-50' : ''}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                Opportunity Agent
+                {!hasOpportunityAgentAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Identifies market opportunities when portfolio is within threshold
+              </p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>AI Provider</Label>
-              <Select value={opportunityAgentProviderId} onValueChange={setOpportunityAgentProviderId}>
+              <Select
+                value={opportunityAgentProviderId}
+                onValueChange={setOpportunityAgentProviderId}
+                disabled={!hasOpportunityAgentAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
@@ -182,8 +221,8 @@ export default function RebalanceTab({
               <Label>Model</Label>
               {opportunityAgentProviderId === defaultProviderId ? (
                 <div>
-                  <Select 
-                    disabled 
+                  <Select
+                    disabled
                     value={getDefaultModelValue()}
                   >
                     <SelectTrigger>
@@ -196,9 +235,10 @@ export default function RebalanceTab({
                 </div>
               ) : (
                 <div>
-                  <Select 
-                    value={opportunityAgentModel} 
+                  <Select
+                    value={opportunityAgentModel}
                     onValueChange={setOpportunityAgentModel}
+                    disabled={!hasOpportunityAgentAccess}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select model" />
@@ -217,6 +257,7 @@ export default function RebalanceTab({
                       placeholder="Enter custom model name *"
                       value={opportunityCustomModel}
                       onChange={(e) => setOpportunityCustomModel(e.target.value)}
+                      disabled={!hasOpportunityAgentAccess}
                       required
                     />
                   )}
@@ -229,9 +270,10 @@ export default function RebalanceTab({
           </div>
           <div className="space-y-2">
             <Label>Market Data Time Range</Label>
-            <Select 
-              value={opportunityMarketRange} 
+            <Select
+              value={opportunityMarketRange}
               onValueChange={setOpportunityMarketRange}
+              disabled={!hasOpportunityAgentAccess}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select time range" />
@@ -261,6 +303,7 @@ export default function RebalanceTab({
                 max={8000}
                 step={500}
                 className="flex-1"
+                disabled={!hasOpportunityAgentAccess}
               />
               <span className="w-16 text-center font-medium">{opportunityMaxTokens}</span>
             </div>
@@ -272,9 +315,10 @@ export default function RebalanceTab({
 
         {/* Save Button for Rebalance Tab */}
         <div className="flex justify-end pt-4">
-          <Button 
-            onClick={() => handleSaveTab('rebalance')} 
+          <Button
+            onClick={() => handleSaveTab('rebalance')}
             size="lg"
+            disabled={!hasRebalanceAccess && !hasOpportunityAgentAccess}
           >
             <Save className="w-4 h-4 mr-2" />
             Save Rebalance Configuration

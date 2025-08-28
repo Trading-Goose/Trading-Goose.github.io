@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -39,10 +40,12 @@ import {
   Settings,
   Eye,
   Info,
+  Lock,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useRBAC } from "@/hooks/useRBAC";
 import ScheduleRebalanceModal from "./ScheduleRebalanceModal";
 
 interface ScheduleListModalProps {
@@ -72,17 +75,35 @@ interface Schedule {
 export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { getScheduleResolution, getMaxScheduledRebalances } = useRBAC();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [deletingSchedule, setDeletingSchedule] = useState<Schedule | null>(null);
 
+  // Get allowed schedule resolutions and max schedules for the user
+  const allowedResolutions = getScheduleResolution();
+  const maxSchedules = getMaxScheduledRebalances();
+  const isAtScheduleLimit = schedules.length >= maxSchedules && maxSchedules > 0;
+
   useEffect(() => {
     if (isOpen && user) {
       loadSchedules();
     }
   }, [isOpen, user]);
+
+  const handleAddSchedule = () => {
+    if (isAtScheduleLimit) {
+      toast({
+        title: "Schedule Limit Reached",
+        description: `You have reached the maximum of ${maxSchedules} scheduled rebalances allowed by your subscription plan.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowAddModal(true);
+  };
 
   const loadSchedules = async () => {
     setLoading(true);
@@ -108,6 +129,17 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
   };
 
   const handleDelete = async (schedule: Schedule) => {
+    // Check access before deleting
+    if (!isScheduleAccessible(schedule)) {
+      toast({
+        title: "Access Restricted",
+        description: "Your subscription plan doesn't allow deleting this schedule frequency",
+        variant: "destructive",
+      });
+      setDeletingSchedule(null);
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('rebalance_schedules')
@@ -135,7 +167,52 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
     }
   };
 
+  // Check if schedule is within user's access level
+  const isScheduleAccessible = (schedule: Schedule): boolean => {
+    // If no resolutions are defined, allow all (backward compatibility)
+    if (!allowedResolutions || allowedResolutions.length === 0) {
+      return true;
+    }
+
+    // Check if the schedule's frequency matches allowed resolutions
+    // The database uses "Day", "Week", "Month" (capitalized)
+
+    // Daily schedules (interval_value = 1, interval_unit = 'days')
+    if (schedule.interval_unit === 'days' && schedule.interval_value === 1) {
+      return allowedResolutions.includes('Day');
+    }
+
+    // Weekly schedules (any interval in weeks)
+    if (schedule.interval_unit === 'weeks') {
+      return allowedResolutions.includes('Week');
+    }
+
+    // Monthly schedules (any interval in months)
+    if (schedule.interval_unit === 'months') {
+      return allowedResolutions.includes('Month');
+    }
+
+    // For custom day intervals (e.g., every 2 days, 3 days, etc.)
+    if (schedule.interval_unit === 'days' && schedule.interval_value > 1) {
+      // If they have Day access, they can use custom day intervals
+      return allowedResolutions.includes('Day');
+    }
+
+    // Default to not accessible for unknown types
+    return false;
+  };
+
   const handleToggleEnabled = async (schedule: Schedule) => {
+    // Check access before toggling
+    if (!isScheduleAccessible(schedule)) {
+      toast({
+        title: "Access Restricted",
+        description: "Your subscription plan doesn't allow modifying this schedule frequency",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('rebalance_schedules')
@@ -146,8 +223,8 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
 
       toast({
         title: schedule.enabled ? "Schedule disabled" : "Schedule enabled",
-        description: schedule.enabled 
-          ? "The schedule has been paused" 
+        description: schedule.enabled
+          ? "The schedule has been paused"
           : "The schedule has been activated",
       });
 
@@ -166,17 +243,17 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
   const formatFrequency = (schedule: Schedule) => {
     const value = schedule.interval_value;
     const unit = schedule.interval_unit;
-    
+
     if (value === 1) {
       switch (unit) {
-        case 'days': return 'Daily';
-        case 'weeks': return 'Weekly';
-        case 'months': return 'Monthly';
+        case 'days': return 'Day';
+        case 'weeks': return 'Week';
+        case 'months': return 'Month';
       }
     } else if (value === 2 && unit === 'weeks') {
       return 'Bi-weekly';
     }
-    
+
     return `Every ${value} ${unit}`;
   };
 
@@ -199,13 +276,13 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
   const calculateNextRun = (schedule: Schedule): Date | null => {
     const now = new Date();
     const [hours, minutes] = schedule.time_of_day.split(':').map(Number);
-    
+
     // If never executed, calculate from current date
     if (!schedule.last_executed_at) {
       // Create a date in the schedule's timezone
       const nextRun = new Date(now);
       nextRun.setHours(hours, minutes, 0, 0);
-      
+
       // If that time has already passed today, add the interval
       if (nextRun <= now) {
         switch (schedule.interval_unit) {
@@ -220,14 +297,14 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
             break;
         }
       }
-      
+
       return nextRun;
     }
-    
+
     // Calculate from last execution
     const lastRun = new Date(schedule.last_executed_at);
     let nextRun = new Date(lastRun);
-    
+
     // Add the interval
     switch (schedule.interval_unit) {
       case 'days':
@@ -240,10 +317,10 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
         nextRun.setMonth(nextRun.getMonth() + schedule.interval_value);
         break;
     }
-    
+
     // Set the proper time
     nextRun.setHours(hours, minutes, 0, 0);
-    
+
     // IMPORTANT: If the calculated next run is in the past (e.g., schedule was paused),
     // advance it to the next valid future time
     while (nextRun <= now) {
@@ -259,28 +336,28 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
           break;
       }
     }
-    
+
     return nextRun;
   };
 
   const formatNextRun = (schedule: Schedule) => {
     if (!schedule.enabled) return 'Paused';
-    
+
     const nextRun = calculateNextRun(schedule);
     if (!nextRun) return 'Not scheduled';
-    
+
     const now = new Date();
     const diffMs = nextRun.getTime() - now.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
-    
+
     if (diffMs < 0) return 'Overdue';
     if (diffHours < 1) return 'Within an hour';
     if (diffHours < 24) return `In ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
     if (diffDays < 7) return `In ${diffDays} day${diffDays > 1 ? 's' : ''}`;
-    
-    return nextRun.toLocaleDateString('en-US', { 
-      month: 'short', 
+
+    return nextRun.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit'
@@ -326,163 +403,189 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
                 <p className="text-sm text-muted-foreground text-center mb-6">
                   Create your first automated rebalancing schedule to maintain your portfolio allocation
                 </p>
-                <Button onClick={() => setShowAddModal(true)}>
+                <Button
+                  onClick={handleAddSchedule}
+                  disabled={isAtScheduleLimit}
+                >
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Schedule
+                  {isAtScheduleLimit ? `Limit Reached (${maxSchedules} max)` : 'Add Schedule'}
                 </Button>
               </div>
             ) : (
               <ScrollArea className="h-full">
                 <div className="p-6 space-y-4">
-                  {schedules.map((schedule, index) => (
-                    <Card key={schedule.id} className="p-4">
-                      <div className="space-y-3">
-                        {/* Header */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3">
-                            <div className="mt-1">
-                              {schedule.enabled ? (
-                                <Badge variant="default" className="text-xs">
-                                  Active
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary" className="text-xs">
-                                  Paused
-                                </Badge>
+                  {schedules.map((schedule, index) => {
+                    const isAccessible = isScheduleAccessible(schedule);
+                    return (
+                      <Card key={schedule.id} className="p-4">
+                        {!isAccessible && (
+                          <Alert className="mb-3">
+                            <Lock className="h-4 w-4" />
+                            <AlertDescription className="text-xs">
+                              This schedule requires a higher subscription plan to modify.
+                              {schedule.interval_unit === 'days' && schedule.interval_value === 1 && " Daily scheduling requires an upgraded plan."}
+                              {schedule.interval_unit === 'weeks' && " Weekly scheduling requires an upgraded plan."}
+                              {schedule.interval_unit === 'months' && " Monthly scheduling requires an upgraded plan."}
+                              {allowedResolutions.length > 0 && (
+                                <> Your current plan allows: {allowedResolutions.map(res =>
+                                  res === 'Day' ? 'days' :
+                                    res === 'Week' ? 'weeks' :
+                                      res === 'Month' ? 'months' : res
+                                ).join(', ')} scheduling.</>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        <div className={`space-y-3 ${!isAccessible ? 'opacity-60' : ''} `}>
+                          {/* Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3">
+                              <div className="mt-1">
+                                {schedule.enabled ? (
+                                  <Badge variant="default" className="text-xs">
+                                    Active
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Paused
+                                  </Badge>
+                                )}
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-sm">
+                                  Schedule #{index + 1}
+                                </h4>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Created {new Date(schedule.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleEnabled(schedule)}
+                                disabled={!isAccessible}
+                              >
+                                {schedule.enabled ? (
+                                  <>
+                                    <XCircle className="w-4 h-4 mr-1" />
+                                    Pause
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    Enable
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeletingSchedule(schedule)}
+                                disabled={!isAccessible}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <Separator />
+
+                          {/* Schedule Details */}
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground mb-1">Frequency</p>
+                              <p className="font-medium">{formatFrequency(schedule)}</p>
+                              {schedule.interval_unit === 'weeks' && schedule.day_of_week && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  On {formatDaysList(schedule.day_of_week)}
+                                </p>
+                              )}
+                              {schedule.interval_unit === 'months' && schedule.day_of_month && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Day {schedule.day_of_month.join(', ')} of month
+                                </p>
                               )}
                             </div>
                             <div>
-                              <h4 className="font-semibold text-sm">
-                                Schedule #{index + 1}
-                              </h4>
+                              <p className="text-muted-foreground mb-1">Time</p>
+                              <p className="font-medium">{formatTime(schedule.time_of_day)}</p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                Created {new Date(schedule.created_at).toLocaleDateString()}
+                                {schedule.timezone}
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleToggleEnabled(schedule)}
-                            >
-                              {schedule.enabled ? (
-                                <>
-                                  <XCircle className="w-4 h-4 mr-1" />
-                                  Pause
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="w-4 h-4 mr-1" />
-                                  Enable
-                                </>
+
+                          {/* Stock Selection */}
+                          <div className="text-sm">
+                            <p className="text-muted-foreground mb-1">Stock Selection</p>
+                            <div className="flex items-center gap-2">
+                              {schedule.include_all_positions ? (
+                                <Badge variant="outline" className="text-xs">
+                                  All Positions
+                                </Badge>
+                              ) : schedule.selected_tickers.length > 0 ? (
+                                <Badge variant="outline" className="text-xs">
+                                  {schedule.selected_tickers.length} Selected Stocks
+                                </Badge>
+                              ) : null}
+                              {schedule.include_watchlist && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Includes Watchlist
+                                </Badge>
                               )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeletingSchedule(schedule)}
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </div>
-
-                        <Separator />
-
-                        {/* Schedule Details */}
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground mb-1">Frequency</p>
-                            <p className="font-medium">{formatFrequency(schedule)}</p>
-                            {schedule.interval_unit === 'weeks' && schedule.day_of_week && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                On {formatDaysList(schedule.day_of_week)}
-                              </p>
-                            )}
-                            {schedule.interval_unit === 'months' && schedule.day_of_month && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Day {schedule.day_of_month.join(', ')} of month
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground mb-1">Time</p>
-                            <p className="font-medium">{formatTime(schedule.time_of_day)}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {schedule.timezone}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Stock Selection */}
-                        <div className="text-sm">
-                          <p className="text-muted-foreground mb-1">Stock Selection</p>
-                          <div className="flex items-center gap-2">
-                            {schedule.include_all_positions ? (
-                              <Badge variant="outline" className="text-xs">
-                                All Positions
-                              </Badge>
-                            ) : schedule.selected_tickers.length > 0 ? (
-                              <Badge variant="outline" className="text-xs">
-                                {schedule.selected_tickers.length} Selected Stocks
-                              </Badge>
-                            ) : null}
-                            {schedule.include_watchlist && (
-                              <Badge variant="outline" className="text-xs">
-                                <Eye className="w-3 h-3 mr-1" />
-                                Includes Watchlist
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        <Separator />
-
-                        {/* Execution Status */}
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <div className="flex items-center gap-1 text-muted-foreground mb-1">
-                              <span>Next Run</span>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="w-3 h-3 cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-xs">
-                                    <p className="text-xs">
-                                      Calculated based on: {schedule.last_executed_at ? 'last execution' : 'schedule start'} + {schedule.interval_value} {schedule.interval_unit}
-                                    </p>
-                                    <p className="text-xs mt-1 text-muted-foreground">
-                                      If a schedule was paused, the next run will automatically advance to the next future occurrence.
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
                             </div>
-                            <p className="font-medium text-xs">
-                              {formatNextRun(schedule)}
-                            </p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground mb-1">Last Run</p>
-                            <div className="flex items-center gap-1">
-                              {getStatusIcon(schedule.last_execution_status)}
+
+                          <Separator />
+
+                          {/* Execution Status */}
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                                <span>Next Run</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="w-3 h-3 cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p className="text-xs">
+                                        Calculated based on: {schedule.last_executed_at ? 'last execution' : 'schedule start'} + {schedule.interval_value} {schedule.interval_unit}
+                                      </p>
+                                      <p className="text-xs mt-1 text-muted-foreground">
+                                        If a schedule was paused, the next run will automatically advance to the next future occurrence.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
                               <p className="font-medium text-xs">
-                                {schedule.last_executed_at 
-                                  ? new Date(schedule.last_executed_at).toLocaleDateString()
-                                  : 'Never'}
+                                {formatNextRun(schedule)}
                               </p>
                             </div>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground mb-1">Total Runs</p>
-                            <p className="font-medium text-xs">{schedule.execution_count || 0}</p>
+                            <div>
+                              <p className="text-muted-foreground mb-1">Last Run</p>
+                              <div className="flex items-center gap-1">
+                                {getStatusIcon(schedule.last_execution_status)}
+                                <p className="font-medium text-xs">
+                                  {schedule.last_executed_at
+                                    ? new Date(schedule.last_executed_at).toLocaleDateString()
+                                    : 'Never'}
+                                </p>
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground mb-1">Total Runs</p>
+                              <p className="font-medium text-xs">{schedule.execution_count || 0}</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             )}
@@ -491,26 +594,38 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
           {/* Footer */}
           <div className="border-t px-6 py-4 bg-background shrink-0">
             <div className="flex justify-between items-center">
-              <p className="text-xs text-muted-foreground">
-                {schedules.length} {schedules.length === 1 ? 'schedule' : 'schedules'} configured
-              </p>
-              <Button onClick={() => setShowAddModal(true)}>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {schedules.length} of {maxSchedules > 0 ? maxSchedules : '∞'} {schedules.length === 1 ? 'schedule' : 'schedules'} configured
+                </p>
+                {isAtScheduleLimit && (
+                  <Badge variant="secondary" className="text-xs">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    Limit Reached
+                  </Badge>
+                )}
+              </div>
+              <Button
+                onClick={handleAddSchedule}
+                disabled={isAtScheduleLimit}
+              >
                 <Plus className="w-4 h-4 mr-2" />
-                Add Schedule
+                {isAtScheduleLimit ? 'Schedule Limit Reached' : 'Add Schedule'}
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </DialogContent >
+      </Dialog >
 
       {/* Add/Edit Schedule Modal */}
-      <ScheduleRebalanceModal
+      < ScheduleRebalanceModal
         isOpen={showAddModal}
         onClose={() => {
           setShowAddModal(false);
           setEditingSchedule(null);
           loadSchedules(); // Reload schedules after adding/editing
-        }}
+        }
+        }
       />
 
       {/* Delete Confirmation Dialog */}

@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Check,
   Info,
+  Lock,
 } from "lucide-react";
 import type { AgentsTabProps } from "./types";
 
@@ -76,6 +77,7 @@ export default function AgentsTab({
   getModelOptions,
   getConfiguredProviders,
   getDefaultModelValue,
+  hasAgentConfigAccess = true,
 }: AgentsTabProps) {
   const defaultProviderId = aiProviders.length > 0 ? aiProviders[0].id : '1';
 
@@ -98,21 +100,33 @@ export default function AgentsTab({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Agent Team Configuration Info */}
-        <Alert className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Each agent team will use your default AI provider unless you assign a specific provider below.
-            Configure additional providers in the Providers tab first.
-          </AlertDescription>
-        </Alert>
+        {!hasAgentConfigAccess ? (
+          <Alert className="mb-6">
+            <Lock className="h-4 w-4" />
+            <AlertDescription>
+              Agent configuration requires a higher subscription plan. Upgrade to customize AI models for each agent team.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Each agent team will use your default AI provider unless you assign a specific provider below.
+              Configure additional providers in the Providers tab first.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Analysis Agent */}
-        <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold">Analysis Agent</h3>
+        <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasAgentConfigAccess ? 'opacity-50' : ''}`}>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            Analysis Agent
+            {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+          </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>AI Provider</Label>
-              <Select value={analysisTeamProviderId} onValueChange={setAnalysisTeamProviderId}>
+              <Select value={analysisTeamProviderId} onValueChange={setAnalysisTeamProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
@@ -146,6 +160,7 @@ export default function AgentsTab({
                   <Select
                     value={analysisTeamModel}
                     onValueChange={setAnalysisTeamModel}
+                    disabled={!hasAgentConfigAccess}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select model" />
@@ -164,6 +179,7 @@ export default function AgentsTab({
                       placeholder="Enter custom model name *"
                       value={analysisCustomModel}
                       onChange={(e) => setAnalysisCustomModel(e.target.value)}
+                      disabled={!hasAgentConfigAccess}
                       required
                     />
                   )}
@@ -180,6 +196,7 @@ export default function AgentsTab({
               <Select
                 value={analysisOptimization}
                 onValueChange={setAnalysisOptimization}
+                disabled={!hasAgentConfigAccess}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select optimization level" />
@@ -198,6 +215,7 @@ export default function AgentsTab({
               <Select
                 value={analysisHistoryDays}
                 onValueChange={setAnalysisHistoryDays}
+                disabled={!hasAgentConfigAccess}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select time range" />
@@ -227,6 +245,7 @@ export default function AgentsTab({
                 max={8000}
                 step={500}
                 className="flex-1"
+                disabled={!hasAgentConfigAccess}
               />
               <span className="w-16 text-center font-medium">{analysisMaxTokens}</span>
             </div>
@@ -237,12 +256,15 @@ export default function AgentsTab({
         </div>
 
         {/* Research Agent */}
-        <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold">Research Agent</h3>
+        <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasAgentConfigAccess ? 'opacity-50' : ''}`}>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            Research Agent
+            {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+          </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>AI Provider</Label>
-              <Select value={researchTeamProviderId} onValueChange={setResearchTeamProviderId}>
+              <Select value={researchTeamProviderId} onValueChange={setResearchTeamProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
@@ -276,6 +298,7 @@ export default function AgentsTab({
                   <Select
                     value={researchTeamModel}
                     onValueChange={setResearchTeamModel}
+                    disabled={!hasAgentConfigAccess}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select model" />
@@ -294,6 +317,7 @@ export default function AgentsTab({
                       placeholder="Enter custom model name *"
                       value={researchCustomModel}
                       onChange={(e) => setResearchCustomModel(e.target.value)}
+                      disabled={!hasAgentConfigAccess}
                       required
                     />
                   )}
@@ -314,6 +338,7 @@ export default function AgentsTab({
                 max={5}
                 step={1}
                 className="flex-1"
+                disabled={!hasAgentConfigAccess}
               />
               <span className="w-12 text-center font-medium">{researchDebateRounds}</span>
             </div>
@@ -334,6 +359,7 @@ export default function AgentsTab({
                 max={8000}
                 step={500}
                 className="flex-1"
+                disabled={!hasAgentConfigAccess}
               />
               <span className="w-16 text-center font-medium">{researchMaxTokens}</span>
             </div>
@@ -344,12 +370,15 @@ export default function AgentsTab({
         </div>
 
         {/* Trading Decision Agent */}
-        <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold">Trading Decision Agent</h3>
+        <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasAgentConfigAccess ? 'opacity-50' : ''}`}>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            Trading Decision Agent
+            {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+          </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>AI Provider</Label>
-              <Select value={tradingTeamProviderId} onValueChange={setTradingTeamProviderId}>
+              <Select value={tradingTeamProviderId} onValueChange={setTradingTeamProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
@@ -383,6 +412,7 @@ export default function AgentsTab({
                   <Select
                     value={tradingTeamModel}
                     onValueChange={setTradingTeamModel}
+                    disabled={!hasAgentConfigAccess}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select model" />
@@ -401,6 +431,7 @@ export default function AgentsTab({
                       placeholder="Enter custom model name *"
                       value={tradingCustomModel}
                       onChange={(e) => setTradingCustomModel(e.target.value)}
+                      disabled={!hasAgentConfigAccess}
                       required
                     />
                   )}
@@ -424,6 +455,7 @@ export default function AgentsTab({
                 max={8000}
                 step={500}
                 className="flex-1"
+                disabled={!hasAgentConfigAccess}
               />
               <span className="w-16 text-center font-medium">{tradingMaxTokens}</span>
             </div>
@@ -434,12 +466,15 @@ export default function AgentsTab({
         </div>
 
         {/* Risk Management Agent */}
-        <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold">Risk Management Agent</h3>
+        <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasAgentConfigAccess ? 'opacity-50' : ''}`}>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            Risk Management Agent
+            {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+          </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>AI Provider</Label>
-              <Select value={riskTeamProviderId} onValueChange={setRiskTeamProviderId}>
+              <Select value={riskTeamProviderId} onValueChange={setRiskTeamProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
@@ -473,6 +508,7 @@ export default function AgentsTab({
                   <Select
                     value={riskTeamModel}
                     onValueChange={setRiskTeamModel}
+                    disabled={!hasAgentConfigAccess}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select model" />
@@ -491,6 +527,7 @@ export default function AgentsTab({
                       placeholder="Enter custom model name *"
                       value={riskCustomModel}
                       onChange={(e) => setRiskCustomModel(e.target.value)}
+                      disabled={!hasAgentConfigAccess}
                       required
                     />
                   )}
@@ -514,6 +551,7 @@ export default function AgentsTab({
                 max={8000}
                 step={500}
                 className="flex-1"
+                disabled={!hasAgentConfigAccess}
               />
               <span className="w-16 text-center font-medium">{riskMaxTokens}</span>
             </div>
@@ -524,15 +562,18 @@ export default function AgentsTab({
         </div>
 
         {/* Portfolio Manager Configuration */}
-        <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold">Portfolio Manager</h3>
+        <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasAgentConfigAccess ? 'opacity-50' : ''}`}>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            Portfolio Manager
+            {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+          </h3>
           <p className="text-sm text-muted-foreground">
             Analyzes portfolio positions and generates optimal allocation strategy with trade orders
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>AI Provider</Label>
-              <Select value={portfolioManagerProviderId} onValueChange={setPortfolioManagerProviderId}>
+              <Select value={portfolioManagerProviderId} onValueChange={setPortfolioManagerProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
@@ -566,6 +607,7 @@ export default function AgentsTab({
                   <Select
                     value={portfolioManagerModel}
                     onValueChange={setPortfolioManagerModel}
+                    disabled={!hasAgentConfigAccess}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select model" />
@@ -584,6 +626,7 @@ export default function AgentsTab({
                       placeholder="Enter custom model name *"
                       value={portfolioManagerCustomModel}
                       onChange={(e) => setPortfolioManagerCustomModel(e.target.value)}
+                      disabled={!hasAgentConfigAccess}
                       required
                     />
                   )}
@@ -607,6 +650,7 @@ export default function AgentsTab({
                 max={8000}
                 step={500}
                 className="flex-1"
+                disabled={!hasAgentConfigAccess}
               />
               <span className="w-16 text-center font-medium">{portfolioManagerMaxTokens}</span>
             </div>
@@ -622,6 +666,7 @@ export default function AgentsTab({
           <Button
             onClick={() => handleSaveTab('agents')}
             size="lg"
+            disabled={!hasAgentConfigAccess}
           >
             <Save className="w-4 h-4 mr-2" />
             Save Agent Configuration

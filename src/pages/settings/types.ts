@@ -28,6 +28,7 @@ export interface ProvidersTabProps {
   removeAiProvider: (id: string) => void;
   handleSaveTab: (tab: string) => void;
   getModelOptions: (provider: string) => string[];
+  hasAdditionalProviderAccess?: boolean;
 }
 
 export interface AgentsTabProps {
@@ -86,6 +87,7 @@ export interface AgentsTabProps {
   getModelOptions: (provider: string) => string[];
   getConfiguredProviders: () => { id: string; nickname: string; provider: string }[];
   getDefaultModelValue: () => string;
+  hasAgentConfigAccess?: boolean;
 }
 
 export interface RebalanceTabProps {
@@ -119,6 +121,8 @@ export interface RebalanceTabProps {
   getModelOptions: (provider: string) => string[];
   getConfiguredProviders: () => { id: string; nickname: string; provider: string }[];
   getDefaultModelValue: () => string;
+  hasOpportunityAgentAccess?: boolean;
+  hasRebalanceAccess?: boolean;
 }
 
 export interface TradingTabProps {
@@ -144,4 +148,6 @@ export interface TradingTabProps {
   setDefaultPositionSizeDollars: (amount: number) => void;
   toggleShowKey: (key: string) => void;
   handleSaveTab: (tab: string) => void;
+  canUseLiveTrading?: boolean;
+  canUseAutoTrading?: boolean;
 }

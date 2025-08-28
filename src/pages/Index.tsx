@@ -39,7 +39,7 @@ const Index = () => {
                 AI-Powered Portfolio Management for the Modern Trader
               </p>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Leverage cutting-edge AI to analyze markets, manage risk, and execute trades with confidence.
+                Leverage cutting-edge AI Agents to analyze markets, manage portfolio, and execute trades with confidence.
               </p>
             </div>
 
@@ -51,7 +51,7 @@ const Index = () => {
               ) : (
                 <>
                   <Button size="lg" className="text-lg px-8 py-6" onClick={() => navigate('/register')}>
-                    Get Started Free
+                    Get Started
                   </Button>
                   <Button variant="outline" size="lg" className="text-lg px-8 py-6" onClick={() => navigate('/login')}>
                     Sign In
@@ -68,9 +68,9 @@ const Index = () => {
               <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
                 <Bot className="h-8 w-8 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold">11 AI Specialists</h3>
+              <h3 className="text-xl font-semibold">Multiple AI Agent Teams</h3>
               <p className="text-muted-foreground">
-                Market Analyst, News Analyst, Social Media Analyst, Fundamentals Analyst, Bull/Bear Researchers, Trader, Risk Analysts, and Portfolio Manager.
+                Analysts, Bull/Bear Researchers, Trader, Risk Analysts, and Portfolio Manager.
               </p>
             </div>
 
@@ -114,7 +114,7 @@ const Index = () => {
               </div>
               <h2 className="text-2xl md:text-3xl font-bold">How TradingGoose Works</h2>
               <p className="text-base text-muted-foreground max-w-3xl mx-auto">
-                TradingGoose employs a sophisticated multi-agent AI system that orchestrates 11 specialized AI agents through structured workflows to analyze stocks and manage portfolios.
+                TradingGoose employs a sophisticated multi-agent AI system that orchestrates 15 specialized AI agents through structured workflows to analyze stocks and manage portfolios.
               </p>
             </div>
 
@@ -131,7 +131,7 @@ const Index = () => {
                 {/* Workflow Image */}
                 <div className="lg:col-span-2">
                   <img
-                    src="/Analysis-Flow.png"
+                    src="/Analysis-Flow-dark.png"
                     alt="TradingGoose Analysis Workflow"
                     className="w-full mx-auto"
                   />
@@ -140,11 +140,11 @@ const Index = () => {
                 {/* Phase Steps */}
                 <div className="space-y-3">
                   {[
-                    { num: 1, title: "Analysis", desc: "Market, News, Social Media & Fundamentals", color: "yellow" },
+                    { num: 1, title: "Analysis", desc: "Macro, Market, News, Social, Fundamentals", color: "yellow" },
                     { num: 2, title: "Research", desc: "Bull & Bear debate + synthesis", color: "green" },
                     { num: 3, title: "Trading", desc: "BUY/SELL/HOLD recommendation", color: "purple" },
-                    { num: 4, title: "Risk", desc: "Multi-perspective risk evaluation", color: "orange" },
-                    { num: 5, title: "Portfolio", desc: "Final position sizing decisions", color: "sky" }
+                    { num: 4, title: "Risk", desc: "Multi-perspective risk evaluation", color: "red" },
+                    { num: 5, title: "Portfolio", desc: "Final position sizing decisions", color: "blue" }
                   ].map((step, index) => (
                     <div key={index} className="inline-flex items-center gap-3 px-3 py-2 bg-card/50 rounded-full border border-border/50 hover:bg-card transition-colors">
                       <div className={`w-6 h-6 bg-${step.color}-500 text-white rounded-full flex items-center justify-center font-bold text-xs`}>
@@ -176,7 +176,7 @@ const Index = () => {
                     { num: 1, title: "Threshold Check", desc: "Monitor portfolio drift triggers", color: "yellow" },
                     { num: 2, title: "Opportunity Check", desc: "Evaluate market conditions", color: "orange" },
                     { num: 3, title: "Full Analysis", desc: "Complete 5-phase analysis", color: "gray" },
-                    { num: 4, title: "Portfolio Execution", desc: "Execute rebalancing strategy", color: "sky" }
+                    { num: 4, title: "Portfolio Execution", desc: "Execute rebalancing strategy", color: "blue" }
                   ].map((step, index) => (
                     <div key={index} className="inline-flex items-center gap-3 px-3 py-2 bg-card/50 rounded-full border border-border/50 hover:bg-card transition-colors">
                       <div className={`w-6 h-6 bg-${step.color}-500 text-white rounded-full flex items-center justify-center font-bold text-xs`}>
@@ -193,7 +193,7 @@ const Index = () => {
                 {/* Workflow Image */}
                 <div className="lg:col-span-2">
                   <img
-                    src="/Rebalance-Flow.png"
+                    src="/Rebalance-Flow-dark.png"
                     alt="TradingGoose Rebalance Workflow"
                     className="w-full mx-auto"
                   />

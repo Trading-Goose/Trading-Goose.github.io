@@ -1,8 +1,7 @@
 <div align="center">
-<div style="display:flex; justify-content:center; align-items:center; padding:10px;">
-  <img src="public/goose.png" alt="TradingGoose Logo" style="width:50px; height:50px; padding:5px;">
-<span style="font-weight:bold; font-size:50px; line-height:50px; ">TradingGoose</span>
-  </div>
+
+<h1 style="line-height:50px;" align="center"><img src="public/goose.png" alt="TradingGoose Logo" style=" vertical-align: middle; width:35px; height:35px;"> TradingGoose </h1>
+
  
   
   An intelligent trading platform powered by multiple AI agents that collaborate to analyze markets, manage portfolios, and execute trades with sophisticated risk management.
@@ -70,26 +69,26 @@ This project's multi-agent analysis workflow architecture is based on the [Tauri
 - **Alpaca Markets API** for market data and trade execution
 - **Customizable AI Providers** for agent intelligence (OpenAI, Anthropic, Google, and more)
 
+---
+
+<br >
+
 ## 🔄 How It Works
 
 ### 🔬 The Analysis Process
 
 When you initiate a stock analysis, TradingGoose orchestrates a sophisticated multi-agent workflow:
 
-<div  style="width:100%; display:flex;">
 
-<div  style="width:80%;">
-<picture>
+<picture style="width:50%">
   <source media="(prefers-color-scheme: dark)" srcset="public/Analysis-Flow-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="public/Analysis-Flow-light.png">
-  <img alt="Analysis Flow"  src="public/Analysis-Flow-light.png" style="min-width:200px; width: 100%; height: auto;">
+  <img alt="Analysis Flow" src="public/Analysis-Flow-light.png" style=" width:50% height: auto;">
 </picture>
 
 ###### _Note: This workflow architecture is adapted from the [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) framework._
 
-</div>
 
-<div style="width:50%;  padding:15px;" >
 
 <details>
 <summary><strong>1. 📊 Data Analysis Phase</strong></summary>
@@ -134,9 +133,7 @@ When you initiate a stock analysis, TradingGoose orchestrates a sophisticated mu
 - 📝 All analysis is logged for historical tracking
 </details>
 
-</div>
 
-</div>
 
 <br >
 
@@ -144,9 +141,6 @@ When you initiate a stock analysis, TradingGoose orchestrates a sophisticated mu
 
 TradingGoose continuously monitors your portfolio and market conditions:
 
-<div style="width:100%; display:flex;">
-
-<div style="width:80%;">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="public/Rebalance-Flow-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="public/Rebalance-Flow-light.png">
@@ -154,7 +148,6 @@ TradingGoose continuously monitors your portfolio and market conditions:
 </picture>
 </div>
 
-<div style="width:50%; padding:15px; ">
 
 <details>
 <summary><strong>1. 👁️ Continuous Monitoring</strong></summary>
@@ -196,9 +189,9 @@ TradingGoose continuously monitors your portfolio and market conditions:
 - 📈 Performance tracking begins immediately post-execution
 </details>
 
-</div>
+---
 
-</div>
+<br >
 
 ## 🚀 Usage
 
@@ -272,7 +265,9 @@ This entire project was crafted with love by **[Claude Code](https://claude.ai/c
 
 Who says robots can't be creative? This production-ready financial platform proves that AI can build sophisticated applications that actually work in the real world. Welcome to the future of software development! 🚀
 
-<br>
+---
+
+<br >
 
 ### ✅ Feature Checklist
 

@@ -333,21 +333,36 @@ export default function RebalanceHistoryTable() {
     }
   };
 
-  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" | undefined => {
     // Convert legacy status to new format for consistent variant display
     const normalizedStatus = convertLegacyRebalanceStatus(status);
 
     switch (normalizedStatus) {
       case REBALANCE_STATUS.COMPLETED:
-        return 'default';
+        return undefined; // No variant, use className only
       case REBALANCE_STATUS.CANCELLED:
       case REBALANCE_STATUS.ERROR:
         return 'destructive';
       case REBALANCE_STATUS.RUNNING:
+        return 'default'; // Use default variant like UnifiedAnalysisHistory
       case REBALANCE_STATUS.PENDING:
         return 'secondary';
       default:
         return 'outline';
+    }
+  };
+  
+  const getStatusClassName = (status: string): string => {
+    // Convert legacy status to new format for consistent variant display
+    const normalizedStatus = convertLegacyRebalanceStatus(status);
+
+    switch (normalizedStatus) {
+      case REBALANCE_STATUS.COMPLETED:
+        return 'border border-green-500/30 bg-green-500/10 text-green-600 font-semibold hover:bg-green-500/20';
+      case REBALANCE_STATUS.RUNNING:
+        return ''; // Let default variant handle the styling
+      default:
+        return '';
     }
   };
 
@@ -542,17 +557,12 @@ export default function RebalanceHistoryTable() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <span className="font-semibold">Portfolio Rebalance</span>
-                            <Badge variant={getStatusVariant(item.status)}>
+                            <Badge variant={getStatusVariant(item.status)} className={getStatusClassName(item.status)}>
                               <span className="flex items-center gap-1">
                                 {getStatusIcon(item.status)}
                                 {item.status.replace('_', ' ')}
                               </span>
                             </Badge>
-                            {item.total_stocks > 0 && (
-                              <span className="text-sm text-muted-foreground">
-                                {item.stocks_analyzed}/{item.total_stocks} stocks
-                              </span>
-                            )}
                           </div>
                           <span className="text-xs text-muted-foreground">
                             Started {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
@@ -608,7 +618,7 @@ export default function RebalanceHistoryTable() {
                                     setSelectedRebalanceId(item.id);
                                     setCancelDialogOpen(true);
                                   }}
-                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                  className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                                   disabled={cancelling}
                                 >
                                   <StopCircle className="h-4 w-4 mr-2" />
@@ -620,7 +630,7 @@ export default function RebalanceHistoryTable() {
                                     setSelectedRebalanceId(item.id);
                                     setDeleteDialogOpen(true);
                                   }}
-                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                  className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete
@@ -650,7 +660,7 @@ export default function RebalanceHistoryTable() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className="font-semibold">Portfolio Rebalance</span>
-                          <Badge variant="default">
+                          <Badge className="border border-green-500/30 bg-green-500/10 text-green-600 font-semibold hover:bg-green-500/20">
                             <span className="flex items-center gap-1">
                               <CheckCircle className="h-3 w-3" />
                               Completed
@@ -700,7 +710,7 @@ export default function RebalanceHistoryTable() {
                                   setSelectedRebalanceId(item.id);
                                   setDeleteDialogOpen(true);
                                 }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
+                                className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
@@ -776,7 +786,7 @@ export default function RebalanceHistoryTable() {
                                   setSelectedRebalanceId(item.id);
                                   setDeleteDialogOpen(true);
                                 }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
+                                className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
@@ -813,17 +823,12 @@ export default function RebalanceHistoryTable() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className="font-semibold">Portfolio Rebalance</span>
-                          <Badge variant={getStatusVariant(item.status)}>
+                          <Badge variant={getStatusVariant(item.status)} className={getStatusClassName(item.status)}>
                             <span className="flex items-center gap-1">
                               {getStatusIcon(item.status)}
                               {getStatusDisplayText(convertLegacyRebalanceStatus(item.status))}
                             </span>
                           </Badge>
-                          {item.total_stocks > 0 && (
-                            <span className="text-sm text-muted-foreground">
-                              {item.stocks_analyzed}/{item.total_stocks} stocks
-                            </span>
-                          )}
                         </div>
                         <span className="text-xs text-muted-foreground">
                           Started {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
@@ -879,7 +884,7 @@ export default function RebalanceHistoryTable() {
                                   setSelectedRebalanceId(item.id);
                                   setCancelDialogOpen(true);
                                 }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
+                                className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                                 disabled={cancelling}
                               >
                                 <StopCircle className="h-4 w-4 mr-2" />
@@ -891,7 +896,7 @@ export default function RebalanceHistoryTable() {
                                   setSelectedRebalanceId(item.id);
                                   setDeleteDialogOpen(true);
                                 }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
+                                className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
@@ -922,7 +927,7 @@ export default function RebalanceHistoryTable() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <span className="font-semibold">Portfolio Rebalance</span>
-                          <Badge variant="default">
+                          <Badge className="border border-green-500/30 bg-green-500/10 text-green-600 font-semibold hover:bg-green-500/20">
                             <span className="flex items-center gap-1">
                               <CheckCircle className="h-3 w-3" />
                               Completed
@@ -972,7 +977,7 @@ export default function RebalanceHistoryTable() {
                                   setSelectedRebalanceId(item.id);
                                   setDeleteDialogOpen(true);
                                 }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
+                                className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
@@ -1052,7 +1057,7 @@ export default function RebalanceHistoryTable() {
                                   setSelectedRebalanceId(item.id);
                                   setDeleteDialogOpen(true);
                                 }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
+                                className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete

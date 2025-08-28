@@ -102,6 +102,7 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
       });
       return;
     }
+    setEditingSchedule(null); // Clear any previous editing schedule
     setShowAddModal(true);
   };
 
@@ -464,6 +465,18 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => {
+                                  setEditingSchedule(schedule);
+                                  setShowAddModal(true);
+                                }}
+                                disabled={!isAccessible}
+                              >
+                                <Settings className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleToggleEnabled(schedule)}
                                 disabled={!isAccessible}
                               >
@@ -484,8 +497,9 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
                                 size="sm"
                                 onClick={() => setDeletingSchedule(schedule)}
                                 disabled={!isAccessible}
+                                className="hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
                               >
-                                <Trash2 className="w-4 h-4 text-destructive" />
+                                <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
                               </Button>
                             </div>
                           </div>
@@ -618,14 +632,14 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
       </Dialog >
 
       {/* Add/Edit Schedule Modal */}
-      < ScheduleRebalanceModal
+      <ScheduleRebalanceModal
         isOpen={showAddModal}
+        scheduleToEdit={editingSchedule}
         onClose={() => {
           setShowAddModal(false);
           setEditingSchedule(null);
           loadSchedules(); // Reload schedules after adding/editing
-        }
-        }
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

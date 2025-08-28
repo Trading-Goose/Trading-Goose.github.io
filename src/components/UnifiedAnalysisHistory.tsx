@@ -695,7 +695,7 @@ export default function UnifiedAnalysisHistory() {
                                     setSelectedAnalysisTicker(item.ticker);
                                     setShowCancelDialog(true);
                                   }}
-                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                  className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                                 >
                                   <StopCircle className="h-4 w-4 mr-2" />
                                   Cancel Analysis
@@ -707,7 +707,7 @@ export default function UnifiedAnalysisHistory() {
                                     setSelectedAnalysisTicker(item.ticker);
                                     setShowDeleteDialog(true);
                                   }}
-                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                  className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete

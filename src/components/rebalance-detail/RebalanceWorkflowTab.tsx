@@ -67,11 +67,11 @@ const calculateAgentStepCompletion = (stockAnalyses: any[]): number => {
 };
 
 // Workflow Steps Component
-function RebalanceWorkflowSteps({ 
-  workflowData, 
+function RebalanceWorkflowSteps({
+  workflowData,
   onNavigateToInsight,
-  onOpenAnalysisModal 
-}: { 
+  onOpenAnalysisModal
+}: {
   workflowData: any;
   onNavigateToInsight?: (agentKey: string) => void;
   onOpenAnalysisModal?: (ticker: string, analysisId: string) => void;
@@ -88,7 +88,7 @@ function RebalanceWorkflowSteps({
     if (step.data?.error || step.status === 'error') {
       return 'error';
     }
-    
+
     // Special handling for analysis step - check if all analyses are complete
     if (step.id === 'analysis' && step.stockAnalyses?.length > 0) {
       const completionPercentage = calculateAgentStepCompletion(step.stockAnalyses);
@@ -98,7 +98,7 @@ function RebalanceWorkflowSteps({
         return 'running';
       }
     }
-    
+
     return step.status || 'pending';
   };
 
@@ -129,19 +129,18 @@ function RebalanceWorkflowSteps({
           <div key={step.id} className="relative">
             <div className="space-y-4">
               {/* Step Header */}
-              <div 
-                className={`rounded-lg border p-4 transition-all ${
-                  (step.id === 'opportunity' || step.id === 'portfolio') && onNavigateToInsight
-                    ? 'cursor-pointer hover:shadow-md'
-                    : ''
-                } ${isCompleted
-                  ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
-                  : isError
-                    ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5'
-                    : isRunning
-                      ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5'
-                      : 'border-border'
-                }`}
+              <div
+                className={`rounded-lg border p-4 transition-all ${(step.id === 'opportunity' || step.id === 'portfolio') && onNavigateToInsight
+                  ? 'cursor-pointer hover:shadow-md'
+                  : ''
+                  } ${isCompleted
+                    ? 'border-green-500/30 bg-green-500/5 dark:bg-green-500/5'
+                    : isError
+                      ? 'border-red-500/30 bg-red-500/5 dark:bg-red-500/5'
+                      : isRunning
+                        ? 'border-yellow-500/30 bg-yellow-500/5 dark:bg-yellow-500/5'
+                        : 'border-border'
+                  }`}
                 onClick={() => {
                   // Handle clicks for opportunity and portfolio agents
                   if (step.id === 'opportunity' && onNavigateToInsight) {
@@ -164,7 +163,7 @@ function RebalanceWorkflowSteps({
                         : isError
                           ? 'bg-red-500/10 dark:bg-red-500/5 text-red-600 dark:text-red-400'
                           : isRunning
-                            ? 'bg-yellow-500/10 dark:bg-yellow-500/5 text-yellow-600 dark:text-yellow-400'
+                            ? 'bg-yellow-500/10 dark:bg-yellow-100/5 text-yellow-600 dark:text-yellow-400'
                             : 'bg-muted text-muted-foreground'
                         }`}>
                         <Icon className="w-6 h-6" />
@@ -236,7 +235,7 @@ function RebalanceWorkflowSteps({
                             // Calculate completion percentage
                             const completionPercentage = calculateAgentStepCompletion(step.stockAnalyses);
                             const isFullyComplete = completionPercentage >= 100;
-                            
+
                             // Check if overall rebalance is active (same as RebalanceHistoryTable)
                             const rebalanceIsActive = workflowData.status && isRebalanceActive(convertLegacyRebalanceStatus(workflowData.status));
 
@@ -513,17 +512,17 @@ function RebalanceWorkflowSteps({
   );
 }
 
-export default function RebalanceWorkflowTab({ 
-  workflowData, 
+export default function RebalanceWorkflowTab({
+  workflowData,
   onNavigateToInsight,
-  onOpenAnalysisModal 
+  onOpenAnalysisModal
 }: RebalanceWorkflowTabProps) {
   return (
     <TabsContent value="workflow" className="data-[state=active]:block hidden">
       <ScrollArea className="h-[calc(90vh-220px)] px-6 pt-6">
         <div className="pb-6">
-          <RebalanceWorkflowSteps 
-            workflowData={workflowData} 
+          <RebalanceWorkflowSteps
+            workflowData={workflowData}
             onNavigateToInsight={onNavigateToInsight}
             onOpenAnalysisModal={onOpenAnalysisModal}
           />

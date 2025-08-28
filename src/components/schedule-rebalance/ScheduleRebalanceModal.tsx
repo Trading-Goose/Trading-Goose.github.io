@@ -24,10 +24,10 @@ import { SettingsTab } from "./tabs/SettingsTab";
 // Import types
 import type { ScheduleRebalanceModalProps } from "./types";
 
-export default function ScheduleRebalanceModal({ isOpen, onClose }: ScheduleRebalanceModalProps) {
+export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit }: ScheduleRebalanceModalProps) {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("schedule");
-  
+
   // Use configuration hooks
   const {
     config,
@@ -55,7 +55,7 @@ export default function ScheduleRebalanceModal({ isOpen, onClose }: ScheduleReba
     maxStocks,
     loadData,
     togglePosition,
-  } = useScheduleData(isOpen);
+  } = useScheduleData(isOpen, scheduleToEdit?.id || null);
 
   // Use actions hook
   const { handleSave: saveSchedule, handleDelete: deleteSchedule } = useScheduleActions({
@@ -68,14 +68,14 @@ export default function ScheduleRebalanceModal({ isOpen, onClose }: ScheduleReba
     onClose,
   });
 
-  // Load data when modal opens
+  // Load data when modal opens or schedule changes
   useEffect(() => {
     if (isOpen && user) {
-      loadData(setConfig, setRebalanceConfig);
+      loadData(setConfig, setRebalanceConfig, scheduleToEdit);
     } else if (!isOpen) {
       setActiveTab("schedule");
     }
-  }, [isOpen, user]);
+  }, [isOpen, user, scheduleToEdit?.id]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -162,9 +162,10 @@ export default function ScheduleRebalanceModal({ isOpen, onClose }: ScheduleReba
             <div>
               {existingSchedule && (
                 <Button
-                  variant="destructive"
+                  variant="outline"
                   onClick={handleDelete}
                   disabled={saving}
+                  className="border-red-500/30 bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-700 dark:hover:text-red-300"
                 >
                   Delete Schedule
                 </Button>

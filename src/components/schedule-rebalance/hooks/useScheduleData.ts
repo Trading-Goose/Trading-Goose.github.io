@@ -14,7 +14,7 @@ import type {
   RebalanceConfig 
 } from "../types";
 
-export function useScheduleData(isOpen: boolean) {
+export function useScheduleData(isOpen: boolean, scheduleId: string | null = null) {
   const { user, apiSettings } = useAuth();
   const { toast } = useToast();
   const { getMaxRebalanceStocks, hasOpportunityAgentAccess } = useRBAC();
@@ -91,17 +91,37 @@ export function useScheduleData(isOpen: boolean) {
 
   const loadData = async (
     setConfig: (config: ScheduleConfig) => void,
-    setRebalanceConfig: (config: RebalanceConfig) => void
+    setRebalanceConfig: (config: RebalanceConfig) => void,
+    scheduleToEdit?: any
   ) => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data: scheduleData, error: scheduleError } = await supabase
-        .from('rebalance_schedules')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
+      // Use passed schedule data if available, or fetch from DB
+      let scheduleData = null;
+      let scheduleError = null;
+      
+      if (scheduleToEdit) {
+        // Edit mode - use passed schedule data directly
+        scheduleData = scheduleToEdit;
+      } else if (scheduleId) {
+        // Edit mode - load specific schedule from DB (fallback)
+        const result = await supabase
+          .from('rebalance_schedules')
+          .select('*')
+          .eq('id', scheduleId)
+          .eq('user_id', user?.id)
+          .single();
+        
+        scheduleData = result.data;
+        scheduleError = result.error;
+      } else {
+        // Create mode - don't load any existing schedule
+        // Just leave scheduleData as null to indicate new schedule
+        scheduleData = null;
+        scheduleError = null;
+      }
 
       if (scheduleData && !scheduleError) {
         setExistingSchedule(scheduleData as ExistingSchedule);

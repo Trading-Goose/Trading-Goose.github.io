@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { useRoleManagement, type RoleWithLimits } from "@/hooks/useRoleManagement";
 import { RoleGate } from "@/components/RoleBasedAccess";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -221,9 +222,9 @@ export default function AdminRoleManager() {
 
   if (!canManageRoles) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <Header />
-        <main className="container mx-auto px-6 py-8">
+        <main className="flex-1 container mx-auto px-6 py-8">
           <Alert className="max-w-md mx-auto">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -236,9 +237,9 @@ export default function AdminRoleManager() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-6 py-8">
+      <main className="flex-1 container mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Shield className="h-8 w-8" />
@@ -678,6 +679,8 @@ export default function AdminRoleManager() {
           </Dialog>
         )}
       </main>
+      
+      <Footer />
     </div>
   );
 }

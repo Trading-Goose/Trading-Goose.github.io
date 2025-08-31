@@ -129,7 +129,8 @@ export function ConfigurationTab({
                       setConfig(prev => ({
                         ...prev,
                         skipThresholdCheck: checked as boolean,
-                        // If forcing rebalance, automatically disable opportunity agent
+                        // If skipping threshold check, must also skip opportunity agent
+                        // because opportunity agent only runs when threshold is NOT exceeded
                         skipOpportunityAgent: checked ? true : prev.skipOpportunityAgent
                       }));
                     }}
@@ -149,10 +150,13 @@ export function ConfigurationTab({
                 <div className="flex items-center space-x-3">
                   <Checkbox
                     id="skipOpportunity"
-                    checked={!hasOppAccess ? true : config.skipOpportunityAgent}
-                    onCheckedChange={(checked) =>
-                      setConfig(prev => ({ ...prev, skipOpportunityAgent: checked as boolean }))
-                    }
+                    checked={!hasOppAccess ? true : (config.skipThresholdCheck ? true : config.skipOpportunityAgent)}
+                    onCheckedChange={(checked) => {
+                      // Only allow changing if threshold check is not skipped
+                      if (!config.skipThresholdCheck) {
+                        setConfig(prev => ({ ...prev, skipOpportunityAgent: checked as boolean }))
+                      }
+                    }}
                     disabled={config.useDefaultSettings || config.skipThresholdCheck || !hasOppAccess}
                   />
                   <Label
@@ -167,7 +171,7 @@ export function ConfigurationTab({
                   {!hasOppAccess
                     ? "Opportunity Agent access is not available in your subscription plan"
                     : config.skipThresholdCheck
-                    ? "Opportunity analysis is automatically skipped when forcing rebalance (skip threshold check)"
+                    ? "Opportunity analysis is automatically skipped when threshold check is skipped"
                     : "When disabled, the Opportunity Agent evaluates market conditions to filter stocks for analysis when drift is below threshold"
                   }
                 </p>

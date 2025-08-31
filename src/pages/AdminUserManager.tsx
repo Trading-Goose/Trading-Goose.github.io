@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { useUserManagement } from "@/hooks/useUserManagement";
 import { RoleGate } from "@/components/RoleBasedAccess";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,7 +66,8 @@ import {
   Clock,
   Shield,
   Hash,
-  Trash2
+  Trash2,
+  CreditCard
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow, addDays, addMonths, addYears } from "date-fns";
@@ -246,9 +248,9 @@ export default function AdminUserManager() {
 
   if (!canManageUsers) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <Header />
-        <main className="container mx-auto px-6 py-8">
+        <main className="flex-1 container mx-auto px-6 py-8">
           <Alert className="max-w-md mx-auto">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -261,9 +263,9 @@ export default function AdminUserManager() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-6 py-8">
+      <main className="flex-1 container mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Users className="h-8 w-8" />
@@ -585,89 +587,112 @@ export default function AdminUserManager() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {/* Show expiration controls for non-admin/default roles */}
-                            {user.pending_role_id &&
-                              availableRoles.find(r => r.id === user.pending_role_id)?.name !== 'admin' &&
-                              availableRoles.find(r => r.id === user.pending_role_id)?.name !== 'default' ? (
-                              <div className="space-y-2">
+                            <div className="space-y-2">
+                              {/* Show subscription status if active */}
+                              {user.is_subscription_active && user.subscription_status && (
                                 <div className="flex items-center gap-2">
-                                  <Input
-                                    type="datetime-local"
-                                    className="w-[200px] text-xs"
-                                    value={(() => {
-                                      const expiration = roleExpirations.get(user.id) || user.pending_expires_at;
-                                      if (!expiration) return '';
-                                      // Convert to local datetime format (remove timezone)
-                                      return expiration.slice(0, 16);
-                                    })()}
-                                    min={new Date().toISOString().slice(0, 16)}
-                                    onChange={(e) => handleExpirationChange(user.id, e.target.value || null)}
-                                  />
+                                  <Badge 
+                                    variant={
+                                      user.subscription_status === 'active' ? 'default' :
+                                      user.subscription_status === 'on_trial' ? 'secondary' :
+                                      user.subscription_status === 'cancelled' ? 'destructive' :
+                                      'outline'
+                                    }
+                                    className="text-xs"
+                                  >
+                                    <CreditCard className="h-3 w-3 mr-1" />
+                                    {user.subscription_status}
+                                  </Badge>
                                 </div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={() => {
-                                      const expires = addDays(new Date(), 7).toISOString().slice(0, 16);
-                                      handleExpirationChange(user.id, expires);
-                                    }}
-                                  >
-                                    +7d
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={() => {
-                                      const expires = addDays(new Date(), 30).toISOString().slice(0, 16);
-                                      handleExpirationChange(user.id, expires);
-                                    }}
-                                  >
-                                    +30d
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={() => {
-                                      const expires = addMonths(new Date(), 3).toISOString().slice(0, 16);
-                                      handleExpirationChange(user.id, expires);
-                                    }}
-                                  >
-                                    +3m
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={() => {
-                                      const expires = addYears(new Date(), 1).toISOString().slice(0, 16);
-                                      handleExpirationChange(user.id, expires);
-                                    }}
-                                  >
-                                    +1y
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="space-y-1">
-                                {/* Show current expiration if exists */}
-                                {user.current_role_expires_at ? (
-                                  <div className="text-sm">
-                                    {formatExpiration(user.current_role_expires_at)}
+                              )}
+                              
+                              {/* Show expiration controls for non-admin/default roles */}
+                              {user.pending_role_id &&
+                                availableRoles.find(r => r.id === user.pending_role_id)?.name !== 'admin' &&
+                                availableRoles.find(r => r.id === user.pending_role_id)?.name !== 'default' ? (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="datetime-local"
+                                      className="w-[200px] text-xs"
+                                      value={(() => {
+                                        const expiration = roleExpirations.get(user.id) || user.pending_expires_at;
+                                        if (!expiration) return '';
+                                        // Convert to local datetime format (remove timezone)
+                                        return expiration.slice(0, 16);
+                                      })()}
+                                      min={new Date().toISOString().slice(0, 16)}
+                                      onChange={(e) => handleExpirationChange(user.id, e.target.value || null)}
+                                      disabled={user.is_subscription_active} // Disable if subscription manages expiration
+                                    />
                                   </div>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">
-                                    {user.pending_role_id && (
-                                      availableRoles.find(r => r.id === user.pending_role_id)?.name === 'admin' ||
-                                      availableRoles.find(r => r.id === user.pending_role_id)?.name === 'default'
-                                    ) ? 'Never' : '-'}
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                                  {!user.is_subscription_active && (
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-6 px-2 text-xs"
+                                        onClick={() => {
+                                          const expires = addDays(new Date(), 7).toISOString().slice(0, 16);
+                                          handleExpirationChange(user.id, expires);
+                                        }}
+                                      >
+                                        +7d
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-6 px-2 text-xs"
+                                        onClick={() => {
+                                          const expires = addDays(new Date(), 30).toISOString().slice(0, 16);
+                                          handleExpirationChange(user.id, expires);
+                                        }}
+                                      >
+                                        +30d
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-6 px-2 text-xs"
+                                        onClick={() => {
+                                          const expires = addMonths(new Date(), 3).toISOString().slice(0, 16);
+                                          handleExpirationChange(user.id, expires);
+                                        }}
+                                      >
+                                        +3m
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-6 px-2 text-xs"
+                                        onClick={() => {
+                                          const expires = addYears(new Date(), 1).toISOString().slice(0, 16);
+                                          handleExpirationChange(user.id, expires);
+                                        }}
+                                      >
+                                        +1y
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  {/* Show current expiration if exists */}
+                                  {user.current_role_expires_at ? (
+                                    <div className="text-sm">
+                                      {formatExpiration(user.current_role_expires_at)}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">
+                                      {user.pending_role_id && (
+                                        availableRoles.find(r => r.id === user.pending_role_id)?.name === 'admin' ||
+                                        availableRoles.find(r => r.id === user.pending_role_id)?.name === 'default'
+                                      ) ? 'Never' : '-'}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
@@ -851,6 +876,8 @@ export default function AdminUserManager() {
           </AlertDialogContent>
         </AlertDialog>
       </main>
+      
+      <Footer />
     </div>
   );
 }

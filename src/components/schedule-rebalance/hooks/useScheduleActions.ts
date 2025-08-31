@@ -32,10 +32,10 @@ export function useScheduleActions({
     if (!user) return false;
 
     // Validate inputs
-    if (selectedPositions.size === 0 && !includeAllPositions) {
+    if (selectedPositions.size === 0) {
       toast({
         title: "No stocks selected",
-        description: "Please select at least one stock or enable 'Include All Positions'",
+        description: "Please select at least one stock for scheduled rebalancing",
         variant: "destructive",
       });
       return false;
@@ -63,9 +63,9 @@ export function useScheduleActions({
         day_of_month: config.intervalUnit === 'months' ? config.daysOfMonth : null,
         time_of_day: `${hour24.toString().padStart(2, '0')}:${minuteStr}:00`,
         timezone: config.timezone,
-        selected_tickers: includeAllPositions ? [] : Array.from(selectedPositions),
+        selected_tickers: Array.from(selectedPositions),
         include_watchlist: includeWatchlist,
-        include_all_positions: includeAllPositions,
+        include_all_positions: false, // Deprecated - always use selected tickers
         // Rebalance configuration
         use_default_settings: rebalanceConfig.useDefaultSettings,
         max_position_size: rebalanceConfig.useDefaultSettings ? null : rebalanceConfig.maxPosition,

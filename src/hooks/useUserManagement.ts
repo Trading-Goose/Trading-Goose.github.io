@@ -19,6 +19,9 @@ export interface UserDetails {
   current_role_expires_at?: string | null;
   pending_role_id?: string | null;
   pending_expires_at?: string | null;
+  // Subscription fields from user_roles
+  is_subscription_active?: boolean;
+  subscription_status?: string | null;
 }
 
 export interface UserFilter {
@@ -90,6 +93,37 @@ export function useUserManagement() {
         .rpc('get_users_with_auth_details');
 
       if (!authError && usersWithAuth && usersWithAuth.length > 0) {
+        // Fetch subscription data for all users
+        const userIds = usersWithAuth.map((u: any) => u.id);
+        
+        // Get subscription status from user_subscriptions
+        const { data: subscriptions } = await supabase
+          .from('user_subscriptions')
+          .select('user_id, subscription_status')
+          .in('user_id', userIds);
+        
+        // Get is_subscription_active from user_roles
+        const { data: roleSubscriptions } = await supabase
+          .from('user_roles')
+          .select('user_id, is_subscription_active')
+          .in('user_id', userIds)
+          .eq('is_active', true);
+        
+        // Create maps for quick lookup
+        const subscriptionStatusMap = new Map();
+        if (subscriptions) {
+          subscriptions.forEach((sub: any) => {
+            subscriptionStatusMap.set(sub.user_id, sub.subscription_status);
+          });
+        }
+        
+        const subscriptionActiveMap = new Map();
+        if (roleSubscriptions) {
+          roleSubscriptions.forEach((role: any) => {
+            subscriptionActiveMap.set(role.user_id, role.is_subscription_active);
+          });
+        }
+        
         // Successfully got users with auth details
         const mappedUsers: UserDetails[] = usersWithAuth.map((user: any) => ({
           id: user.id,
@@ -105,7 +139,9 @@ export function useUserManagement() {
           user_metadata: user.user_metadata || {},
           current_role_id: user.current_role_id,
           current_role_name: user.current_role_name,
-          current_role_expires_at: user.current_role_expires_at
+          current_role_expires_at: user.current_role_expires_at,
+          is_subscription_active: subscriptionActiveMap.get(user.id) || false,
+          subscription_status: subscriptionStatusMap.get(user.id) || null
         }));
 
         setUsers(mappedUsers);

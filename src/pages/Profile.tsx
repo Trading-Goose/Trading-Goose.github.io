@@ -20,14 +20,18 @@ import {
   Clock,
   Edit2,
   Check,
-  X
+  X,
+  CreditCard,
+  ExternalLink
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useRBAC } from "@/hooks/useRBAC";
+import { useSubscription } from "@/hooks/useSubscription";
 import { format } from "date-fns";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 export default function ProfilePage() {
@@ -35,6 +39,16 @@ export default function ProfilePage() {
   const { user, profile, apiSettings, logout, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const { getPrimaryRole } = useRBAC();
+  const { 
+    hasSubscription, 
+    subscriptionStatus, 
+    variantName, 
+    currentPeriodEnd, 
+    customerPortalUrl,
+    openCustomerPortal,
+    formatPeriodEnd,
+    getSubscriptionBadgeColor 
+  } = useSubscription();
   const [activityStats, setActivityStats] = useState({
     totalAnalyses: 0,
     executedTrades: 0,
@@ -247,10 +261,10 @@ export default function ProfilePage() {
   const primaryRole = getPrimaryRole();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
 
-      <main className="container mx-auto px-6 py-8">
+      <main className="flex-1 container mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <User className="h-8 w-8" />
@@ -347,21 +361,61 @@ export default function ProfilePage() {
                     <Shield className="h-4 w-4" />
                     Account Membership
                   </div>
-                  <div className="flex items-center gap-2">
-                    {primaryRole ? (
-                      <Badge variant={primaryRole.name === 'admin' ? 'default' : 'secondary'}>
-                        {primaryRole.display_name}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline">No Role</Badge>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {primaryRole ? (
+                        <Badge variant={primaryRole.name === 'admin' ? 'default' : 'secondary'}>
+                          {primaryRole.display_name}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">No Role</Badge>
+                      )}
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {roleExpiration ? 
+                          `Expires: ${format(new Date(roleExpiration), 'MMM dd, yyyy')}` : 
+                          'Never expires'
+                        }
+                      </span>
+                    </div>
+                    
+                    {/* Subscription Status */}
+                    {hasSubscription && (
+                      <div className="flex items-center gap-2">
+                        <Badge className={getSubscriptionBadgeColor()}>
+                          <CreditCard className="h-3 w-3 mr-1" />
+                          {variantName} - {subscriptionStatus}
+                        </Badge>
+                        {currentPeriodEnd && subscriptionStatus === 'active' && (
+                          <span className="text-xs text-muted-foreground">
+                            Renews {formatPeriodEnd(currentPeriodEnd)}
+                          </span>
+                        )}
+                        {currentPeriodEnd && subscriptionStatus === 'cancelled' && (
+                          <span className="text-xs text-muted-foreground">
+                            Expires {formatPeriodEnd(currentPeriodEnd)}
+                          </span>
+                        )}
+                      </div>
                     )}
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {roleExpiration ? 
-                        `Expires: ${format(new Date(roleExpiration), 'MMM dd, yyyy')}` : 
-                        'Never expires'
-                      }
-                    </span>
+                    
+                    {customerPortalUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openCustomerPortal}
+                        className="mt-2"
+                      >
+                        <ExternalLink className="h-3 w-3 mr-2" />
+                        Manage Subscription
+                      </Button>
+                    )}
+                    
+                    {!hasSubscription && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        No active subscription
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -517,6 +571,8 @@ export default function ProfilePage() {
         isOpen={showChangePasswordModal}
         onClose={() => setShowChangePasswordModal(false)}
       />
+      
+      <Footer />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -272,9 +273,9 @@ export default function AdminInvitationsNew() {
 
   // Main admin interface
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-6 py-8">
+      <main className="flex-1 container mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Mail className="h-8 w-8" />
@@ -542,6 +543,8 @@ export default function AdminInvitationsNew() {
           </Card>
         </div>
       </main>
+      
+      <Footer />
     </div>
   );
 }

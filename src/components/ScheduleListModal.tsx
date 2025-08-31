@@ -46,7 +46,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useRBAC } from "@/hooks/useRBAC";
-import ScheduleRebalanceModal from "./ScheduleRebalanceModal";
+import ScheduleRebalanceModal from "./schedule-rebalance/ScheduleRebalanceModal";
 
 interface ScheduleListModalProps {
   isOpen: boolean;
@@ -278,8 +278,35 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
     const now = new Date();
     const [hours, minutes] = schedule.time_of_day.split(':').map(Number);
 
+    // Helper function to find next occurrence for weekly schedules with specific days
+    const findNextWeeklyOccurrence = (startDate: Date, daysOfWeek: number[]): Date => {
+      const result = new Date(startDate);
+      result.setHours(hours, minutes, 0, 0);
+      
+      // If the time has already passed today, start checking from tomorrow
+      if (result <= now) {
+        result.setDate(result.getDate() + 1);
+      }
+      
+      // Find the next matching day of week (max 7 days to check)
+      for (let i = 0; i < 7; i++) {
+        if (daysOfWeek.includes(result.getDay())) {
+          return result;
+        }
+        result.setDate(result.getDate() + 1);
+      }
+      
+      // Fallback (should never reach here if daysOfWeek is valid)
+      return result;
+    };
+
     // If never executed, calculate from current date
     if (!schedule.last_executed_at) {
+      // For weekly schedules with specific days
+      if (schedule.interval_unit === 'weeks' && schedule.day_of_week && schedule.day_of_week.length > 0) {
+        return findNextWeeklyOccurrence(now, schedule.day_of_week);
+      }
+
       // Create a date in the schedule's timezone
       const nextRun = new Date(now);
       nextRun.setHours(hours, minutes, 0, 0);
@@ -306,7 +333,14 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
     const lastRun = new Date(schedule.last_executed_at);
     let nextRun = new Date(lastRun);
 
-    // Add the interval
+    // For weekly schedules with specific days
+    if (schedule.interval_unit === 'weeks' && schedule.day_of_week && schedule.day_of_week.length > 0) {
+      // Start from the day after last execution
+      nextRun.setDate(nextRun.getDate() + 1);
+      return findNextWeeklyOccurrence(nextRun, schedule.day_of_week);
+    }
+
+    // Add the interval for regular schedules
     switch (schedule.interval_unit) {
       case 'days':
         nextRun.setDate(nextRun.getDate() + schedule.interval_value);
@@ -381,8 +415,8 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="!max-w-4xl !max-h-[85vh] !p-0 !flex !flex-col !gap-0">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+        <DialogContent className="max-w-4xl h-[85vh] p-0 flex flex-col gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Clock className="w-5 h-5" />
               Scheduled Rebalances
@@ -392,7 +426,7 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -413,11 +447,10 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
                 </Button>
               </div>
             ) : (
-              <ScrollArea className="h-full">
-                <div className="p-6 space-y-4">
-                  {schedules.map((schedule, index) => {
-                    const isAccessible = isScheduleAccessible(schedule);
-                    return (
+              <div className="p-6 space-y-4">
+                {schedules.map((schedule, index) => {
+                  const isAccessible = isScheduleAccessible(schedule);
+                  return (
                       <Card key={schedule.id} className="p-4">
                         {!isAccessible && (
                           <Alert className="mb-3">
@@ -598,15 +631,14 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
                           </div>
                         </div>
                       </Card>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
+                  );
+                })}
+              </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="border-t px-6 py-4 bg-background shrink-0">
+          <div className="border-t px-6 py-4 bg-background flex-shrink-0">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <p className="text-xs text-muted-foreground">

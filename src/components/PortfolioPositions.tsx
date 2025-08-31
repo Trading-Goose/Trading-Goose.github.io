@@ -28,7 +28,7 @@ import {
   convertLegacyAnalysisStatus,
   isAnalysisActive
 } from "@/lib/statusTypes";
-import RebalanceModal from "./RebalanceModal";
+import RebalanceModal from "./rebalance/RebalanceModal";
 import RebalanceDetailModal from "./RebalanceDetailModal";
 import ScheduleListModal from "./ScheduleListModal";
 
@@ -606,14 +606,35 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
 
             // Handle successful response
             if (data?.success) {
-              toast({
-                title: "Rebalance Initiated",
-                description: `Analyzing ${data.tickers?.length || 0} stocks for rebalancing. You will be notified when complete.`,
-              });
+              // Check if rebalance completed immediately (threshold not exceeded, opportunity skipped)
+              const isImmediateCompletion = data.status === 'completed' || data.tickersAnalyzed === 0;
+              
+              if (isImmediateCompletion) {
+                // Rebalance completed immediately without any analysis
+                toast({
+                  title: "Rebalance Complete",
+                  description: data.message || "No rebalancing needed - threshold not exceeded",
+                });
+                // Don't set running rebalance since it's already complete
+              } else {
+                // Normal rebalance with analysis
+                const stockCount = data.tickers?.length || 
+                                 data.tickersToEvaluate || 
+                                 data.totalAnalyses || 
+                                 selectedPositions.length || 
+                                 0;
+                
+                toast({
+                  title: "Rebalance Initiated",
+                  description: `Analyzing ${stockCount} stocks for rebalancing. You will be notified when complete.`,
+                });
 
-              // Store rebalance request ID if needed for tracking
-              if (data.rebalanceRequestId) {
-                localStorage.setItem('activeRebalanceId', data.rebalanceRequestId);
+                // Store rebalance request ID if needed for tracking
+                if (data.rebalanceRequestId) {
+                  localStorage.setItem('activeRebalanceId', data.rebalanceRequestId);
+                  // Immediately set the running rebalance to show the button change
+                  setRunningRebalance(data.rebalanceRequestId);
+                }
               }
             } else {
               // Handle malformed response (no success field)

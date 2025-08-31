@@ -101,7 +101,7 @@ export default function Header() {
                   <img src="/goose.png" alt="TradingGoose Logo" className="h-5 w-5 sm:h-10 sm:w-10" />
                 </div>
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-foreground">TradingGoose</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold" style={{ color: '#FFCC00' }}>TradingGoose</h1>
                   <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">AI-Powered Portfolio Management</p>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Bot, Shield, Calendar, Play } from "lucide-react";
@@ -24,10 +25,10 @@ const Index = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
 
-      <main className="container mx-auto px-6 py-8">
+      <main className="flex-1 container mx-auto px-6 py-8">
         <div className="max-w-6xl mx-auto">
           {/* Hero Section */}
           <div className="text-center py-16 space-y-8">
@@ -204,6 +205,7 @@ const Index = () => {
 
         </div>
       </main>
+      <Footer />
     </div>
   );
 };

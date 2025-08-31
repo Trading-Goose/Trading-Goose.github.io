@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import PortfolioPositions from "@/components/PortfolioPositions";
 import RecentTrades from "@/components/RecentTrades";
 import PerformanceChart from "@/components/PerformanceChart";
-import HorizontalWorkflow from "@/components/HorizontalWorkflow";
+import HorizontalWorkflow from "@/components/workflow";
 import StandaloneWatchlist from "@/components/StandaloneWatchlist";
 import { useAuth } from "@/lib/auth";
 
@@ -62,10 +63,10 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
       
-      <main className="container mx-auto px-6 py-8">
+      <main className="flex-1 container mx-auto px-6 py-8">
         {/* Main Content */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           {/* Left Side - Performance and Watchlist */}
@@ -91,6 +92,7 @@ const Dashboard = () => {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   );
 };

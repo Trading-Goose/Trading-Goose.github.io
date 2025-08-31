@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import HorizontalWorkflow from "./HorizontalWorkflow";
+import HorizontalWorkflow from "./workflow";
 import WorkflowVisualization from "./WorkflowVisualization";
 import MarkdownRenderer from "./MarkdownRenderer";
 import MessageRenderer from "./MessageRenderer";

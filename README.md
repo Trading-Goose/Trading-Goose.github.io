@@ -2,16 +2,34 @@
 
 <h1 style="line-height:50px;" align="center"><img src="public/goose.png" alt="TradingGoose Logo" style=" vertical-align: middle; width:35px; height:35px;"> TradingGoose </h1>
 
- 
+[![Discord](https://dcbadge.limes.pink/api/server/3dkTaNyp?style=flat)](https://discord.gg/3dkTaNyp)
   
   An intelligent trading platform powered by multiple AI agents that collaborate to analyze markets, manage portfolios, and execute trades with sophisticated risk management.
+
+  **[Open Source Version Available](https://github.com/Trading-Goose/Open-TradingGoose)** - Deploy your own instance!
 </div>
 
 <img src="public/screen-shot.png" >
 
 ## 📖 Overview
 
-This repository contains the **frontend application** for the TradingGoose project - a comprehensive trading system that leverages a swarm of specialized AI agents to provide institutional-grade market analysis and automated trading capabilities. The platform combines fundamental analysis, technical indicators, news sentiment, and social media signals to make informed trading decisions.
+TradingGoose focuses on **event-driven trading strategy and analysis** that harnesses the power of AI agents and Alpaca's market data to deliver sophisticated trading recommendations and automated portfolio management insights. The system employs a multi-agent workflow architecture where specialized AI agents collaborate to analyze market-moving events in real-time.
+
+### 🎯 Core Concept
+
+The system leverages Large Language Models' natural language processing capabilities to rapidly analyze news, social media, and other textual data sources that often trigger market volatility. By processing these events faster than traditional methods, TradingGoose identifies potential market movements and generates timely trading signals for user-selected stocks.
+
+### 🔄 Intelligent Execution
+
+Once analysis agents provide their recommendations, the **Portfolio Manager AI agent** takes over to:
+- Analyze the user's Alpaca account details and current portfolio state
+- Consider user-configured position sizing, allocation strategies, and risk tolerance
+- Generate final trading orders with precise values and actions for specific tickers
+- Make autonomous decisions that may differ from initial recommendations based on actual portfolio constraints and risk management
+
+This two-layer approach ensures that while the analysis agents focus on identifying opportunities, the portfolio manager maintains discipline in execution, potentially overriding recommendations when they conflict with portfolio health, risk limits, or allocation rules.
+
+### 🏗️ Architecture Foundation
 
 This project's multi-agent analysis workflow architecture is based on the [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) framework, which pioneered the concept of collaborative AI agents for financial analysis.
 
@@ -255,7 +273,7 @@ This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE)
 For issues, questions, or suggestions:
 
 - Open an issue on GitHub
-- Discord server coming soon! 🎮
+- Join our [Discord community](https://discord.gg/3dkTaNyp) 🎮
 
 ## 🚧 Development
 

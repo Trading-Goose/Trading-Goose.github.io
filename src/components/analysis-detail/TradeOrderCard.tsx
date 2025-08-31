@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertCircle,
   ArrowUpRight,
   ArrowDownRight,
@@ -177,6 +178,11 @@ export default function TradeOrderCard({
 
   // Determine card background based on status and action
   const getCardClasses = () => {
+    // For HOLD orders, use default outline style
+    if (decision === 'HOLD') {
+      return '';
+    }
+    
     if (isPending) {
       return 'bg-yellow-500/5 border-yellow-500/20 hover:bg-yellow-500/10';
     } else if (isOrderExecuted) {
@@ -309,8 +315,8 @@ export default function TradeOrderCard({
             </Badge>
           )}
 
-          {/* Only show action buttons for pending decisions */}
-          {isPending && !isApproved && !isRejected && (
+          {/* Only show action buttons for pending decisions and NOT HOLD orders */}
+          {isPending && !isApproved && !isRejected && decision !== 'HOLD' && (
             <>
               <Button
                 size="sm"

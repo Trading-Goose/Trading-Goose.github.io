@@ -3,7 +3,8 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const Disclaimer = () => {
   // Scroll to top when component mounts
@@ -260,19 +261,38 @@ const Disclaimer = () => {
             </CardContent>
           </Card>
 
-          {/* Section 13 */}
-          <Card className="border-primary/30 bg-primary/5">
+          {/* Section 13 - Acceptance */}
+          <Card>
             <CardContent className="pt-6">
-              <h2 className="text-xl font-semibold mb-4">13. Acceptance and Contact</h2>
+              <h2 className="text-xl font-semibold mb-4">13. Acceptance of Terms</h2>
               <p className="text-muted-foreground leading-relaxed">
                 By accessing and using TradingGoose, you acknowledge that you have read, understood, and agree to be bound 
                 by this disclaimer. If you do not agree with any part of this disclaimer, you must immediately discontinue 
                 use of the platform.
               </p>
-              <p className="text-muted-foreground leading-relaxed mt-4">
-                For questions about this disclaimer or the TradingGoose platform, please contact us through our official 
-                support channels.
-              </p>
+            </CardContent>
+          </Card>
+
+          {/* Contact Section */}
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <Users className="h-6 w-6 text-primary mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Still have questions?</h3>
+                  <p className="text-muted-foreground">
+                    If you couldn't find the answer you're looking for, please don't hesitate to reach out to our support team.
+                    We're here to help you get the most out of TradingGoose.
+                  </p>
+                  <Button 
+                    className="mt-4" 
+                    variant="default"
+                    onClick={() => window.open('https://discord.gg/3dkTaNyp', '_blank')}
+                  >
+                    Contact Support
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

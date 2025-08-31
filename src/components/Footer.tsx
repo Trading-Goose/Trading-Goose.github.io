@@ -55,7 +55,7 @@ const Footer = () => {
             {/* Right Section - Social Media Icons */}
             <div className="flex items-center justify-center md:justify-end space-x-4">
               <a
-                href="https://discord.gg"
+                href="https://discord.gg/3dkTaNyp"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-primary transition-colors"
@@ -91,10 +91,7 @@ const Footer = () => {
           <div className="border-t border-border py-6">
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
-                © {currentYear} TradingGoose. All rights reserved.
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Pioneering Trading Intelligence with AI Precision
+                © {currentYear} TradingGoose. All rights reserved.   -    Pioneering Trading Intelligence with AI Precision
               </p>
             </div>
           </div>

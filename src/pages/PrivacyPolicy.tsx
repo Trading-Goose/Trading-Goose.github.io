@@ -3,7 +3,8 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Shield, Lock, Eye, Database, Key, UserCheck, Globe, Mail } from "lucide-react";
+import { Shield, Lock, Eye, Database, Key, UserCheck, Globe, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const PrivacyPolicy = () => {
   // Scroll to top when component mounts
@@ -304,20 +305,24 @@ const PrivacyPolicy = () => {
             </CardContent>
           </Card>
 
-          {/* Section 12 - Contact Information */}
+          {/* Contact Section */}
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="pt-6">
               <div className="flex items-start gap-4">
-                <Mail className="h-6 w-6 text-primary mt-1 flex-shrink-0" />
+                <Users className="h-6 w-6 text-primary mt-1 flex-shrink-0" />
                 <div>
-                  <h2 className="text-xl font-semibold mb-4">12. Contact Us</h2>
-                  <p className="text-muted-foreground leading-relaxed">
-                    If you have any questions, concerns, or requests regarding this Privacy Policy or our privacy
-                    practices, please contact us through our official support channels.
+                  <h3 className="text-lg font-semibold mb-2">Still have questions?</h3>
+                  <p className="text-muted-foreground">
+                    If you couldn't find the answer you're looking for, please don't hesitate to reach out to our support team.
+                    We're here to help you get the most out of TradingGoose.
                   </p>
-                  <p className="mt-4 text-muted-foreground">
-                    We are committed to addressing your privacy concerns and will respond to inquiries as promptly as possible.
-                  </p>
+                  <Button 
+                    className="mt-4" 
+                    variant="default"
+                    onClick={() => window.open('https://discord.gg/3dkTaNyp', '_blank')}
+                  >
+                    Contact Support
+                  </Button>
                 </div>
               </div>
             </CardContent>

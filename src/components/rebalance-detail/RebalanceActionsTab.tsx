@@ -313,15 +313,54 @@ export default function RebalanceActionsTab({
         throw new Error('Trade action ID not found for this position');
       }
 
-      const { data, error } = await supabase.functions.invoke('execute-trade', {
+      const response = await supabase.functions.invoke('execute-trade', {
         body: {
           tradeActionId: position.tradeActionId,
           action: 'approve'
         }
       });
 
-      if (error) throw error;
+      console.log('Execute trade response:', response);
 
+      // Check if the function call itself failed (network error, etc)
+      if (response.error) {
+        console.error('Supabase function error:', response.error);
+        let errorMessage = "Failed to execute order";
+        
+        // Parse the error message
+        if (typeof response.error === 'string') {
+          errorMessage = response.error;
+        } else if (response.error?.message) {
+          errorMessage = response.error.message;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Parse the response data
+      const data = response.data;
+      
+      // Check if the edge function returned an error in the response body
+      if (data?.error) {
+        console.error('Edge function returned error:', data.error);
+        let errorMessage = data.error;
+        
+        // Clean up common error messages
+        if (errorMessage.includes('Alpaca API error:')) {
+          // Extract the actual Alpaca error
+          const alpacaError = errorMessage.replace('Alpaca API error:', '').trim();
+          try {
+            const alpacaErrorJson = JSON.parse(alpacaError);
+            errorMessage = alpacaErrorJson.message || alpacaErrorJson.error || alpacaError;
+          } catch {
+            errorMessage = alpacaError;
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Check for success flag
       if (data?.success) {
         setExecutedTickers(new Set([...executedTickers, ticker]));
 
@@ -343,17 +382,46 @@ export default function RebalanceActionsTab({
           description: `Order for ${ticker} has been submitted to Alpaca. Order ID: ${data.alpacaOrderId?.substring(0, 8)}...`,
         });
       } else {
+        // Handle case where data.success is false
+        const errorMessage = data?.message || data?.error || "Failed to execute order";
+        console.error('Order execution failed:', data);
         toast({
           title: "Order Failed",
-          description: data?.message || "Failed to execute order",
+          description: errorMessage,
           variant: "destructive",
         });
       }
     } catch (error: any) {
       console.error('Error executing order:', error);
+      
+      // Extract error message with better parsing
+      let errorMessage = error.message || "Failed to execute order";
+      
+      // Clean up common error patterns
+      if (errorMessage.includes('insufficient') || errorMessage.includes('Insufficient')) {
+        errorMessage = "Insufficient buying power or balance";
+      } else if (errorMessage.includes('market') || errorMessage.includes('Market')) {
+        errorMessage = "Market is closed or order cannot be placed at this time";
+      } else if (errorMessage.includes('API settings not found')) {
+        errorMessage = "API settings not found. Please configure in Settings.";
+      } else if (errorMessage.includes('Alpaca credentials not configured')) {
+        errorMessage = "Alpaca credentials not configured. Please add them in Settings.";
+      } else if (errorMessage.includes('Invalid order')) {
+        errorMessage = "Invalid order: no quantity or dollar amount specified";
+      } else if (errorMessage.includes('Order already executed')) {
+        // This is actually not an error - the order was already executed
+        toast({
+          title: "Order Already Executed",
+          description: `Order for ${ticker} was already submitted to Alpaca`,
+          variant: "default",
+        });
+        setExecutingTicker(null);
+        return;
+      }
+      
       toast({
         title: "Order Failed",
-        description: error.message || "Failed to execute order on Alpaca",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -456,40 +524,134 @@ export default function RebalanceActionsTab({
       let successCount = 0;
       let failedCount = 0;
       const newExecutedTickers = new Set(executedTickers);
+      const failedOrders: { ticker: string; error: string }[] = [];
 
       results.forEach((result, index) => {
         const position = pendingPositions[index];
-        if (result.status === 'fulfilled' && result.value.data?.success) {
-          successCount++;
-          newExecutedTickers.add(position.ticker);
-          position.executed = true;
-          position.orderStatus = 'approved';
-          position.alpacaOrderId = result.value.data.alpacaOrderId;
+        if (result.status === 'fulfilled') {
+          const response = result.value;
+          const data = response.data;
+          const error = response.error;
+          
+          // Check for errors in the response
+          if (error || data?.error) {
+            failedCount++;
+            let errorMessage = "Unknown error";
+            
+            if (error) {
+              errorMessage = typeof error === 'string' ? error : (error.message || "Failed to execute order");
+            } else if (data?.error) {
+              errorMessage = data.error;
+              // Clean up Alpaca API errors
+              if (errorMessage.includes('Alpaca API error:')) {
+                const alpacaError = errorMessage.replace('Alpaca API error:', '').trim();
+                try {
+                  const alpacaErrorJson = JSON.parse(alpacaError);
+                  errorMessage = alpacaErrorJson.message || alpacaErrorJson.error || alpacaError;
+                } catch {
+                  errorMessage = alpacaError;
+                }
+              }
+            }
+            
+            failedOrders.push({
+              ticker: position.ticker,
+              error: errorMessage
+            });
+            console.error(`Failed to execute order for ${position.ticker}:`, error || data);
+          } else if (data?.success) {
+            // Success case
+            successCount++;
+            newExecutedTickers.add(position.ticker);
+            position.executed = true;
+            position.orderStatus = 'approved';
+            position.alpacaOrderId = data.alpacaOrderId;
+            
+            // Update order status
+            setOrderStatuses(prev => new Map(prev.set(position.ticker, {
+              status: 'approved',
+              alpacaOrderId: data.alpacaOrderId,
+              alpacaStatus: data.alpacaStatus
+            })));
+          } else {
+            // Unexpected response format
+            failedCount++;
+            failedOrders.push({
+              ticker: position.ticker,
+              error: "Unexpected response from server"
+            });
+            console.error(`Unexpected response for ${position.ticker}:`, data);
+          }
         } else {
+          // Promise was rejected
           failedCount++;
-          console.error(`Failed to execute order for ${position.ticker}:`, result);
+          const errorMessage = result.reason?.message || "Failed to execute order";
+          failedOrders.push({
+            ticker: position.ticker,
+            error: errorMessage
+          });
+          console.error(`Failed to execute order for ${position.ticker}:`, result.reason);
         }
       });
 
       setExecutedTickers(newExecutedTickers);
 
-      if (successCount > 0) {
+      if (successCount > 0 && failedCount === 0) {
         toast({
           title: "Orders Executed",
-          description: `${successCount} order${successCount !== 1 ? 's' : ''} submitted successfully${failedCount > 0 ? `, ${failedCount} failed` : ''}`,
+          description: `All ${successCount} order${successCount !== 1 ? 's' : ''} submitted successfully`,
         });
+      } else if (successCount > 0 && failedCount > 0) {
+        // Show success with warning about failures
+        toast({
+          title: "Partial Success",
+          description: `${successCount} order${successCount !== 1 ? 's' : ''} submitted, ${failedCount} failed`,
+          variant: "default",
+        });
+        
+        // Show details of failed orders
+        if (failedOrders.length > 0) {
+          const failedTickerList = failedOrders.map(f => f.ticker).join(', ');
+          toast({
+            title: "Failed Orders",
+            description: `Failed to execute: ${failedTickerList}`,
+            variant: "destructive",
+          });
+        }
       } else {
+        // All failed
+        let errorDescription = "Failed to execute any orders";
+        if (failedOrders.length > 0 && failedOrders[0].error) {
+          // Show the first error message if available
+          errorDescription = failedOrders[0].error;
+        }
         toast({
           title: "Execution Failed",
-          description: "Failed to execute any orders",
+          description: errorDescription,
           variant: "destructive",
         });
       }
     } catch (error: any) {
       console.error('Error executing orders:', error);
+      
+      // Better error message extraction
+      let errorMessage = "Failed to execute orders";
+      if (error.message) {
+        errorMessage = error.message;
+        
+        // Check for common error patterns
+        if (errorMessage.includes('Edge function returned non-2xx')) {
+          errorMessage = "Service error - please check your API configuration";
+        } else if (errorMessage.includes('insufficient') || errorMessage.includes('Insufficient')) {
+          errorMessage = "Insufficient buying power for all orders";
+        } else if (errorMessage.includes('market') || errorMessage.includes('Market')) {
+          errorMessage = "Market is closed or orders cannot be placed at this time";
+        }
+      }
+      
       toast({
         title: "Execution Failed",
-        description: error.message || "Failed to execute orders",
+        description: errorMessage,
         variant: "destructive",
       });
     }

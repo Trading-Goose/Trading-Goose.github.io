@@ -625,3 +625,18 @@ export const validateDeepSeekKey = (key: string): boolean => {
 export const validateGoogleKey = (key: string): boolean => {
   return key.startsWith('AIza') && key.length > 30;
 };
+
+// Check if Alpaca credentials are configured
+export const hasAlpacaCredentials = (settings: ApiSettings | null): boolean => {
+  if (!settings) return false;
+  
+  const isPaper = settings.alpaca_paper_trading ?? true;
+  
+  if (isPaper) {
+    // For paper trading, check paper API keys
+    return !!(settings.alpaca_paper_api_key && settings.alpaca_paper_secret_key);
+  } else {
+    // For live trading, check live API keys
+    return !!(settings.alpaca_live_api_key && settings.alpaca_live_secret_key);
+  }
+};

@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Calendar, Settings, List, Loader2 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Clock, Calendar, Settings, List, Loader2, AlertCircle } from "lucide-react";
+import { useAuth, hasRequiredApiKeys, hasAlpacaCredentials } from "@/lib/auth";
 // Import hooks
 import { useScheduleData } from "./hooks/useScheduleData";
 import { useScheduleConfig } from "./hooks/useScheduleConfig";
@@ -25,8 +26,13 @@ import { SettingsTab } from "./tabs/SettingsTab";
 import type { ScheduleRebalanceModalProps } from "./types";
 
 export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit }: ScheduleRebalanceModalProps) {
-  const { user } = useAuth();
+  const { user, apiSettings } = useAuth();
   const [activeTab, setActiveTab] = useState("schedule");
+  
+  // Check for required credentials
+  const hasApiKeys = hasRequiredApiKeys(apiSettings);
+  const hasAlpaca = hasAlpacaCredentials(apiSettings);
+  const canCreateSchedule = hasApiKeys && hasAlpaca;
 
   // Use configuration hooks
   const {
@@ -156,6 +162,30 @@ export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit
           />
         </Tabs>
 
+        {/* Warning message for missing credentials */}
+        {!canCreateSchedule && (
+          <div className="px-6 py-4 border-t">
+            <Alert className="bg-yellow-500/10 border-yellow-500/20">
+              <AlertCircle className="h-4 w-4 text-yellow-500" />
+              <AlertDescription className="text-yellow-600 dark:text-yellow-400">
+                {!hasApiKeys && !hasAlpaca ? (
+                  <>
+                    <strong>Configuration Required:</strong> Please configure both your AI provider API keys and Alpaca credentials in the Settings page before creating a rebalance schedule.
+                  </>
+                ) : !hasApiKeys ? (
+                  <>
+                    <strong>AI Provider Required:</strong> Please configure your AI provider API keys in the Settings page before creating a rebalance schedule.
+                  </>
+                ) : (
+                  <>
+                    <strong>Alpaca Credentials Required:</strong> Please configure your Alpaca API credentials in the Settings page before creating a rebalance schedule.
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
         {/* Fixed Footer */}
         <div className="border-t px-6 py-4 bg-background shrink-0">
           <div className="flex justify-between">
@@ -177,7 +207,8 @@ export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={saving || loading || (selectedPositions.size === 0 && !includeAllPositions)}
+                disabled={saving || loading || (selectedPositions.size === 0 && !includeAllPositions) || !canCreateSchedule}
+                title={!canCreateSchedule ? "Please configure API keys and Alpaca credentials first" : undefined}
               >
                 {saving ? (
                   <>

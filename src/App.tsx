@@ -26,6 +26,7 @@ import InvitationSetup from "./pages/InvitationSetup";
 import Disclaimer from "./pages/Disclaimer";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import FAQ from "./pages/FAQ";
+import Pricing from "./pages/Pricing";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const AppRoutes = () => {
       <Route path="/disclaimer" element={<Disclaimer />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/faq" element={<FAQ />} />
+      <Route path="/pricing" element={<Pricing />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

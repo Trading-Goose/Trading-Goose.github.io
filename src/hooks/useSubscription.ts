@@ -8,7 +8,9 @@ interface SubscriptionInfo {
   variantName: string | null;
   currentPeriodEnd: string | null;
   customerPortalUrl: string | null;
-  isSubscriptionActive: boolean;
+  pendingVariantName: string | null;
+  pendingChangeType: string | null;
+  pendingChangeEffectiveAt: string | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -21,7 +23,9 @@ export function useSubscription() {
     variantName: null,
     currentPeriodEnd: null,
     customerPortalUrl: null,
-    isSubscriptionActive: false,
+    pendingVariantName: null,
+    pendingChangeType: null,
+    pendingChangeEffectiveAt: null,
     isLoading: true,
     error: null
   });
@@ -60,7 +64,9 @@ export function useSubscription() {
             variantName: subData.variant_name,
             currentPeriodEnd: subData.current_period_end,
             customerPortalUrl: subData.customer_portal_url,
-            isSubscriptionActive: subData.is_subscription_active,
+            pendingVariantName: subData.pending_variant_name,
+            pendingChangeType: subData.pending_change_type,
+            pendingChangeEffectiveAt: subData.pending_change_effective_at,
             isLoading: false,
             error: null
           });
@@ -71,7 +77,9 @@ export function useSubscription() {
             variantName: null,
             currentPeriodEnd: null,
             customerPortalUrl: null,
-            isSubscriptionActive: false,
+            pendingVariantName: null,
+            pendingChangeType: null,
+            pendingChangeEffectiveAt: null,
             isLoading: false,
             error: null
           });

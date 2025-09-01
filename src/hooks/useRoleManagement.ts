@@ -29,6 +29,14 @@ export interface RoleWithLimits {
   role_id: string;
   role_name: string;
   is_built_in?: boolean;
+  // New subscription and display fields
+  color?: string;
+  icon_url?: string;
+  price_monthly?: number;
+  price_yearly?: number;
+  features?: any; // JSONB array of features
+  lemon_squeezy_variant_id_monthly?: string;
+  lemon_squeezy_variant_id_yearly?: string;
   // Flattened limits for easier access
   max_parallel_analysis: number;
   max_watchlist_stocks: number;
@@ -99,6 +107,14 @@ export function useRoleManagement() {
           is_built_in: role.is_built_in,
           limits,
           permissions: rolePermNames,
+          // New subscription and display fields
+          color: role.color,
+          icon_url: role.icon_url,
+          price_monthly: role.price_monthly,
+          price_yearly: role.price_yearly,
+          features: role.features,
+          lemon_squeezy_variant_id_monthly: role.lemon_squeezy_variant_id_monthly,
+          lemon_squeezy_variant_id_yearly: role.lemon_squeezy_variant_id_yearly,
           // Flatten limits for easier access in the component
           max_parallel_analysis: limits?.max_parallel_analysis ?? 1,
           max_watchlist_stocks: limits?.max_watchlist_stocks ?? 10,
@@ -190,7 +206,10 @@ export function useRoleManagement() {
       }
 
       // Try RPC function first, fall back to direct update if it doesn't exist
-      if (updates.name || updates.display_name || updates.description || updates.priority !== undefined) {
+      if (updates.name || updates.display_name || updates.description || updates.priority !== undefined || 
+          updates.color !== undefined || updates.icon_url !== undefined || updates.price_monthly !== undefined || 
+          updates.price_yearly !== undefined || updates.features !== undefined || 
+          updates.lemon_squeezy_variant_id_monthly !== undefined || updates.lemon_squeezy_variant_id_yearly !== undefined) {
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('update_role_details', {
             p_role_id: roleId,
@@ -208,6 +227,16 @@ export function useRoleManagement() {
           if (updates.display_name) updateData.display_name = updates.display_name;
           if (updates.description !== undefined) updateData.description = updates.description;
           if (updates.priority !== undefined) updateData.priority = updates.priority;
+          // Handle color - empty string should be saved as null
+          if (updates.color !== undefined) updateData.color = updates.color || null;
+          // Handle icon_url - empty string should be saved as null
+          if (updates.icon_url !== undefined) updateData.icon_url = updates.icon_url || null;
+          if (updates.price_monthly !== undefined) updateData.price_monthly = updates.price_monthly;
+          if (updates.price_yearly !== undefined) updateData.price_yearly = updates.price_yearly;
+          if (updates.features !== undefined) updateData.features = updates.features;
+          // Handle Lemon Squeezy IDs - empty strings should be saved as null
+          if (updates.lemon_squeezy_variant_id_monthly !== undefined) updateData.lemon_squeezy_variant_id_monthly = updates.lemon_squeezy_variant_id_monthly || null;
+          if (updates.lemon_squeezy_variant_id_yearly !== undefined) updateData.lemon_squeezy_variant_id_yearly = updates.lemon_squeezy_variant_id_yearly || null;
           
           const { error: updateError } = await supabase
             .from('roles')
@@ -217,6 +246,51 @@ export function useRoleManagement() {
           if (updateError) throw updateError;
         } else if (rpcError) {
           throw rpcError;
+        } else {
+          // RPC function exists and succeeded, but we still need to update the extended fields
+          // since the RPC function might not handle them
+          const extendedUpdateData: any = {};
+          let hasExtendedUpdates = false;
+          
+          // Handle extended fields that might not be in the RPC function
+          if (updates.color !== undefined) {
+            extendedUpdateData.color = updates.color || null;
+            hasExtendedUpdates = true;
+          }
+          if (updates.icon_url !== undefined) {
+            extendedUpdateData.icon_url = updates.icon_url || null;
+            hasExtendedUpdates = true;
+          }
+          if (updates.price_monthly !== undefined) {
+            extendedUpdateData.price_monthly = updates.price_monthly;
+            hasExtendedUpdates = true;
+          }
+          if (updates.price_yearly !== undefined) {
+            extendedUpdateData.price_yearly = updates.price_yearly;
+            hasExtendedUpdates = true;
+          }
+          if (updates.features !== undefined) {
+            extendedUpdateData.features = updates.features;
+            hasExtendedUpdates = true;
+          }
+          if (updates.lemon_squeezy_variant_id_monthly !== undefined) {
+            extendedUpdateData.lemon_squeezy_variant_id_monthly = updates.lemon_squeezy_variant_id_monthly || null;
+            hasExtendedUpdates = true;
+          }
+          if (updates.lemon_squeezy_variant_id_yearly !== undefined) {
+            extendedUpdateData.lemon_squeezy_variant_id_yearly = updates.lemon_squeezy_variant_id_yearly || null;
+            hasExtendedUpdates = true;
+          }
+          
+          // If there are extended fields to update, do a direct update for those
+          if (hasExtendedUpdates) {
+            const { error: extendedUpdateError } = await supabase
+              .from('roles')
+              .update(extendedUpdateData)
+              .eq('id', roleId);
+              
+            if (extendedUpdateError) throw extendedUpdateError;
+          }
         }
       }
 

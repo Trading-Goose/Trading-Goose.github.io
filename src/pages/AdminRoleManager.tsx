@@ -67,6 +67,7 @@ export default function AdminRoleManager() {
   const [selectedRole, setSelectedRole] = useState<RoleWithLimits | null>(null);
   const [editingLimits, setEditingLimits] = useState<RoleWithLimits | null>(null);
   const [editingRole, setEditingRole] = useState<RoleWithLimits | null>(null);
+  const [editingRoleExtended, setEditingRoleExtended] = useState<any>(null);
   const [expandedPermissions, setExpandedPermissions] = useState<string[]>([]);
   const [isCreatingRole, setIsCreatingRole] = useState(false);
   const [newRole, setNewRole] = useState({
@@ -198,7 +199,14 @@ export default function AdminRoleManager() {
         name: editingRole.name,
         display_name: editingRole.display_name,
         description: editingRole.description,
-        priority: editingRole.priority
+        priority: editingRole.priority,
+        color: editingRoleExtended?.color,
+        icon_url: editingRoleExtended?.icon_url,
+        price_monthly: editingRoleExtended?.price_monthly,
+        price_yearly: editingRoleExtended?.price_yearly,
+        features: editingRoleExtended?.features,
+        lemon_squeezy_variant_id_monthly: editingRoleExtended?.lemon_squeezy_variant_id_monthly,
+        lemon_squeezy_variant_id_yearly: editingRoleExtended?.lemon_squeezy_variant_id_yearly
       });
 
       if (result.success) {
@@ -347,7 +355,18 @@ export default function AdminRoleManager() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => setEditingRole(role)}
+                              onClick={() => {
+                                setEditingRole(role);
+                                setEditingRoleExtended({
+                                  color: role.color || '',
+                                  icon_url: role.icon_url || '',
+                                  price_monthly: role.price_monthly ?? null,
+                                  price_yearly: role.price_yearly ?? null,
+                                  features: role.features || [],
+                                  lemon_squeezy_variant_id_monthly: role.lemon_squeezy_variant_id_monthly || '',
+                                  lemon_squeezy_variant_id_yearly: role.lemon_squeezy_variant_id_yearly || ''
+                                });
+                              }}
                               title="Edit role details"
                             >
                               <Edit className="h-4 w-4" />
@@ -462,8 +481,11 @@ export default function AdminRoleManager() {
 
         {/* Edit Role Dialog */}
         {editingRole && (
-          <Dialog open={!!editingRole} onOpenChange={() => setEditingRole(null)}>
-            <DialogContent>
+          <Dialog open={!!editingRole} onOpenChange={() => {
+            setEditingRole(null);
+            setEditingRoleExtended(null);
+          }}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit Role: {editingRole.display_name}</DialogTitle>
                 <DialogDescription>
@@ -507,9 +529,150 @@ export default function AdminRoleManager() {
                     onChange={(e) => setEditingRole({ ...editingRole, priority: parseInt(e.target.value) || 10 })}
                   />
                 </div>
+                
+                {/* Extended role fields */}
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold mb-3">Display Settings</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Color (Hex Code)</Label>
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          value={editingRoleExtended?.color || ''}
+                          onChange={(e) => setEditingRoleExtended({ ...editingRoleExtended, color: e.target.value })}
+                          placeholder="e.g., #FF5733"
+                          className="flex-1"
+                        />
+                        <div 
+                          className="w-10 h-10 rounded border"
+                          style={{ backgroundColor: editingRoleExtended?.color || '#6B7280' }}
+                          title="Color preview"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Icon URL</Label>
+                      <Input
+                        value={editingRoleExtended?.icon_url || ''}
+                        onChange={(e) => setEditingRoleExtended({ ...editingRoleExtended, icon_url: e.target.value })}
+                        placeholder="e.g., https://example.com/icons/crown.svg"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold mb-3">Pricing</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Monthly Price (USD)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editingRoleExtended?.price_monthly ?? ''}
+                        onChange={(e) => setEditingRoleExtended({ 
+                          ...editingRoleExtended, 
+                          price_monthly: e.target.value === '' ? null : parseFloat(e.target.value)
+                        })}
+                        placeholder="e.g., 29.99 or 0.00 for free"
+                      />
+                    </div>
+                    <div>
+                      <Label>Yearly Price (USD)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editingRoleExtended?.price_yearly ?? ''}
+                        onChange={(e) => setEditingRoleExtended({ 
+                          ...editingRoleExtended, 
+                          price_yearly: e.target.value === '' ? null : parseFloat(e.target.value)
+                        })}
+                        placeholder="e.g., 299.99 or 0.00 for free"
+                      />
+                      {editingRoleExtended?.price_monthly > 0 && editingRoleExtended?.price_yearly > 0 && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Yearly discount: {Math.round((1 - (editingRoleExtended.price_yearly / 12) / editingRoleExtended.price_monthly) * 100)}%
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold mb-3">Lemon Squeezy Integration</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Monthly Variant ID</Label>
+                      <Input
+                        value={editingRoleExtended?.lemon_squeezy_variant_id_monthly || ''}
+                        onChange={(e) => setEditingRoleExtended({ 
+                          ...editingRoleExtended, 
+                          lemon_squeezy_variant_id_monthly: e.target.value 
+                        })}
+                        placeholder="e.g., variant_abc123"
+                      />
+                    </div>
+                    <div>
+                      <Label>Yearly Variant ID</Label>
+                      <Input
+                        value={editingRoleExtended?.lemon_squeezy_variant_id_yearly || ''}
+                        onChange={(e) => setEditingRoleExtended({ 
+                          ...editingRoleExtended, 
+                          lemon_squeezy_variant_id_yearly: e.target.value 
+                        })}
+                        placeholder="e.g., variant_xyz789"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold mb-3">Features</h3>
+                  <div className="space-y-2">
+                    {(editingRoleExtended?.features || []).map((feature: string, index: number) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={feature}
+                          onChange={(e) => {
+                            const newFeatures = [...(editingRoleExtended?.features || [])];
+                            newFeatures[index] = e.target.value;
+                            setEditingRoleExtended({ ...editingRoleExtended, features: newFeatures });
+                          }}
+                          placeholder="Feature description"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newFeatures = (editingRoleExtended?.features || []).filter((_: string, i: number) => i !== index);
+                            setEditingRoleExtended({ ...editingRoleExtended, features: newFeatures });
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newFeatures = [...(editingRoleExtended?.features || []), ''];
+                        setEditingRoleExtended({ ...editingRoleExtended, features: newFeatures });
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Feature
+                    </Button>
+                  </div>
+                </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingRole(null)}>
+                <Button variant="outline" onClick={() => {
+                  setEditingRole(null);
+                  setEditingRoleExtended(null);
+                }}>
                   Cancel
                 </Button>
                 <Button onClick={handleUpdateRole}>

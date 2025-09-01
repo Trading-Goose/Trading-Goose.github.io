@@ -15,6 +15,7 @@ import {
   Activity,
   TrendingUp,
   AlertCircle,
+  AlertTriangle,
   LogOut,
   Lock,
   Clock,
@@ -22,7 +23,10 @@ import {
   Check,
   X,
   CreditCard,
-  ExternalLink
+  ExternalLink,
+  Crown,
+  Sparkles,
+  Zap
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
@@ -362,21 +366,42 @@ export default function ProfilePage() {
                     Account Membership
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      {primaryRole ? (
-                        <Badge variant={primaryRole.name === 'admin' ? 'default' : 'secondary'}>
-                          {primaryRole.display_name}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">No Role</Badge>
-                      )}
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {roleExpiration ? 
-                          `Expires: ${format(new Date(roleExpiration), 'MMM dd, yyyy')}` : 
-                          'Never expires'
-                        }
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {primaryRole ? (
+                          <Badge variant={primaryRole.name === 'admin' ? 'default' : 'secondary'} className="flex items-center gap-1">
+                            {primaryRole.icon_url ? (
+                              <img 
+                                src={primaryRole.icon_url} 
+                                alt={primaryRole.display_name}
+                                className="h-3 w-3 object-contain"
+                              />
+                            ) : (
+                              <Shield className="h-3 w-3" />
+                            )}
+                            {primaryRole.display_name}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">No Role</Badge>
+                        )}
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {roleExpiration ? 
+                            `Expires: ${format(new Date(roleExpiration), 'MMM dd, yyyy')}` : 
+                            'Never expires'
+                          }
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Navigate to pricing/subscription page
+                          window.location.href = '/pricing';
+                        }}
+                      >
+                        Change
+                      </Button>
                     </div>
                     
                     {/* Subscription Status */}
@@ -412,8 +437,20 @@ export default function ProfilePage() {
                     )}
                     
                     {!hasSubscription && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        No active subscription
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="text-xs text-muted-foreground">
+                          No active subscription
+                        </div>
+                        {customerPortalUrl && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={openCustomerPortal}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-2" />
+                            Manage Billing
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -545,14 +582,24 @@ export default function ProfilePage() {
           </Card>
 
           {/* Danger Zone */}
-          <Card className="md:col-span-2 lg:col-span-3 border-red-200">
+          <Card className="md:col-span-2 lg:col-span-3 border-red-500/30 bg-red-500/5 dark:bg-red-500/5">
             <CardHeader>
-              <CardTitle className="text-red-800">Danger Zone</CardTitle>
-              <CardDescription>
-                Irreversible actions for your account
-              </CardDescription>
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-red-500/10 dark:bg-red-500/5">
+                  <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+                  <CardDescription>
+                    Irreversible actions for your account
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Logging out will end your current session. You'll need to sign in again to access your account.
+              </p>
               <Button
                 variant="destructive"
                 onClick={handleLogout}

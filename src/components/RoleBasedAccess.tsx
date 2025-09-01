@@ -152,9 +152,12 @@ export function RoleBadge({ className = '' }: RoleBadgeProps) {
   const { getPrimaryRole } = useRBAC();
   const primaryRole = getPrimaryRole();
   
+  console.log('[RoleBadge] Primary role:', primaryRole);
+  
   if (!primaryRole) return null;
   
-  const roleColors: Record<string, string> = {
+  // Default colors as fallback
+  const defaultRoleColors: Record<string, string> = {
     super_admin: 'bg-purple-100 text-purple-800 border-purple-200',
     admin: 'bg-blue-100 text-blue-800 border-blue-200',
     moderator: 'bg-green-100 text-green-800 border-green-200',
@@ -163,13 +166,24 @@ export function RoleBadge({ className = '' }: RoleBadgeProps) {
     guest: 'bg-gray-50 text-gray-600 border-gray-200'
   };
   
-  const colorClass = roleColors[primaryRole.name] || roleColors.user;
+  // Use custom color if available, otherwise fall back to default
+  const hasCustomColor = primaryRole.color;
+  const defaultColorClass = defaultRoleColors[primaryRole.name] || defaultRoleColors.user;
+  
+  // Create style object for custom color
+  const customStyle = hasCustomColor ? {
+    backgroundColor: `${primaryRole.color}20`, // 20 is for opacity (12.5%)
+    color: primaryRole.color,
+    borderColor: `${primaryRole.color}40` // 40 is for opacity (25%)
+  } : {};
   
   return (
-    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium ${colorClass} ${className}`}>
-      <Shield className="h-3 w-3" />
+    <span 
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium ${!hasCustomColor ? defaultColorClass : ''} ${className}`}
+      style={hasCustomColor ? customStyle : {}}
+    >
       {primaryRole.display_name}
-    </div>
+    </span>
   );
 }
 

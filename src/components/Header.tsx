@@ -12,10 +12,12 @@ import {
   RefreshCw,
   UserPlus,
   Activity,
-  Menu
+  Menu,
+  Loader2
 } from "lucide-react";
 import { useAuth, hasRequiredApiKeys } from "@/lib/auth";
 import { RoleBadge, RoleGate } from "@/components/RoleBasedAccess";
+import { useRBAC } from "@/hooks/useRBAC";
 import { supabase } from "@/lib/supabase";
 import { 
   ANALYSIS_STATUS,
@@ -35,10 +37,12 @@ import {
 export default function Header() {
   const navigate = useNavigate();
   const { user, profile, isAuthenticated, logout, apiSettings } = useAuth();
+  const { getPrimaryRole, isLoading: isRoleLoading } = useRBAC();
   const [runningAnalyses, setRunningAnalyses] = useState(0);
   const [runningRebalances, setRunningRebalances] = useState(0);
 
   const hasApiKeys = hasRequiredApiKeys(apiSettings);
+  const primaryRole = getPrimaryRole();
 
   // Check for running analyses and rebalances
   useEffect(() => {
@@ -142,22 +146,62 @@ export default function Header() {
                   {/* Desktop Profile Dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild className="hidden md:flex">
-                      <Button variant="outline" size="sm" className="max-w-[150px] sm:max-w-none">
-                        <UserIcon className="h-4 w-4 mr-2" />
-                        <span className="truncate">{profile?.name || profile?.full_name || user?.email || 'Profile'}</span>
-                      </Button>
+                      {isRoleLoading ? (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="max-w-[150px] sm:max-w-none"
+                          disabled
+                        >
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <span className="truncate">Loading...</span>
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className={`max-w-[150px] sm:max-w-none transition-all duration-200 ${
+                            primaryRole?.color 
+                              ? `border border-opacity-30 hover:bg-opacity-20` 
+                              : 'border border-border hover:bg-accent'
+                          }`}
+                          style={primaryRole?.color ? {
+                            borderColor: `${primaryRole.color}4D`, // 30% opacity
+                            backgroundColor: `${primaryRole.color}1A`, // 10% opacity
+                            color: primaryRole.color
+                          } : {}}
+                          onMouseEnter={(e) => {
+                            if (primaryRole?.color) {
+                              e.currentTarget.style.backgroundColor = `${primaryRole.color}33`; // 20% opacity on hover
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (primaryRole?.color) {
+                              e.currentTarget.style.backgroundColor = `${primaryRole.color}1A`; // Back to 10% opacity
+                            }
+                          }}
+                        >
+                          {primaryRole?.icon_url ? (
+                            <img 
+                              src={primaryRole.icon_url} 
+                              alt={primaryRole.display_name}
+                              className="h-4 w-4 mr-2 object-contain"
+                            />
+                          ) : (
+                            <UserIcon className="h-4 w-4 mr-2" />
+                          )}
+                          <span className="truncate">{profile?.name || profile?.full_name || user?.email || 'Profile'}</span>
+                        </Button>
+                      )}
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>
-                        <div className="flex flex-col gap-1">
-                          <RoleBadge className="mt-1" />
-                        </div>
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link to="/profile" className="flex items-center">
-                          <UserIcon className="h-4 w-4 mr-2" />
-                          Profile
+                        <Link to="/profile" className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <UserIcon className="h-4 w-4 mr-2" />
+                            Profile
+                          </div>
+                          <RoleBadge className="ml-2" />
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
@@ -204,13 +248,6 @@ export default function Header() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuLabel>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-sm font-normal truncate">{profile?.name || profile?.full_name || user?.email}</span>
-                          <RoleBadge className="mt-1" />
-                        </div>
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
                       <DropdownMenuLabel className="text-xs text-muted-foreground">Navigation</DropdownMenuLabel>
                       <DropdownMenuItem asChild>
                         <Link to="/dashboard" className="flex items-center">
@@ -239,9 +276,12 @@ export default function Header() {
                       <DropdownMenuSeparator />
                       <DropdownMenuLabel className="text-xs text-muted-foreground">Account</DropdownMenuLabel>
                       <DropdownMenuItem asChild>
-                        <Link to="/profile" className="flex items-center">
-                          <UserIcon className="h-4 w-4 mr-2" />
-                          Profile
+                        <Link to="/profile" className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <UserIcon className="h-4 w-4 mr-2" />
+                            Profile
+                          </div>
+                          <RoleBadge className="ml-2" />
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>

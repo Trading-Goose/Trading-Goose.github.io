@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useUserManagement } from "@/hooks/useUserManagement";
-import { RoleGate } from "@/components/RoleBasedAccess";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -591,12 +590,12 @@ export default function AdminUserManager() {
                               {/* Show subscription status if active */}
                               {user.is_subscription_active && user.subscription_status && (
                                 <div className="flex items-center gap-2">
-                                  <Badge 
+                                  <Badge
                                     variant={
                                       user.subscription_status === 'active' ? 'default' :
-                                      user.subscription_status === 'on_trial' ? 'secondary' :
-                                      user.subscription_status === 'cancelled' ? 'destructive' :
-                                      'outline'
+                                        user.subscription_status === 'on_trial' ? 'secondary' :
+                                          user.subscription_status === 'cancelled' ? 'destructive' :
+                                            'outline'
                                     }
                                     className="text-xs"
                                   >
@@ -605,7 +604,7 @@ export default function AdminUserManager() {
                                   </Badge>
                                 </div>
                               )}
-                              
+
                               {/* Show expiration controls for non-admin/default roles */}
                               {user.pending_role_id &&
                                 availableRoles.find(r => r.id === user.pending_role_id)?.name !== 'admin' &&
@@ -876,7 +875,7 @@ export default function AdminUserManager() {
           </AlertDialogContent>
         </AlertDialog>
       </main>
-      
+
       <Footer />
     </div>
   );

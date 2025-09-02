@@ -486,32 +486,39 @@ export default function UnifiedAnalysisHistory() {
   };
 
   // Render individual analysis card
-  const renderAnalysisCard = (item: AnalysisHistoryItem, isInRebalanceGroup: boolean = false) => (
-    <div
-      key={item.id}
-      className={`border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors ${isInRebalanceGroup ? 'bg-muted/10' : ''
-        }`}
-      onClick={() => viewDetails(item)}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="font-semibold">{item.ticker}</span>
-          <Badge variant={getDecisionVariant(item.decision)}>
-            <span className="flex items-center gap-1">
-              {getDecisionIcon(item.decision)}
-              {item.decision}
-            </span>
-          </Badge>
-          {item.confidence > 0 && (
-            <span className={`text-sm font-medium ${getConfidenceColor(item.confidence)}`}>
-              {item.confidence}% confidence
-            </span>
-          )}
+  const renderAnalysisCard = (item: AnalysisHistoryItem, isInRebalanceGroup: boolean = false) => {
+    // Prioritize Portfolio Manager's decision over Risk Manager's decision
+    const displayDecision = item.agent_insights?.portfolioManager?.finalDecision?.action || 
+                           item.agent_insights?.portfolioManager?.decision?.action ||
+                           item.agent_insights?.portfolioManager?.action ||
+                           item.decision;
+    
+    return (
+      <div
+        key={item.id}
+        className={`border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors ${isInRebalanceGroup ? 'bg-muted/10' : ''
+          }`}
+        onClick={() => viewDetails(item)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold">{item.ticker}</span>
+            <Badge variant={getDecisionVariant(displayDecision)}>
+              <span className="flex items-center gap-1">
+                {getDecisionIcon(displayDecision)}
+                {displayDecision}
+              </span>
+            </Badge>
+            {item.confidence > 0 && (
+              <span className={`text-sm font-medium ${getConfidenceColor(item.confidence)}`}>
+                {item.confidence}% confidence
+              </span>
+            )}
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+          </span>
         </div>
-        <span className="text-xs text-muted-foreground">
-          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-        </span>
-      </div>
 
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
@@ -562,7 +569,8 @@ export default function UnifiedAnalysisHistory() {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -769,22 +777,29 @@ export default function UnifiedAnalysisHistory() {
               {canceledAnalyses.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-muted-foreground mb-3">Canceled Analyses</h3>
-                  {canceledAnalyses.map((item) => (
-                    <div
-                      key={item.id}
-                      className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors opacity-60"
-                      onClick={() => viewDetails(item)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold">{item.ticker}</span>
-                          <Badge variant={getDecisionVariant(item.decision)}>
-                            <span className="flex items-center gap-1">
-                              {getDecisionIcon(item.decision)}
-                              {item.decision}
-                            </span>
-                          </Badge>
-                        </div>
+                  {canceledAnalyses.map((item) => {
+                    // Prioritize Portfolio Manager's decision over Risk Manager's decision
+                    const displayDecision = item.agent_insights?.portfolioManager?.finalDecision?.action || 
+                                           item.agent_insights?.portfolioManager?.decision?.action ||
+                                           item.agent_insights?.portfolioManager?.action ||
+                                           item.decision;
+                    
+                    return (
+                      <div
+                        key={item.id}
+                        className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors opacity-60"
+                        onClick={() => viewDetails(item)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold">{item.ticker}</span>
+                            <Badge variant={getDecisionVariant(displayDecision)}>
+                              <span className="flex items-center gap-1">
+                                {getDecisionIcon(displayDecision)}
+                                {displayDecision}
+                              </span>
+                            </Badge>
+                          </div>
                         <span className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </span>
@@ -824,7 +839,8 @@ export default function UnifiedAnalysisHistory() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -1016,22 +1032,29 @@ export default function UnifiedAnalysisHistory() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {canceledAnalyses.map((item) => (
-                    <div
-                      key={item.id}
-                      className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors opacity-60"
-                      onClick={() => viewDetails(item)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold">{item.ticker}</span>
-                          <Badge variant={getDecisionVariant(item.decision)}>
-                            <span className="flex items-center gap-1">
-                              {getDecisionIcon(item.decision)}
-                              {item.decision}
-                            </span>
-                          </Badge>
-                        </div>
+                  {canceledAnalyses.map((item) => {
+                    // Prioritize Portfolio Manager's decision over Risk Manager's decision
+                    const displayDecision = item.agent_insights?.portfolioManager?.finalDecision?.action || 
+                                           item.agent_insights?.portfolioManager?.decision?.action ||
+                                           item.agent_insights?.portfolioManager?.action ||
+                                           item.decision;
+                    
+                    return (
+                      <div
+                        key={item.id}
+                        className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors opacity-60"
+                        onClick={() => viewDetails(item)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold">{item.ticker}</span>
+                            <Badge variant={getDecisionVariant(displayDecision)}>
+                              <span className="flex items-center gap-1">
+                                {getDecisionIcon(displayDecision)}
+                                {displayDecision}
+                              </span>
+                            </Badge>
+                          </div>
                         <span className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                         </span>
@@ -1071,7 +1094,8 @@ export default function UnifiedAnalysisHistory() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </TabsContent>

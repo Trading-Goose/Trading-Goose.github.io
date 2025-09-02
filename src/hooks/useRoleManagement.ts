@@ -10,6 +10,8 @@ export interface RoleLimit {
   max_rebalance_stocks: number;
   max_scheduled_rebalances: number;
   schedule_resolution: string;
+  optimization_mode?: string;
+  number_of_search_sources?: number;
   rebalance_access: boolean;
   opportunity_agent_access: boolean;
   additional_provider_access: boolean;
@@ -43,6 +45,8 @@ export interface RoleWithLimits {
   max_rebalance_stocks: number;
   max_scheduled_rebalances: number;
   schedule_resolution: string;
+  optimization_mode?: string;
+  number_of_search_sources?: number;
   rebalance_access: boolean;
   opportunity_agent_access: boolean;
   additional_provider_access: boolean;
@@ -121,6 +125,8 @@ export function useRoleManagement() {
           max_rebalance_stocks: limits?.max_rebalance_stocks ?? 5,
           max_scheduled_rebalances: limits?.max_scheduled_rebalances ?? 2,
           schedule_resolution: limits?.schedule_resolution ?? 'Month',
+          optimization_mode: limits?.optimization_mode ?? 'speed',
+          number_of_search_sources: limits?.number_of_search_sources ?? 5,
           rebalance_access: limits?.rebalance_access ?? false,
           opportunity_agent_access: limits?.opportunity_agent_access ?? false,
           additional_provider_access: limits?.additional_provider_access ?? false,
@@ -169,6 +175,8 @@ export function useRoleManagement() {
             max_rebalance_stocks: 5,
             max_scheduled_rebalances: 2,
             schedule_resolution: 'Month',
+            optimization_mode: 'speed',
+            number_of_search_sources: 5,
             rebalance_access: false,
             opportunity_agent_access: false,
             additional_provider_access: false,

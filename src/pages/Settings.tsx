@@ -121,6 +121,7 @@ export default function SettingsPage() {
 
   // Analysis optimization settings (for all analysis agents)
   const [analysisOptimization, setAnalysisOptimization] = useState((apiSettings as any)?.analysis_optimization || 'speed');
+  const [analysisSearchSources, setAnalysisSearchSources] = useState((apiSettings as any)?.analysis_search_sources || 5);
 
   // Historical data time ranges (separate from opportunity agent)
   const [analysisHistoryDays, setAnalysisHistoryDays] = useState((apiSettings as any)?.analysis_history_days || '1M');
@@ -209,6 +210,11 @@ export default function SettingsPage() {
       });
       if (analysisOpt !== undefined) {
         setAnalysisOptimization(analysisOpt || 'speed');
+      }
+      
+      const searchSources = (apiSettings as any)?.analysis_search_sources;
+      if (searchSources !== undefined) {
+        setAnalysisSearchSources(searchSources || 5);
       }
 
       // Historical data time ranges
@@ -582,6 +588,7 @@ export default function SettingsPage() {
           portfolio_manager_max_tokens: portfolioManagerMaxTokens,
           // Analysis customization
           analysis_optimization: analysisOptimization,
+          analysis_search_sources: analysisSearchSources,
           analysis_history_days: analysisHistoryDays, // Separate time range for analysis agents
           // Max tokens for each workflow step
           analysis_max_tokens: analysisMaxTokens,
@@ -1509,6 +1516,7 @@ export default function SettingsPage() {
               portfolioManagerModel={portfolioManagerModel}
               portfolioManagerCustomModel={portfolioManagerCustomModel}
               analysisOptimization={analysisOptimization}
+              analysisSearchSources={analysisSearchSources}
               analysisHistoryDays={analysisHistoryDays}
               analysisMaxTokens={analysisMaxTokens}
               researchMaxTokens={researchMaxTokens}
@@ -1536,6 +1544,7 @@ export default function SettingsPage() {
               setPortfolioManagerModel={setPortfolioManagerModel}
               setPortfolioManagerCustomModel={setPortfolioManagerCustomModel}
               setAnalysisOptimization={setAnalysisOptimization}
+              setAnalysisSearchSources={setAnalysisSearchSources}
               setAnalysisHistoryDays={setAnalysisHistoryDays}
               setAnalysisMaxTokens={setAnalysisMaxTokens}
               setResearchMaxTokens={setResearchMaxTokens}

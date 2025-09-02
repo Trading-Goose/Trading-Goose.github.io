@@ -87,6 +87,8 @@ export function useRBAC() {
               const maxRebalanceStocks = limits?.max_rebalance_stocks !== undefined ? Number(limits.max_rebalance_stocks) : undefined;
               const maxScheduledRebalances = limits?.max_scheduled_rebalances !== undefined ? Number(limits.max_scheduled_rebalances) : undefined;
               const scheduleResolution = limits?.schedule_resolution || undefined;
+              const optimizationMode = limits?.optimization_mode || undefined;
+              const numberOfSearchSources = limits?.number_of_search_sources !== undefined ? Number(limits.number_of_search_sources) : undefined;
               const rebalanceAccess = limits?.rebalance_access ?? false;
               const opportunityAgentAccess = limits?.opportunity_agent_access ?? false;
               const additionalProviderAccess = limits?.additional_provider_access ?? false;
@@ -106,6 +108,8 @@ export function useRBAC() {
                 max_rebalance_stocks: maxRebalanceStocks,
                 max_scheduled_rebalances: maxScheduledRebalances,
                 schedule_resolution: scheduleResolution,
+                optimization_mode: optimizationMode,
+                number_of_search_sources: numberOfSearchSources,
                 rebalance_access: rebalanceAccess,
                 opportunity_agent_access: opportunityAgentAccess,
                 additional_provider_access: additionalProviderAccess,
@@ -430,6 +434,56 @@ export function useRBAC() {
     return false;
   };
 
+  const getMaxSearchSources = (): number => {
+    // Get the highest search sources limit from all user roles
+    let maxLimit = 0;
+    let foundLimit = false;
+
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      const searchSources = roleDetail?.number_of_search_sources;
+      
+      console.log('[useRBAC] getMaxSearchSources - role:', roleDetail?.name, 'sources:', searchSources);
+      
+      if (searchSources !== undefined && searchSources !== null && searchSources > 0) {
+        foundLimit = true;
+        maxLimit = Math.max(maxLimit, searchSources);
+      }
+    }
+
+    console.log('[useRBAC] getMaxSearchSources - final maxLimit:', maxLimit, 'foundLimit:', foundLimit);
+    
+    // Return the found limit or default to 25 if no limits found
+    return foundLimit ? maxLimit : 25;
+  };
+
+  const getAvailableOptimizationModes = (): string[] => {
+    // Get all available optimization modes from all user roles
+    const allModes = new Set<string>();
+    
+    for (const userRole of userRoles) {
+      const roleDetail = roleDetails.get(userRole.role_id);
+      const optimizationMode = roleDetail?.optimization_mode;
+      
+      console.log('[useRBAC] getAvailableOptimizationModes - role:', roleDetail?.name, 'modes:', optimizationMode);
+      
+      if (optimizationMode) {
+        // Split comma-separated modes and add to set
+        const modes = optimizationMode.split(',').map(m => m.trim());
+        modes.forEach(mode => allModes.add(mode));
+      }
+    }
+    
+    // If no modes found, default to just 'speed'
+    if (allModes.size === 0) {
+      allModes.add('speed');
+    }
+    
+    console.log('[useRBAC] getAvailableOptimizationModes - final modes:', Array.from(allModes));
+    
+    return Array.from(allModes);
+  };
+
   return {
     permissions,
     isLoading,
@@ -447,10 +501,14 @@ export function useRBAC() {
     getMaxRebalanceStocks,
     getMaxScheduledRebalances,
     getScheduleResolution,
+    getMaxSearchSources,
+    getAvailableOptimizationModes,
     hasRebalanceAccess,
     hasOpportunityAgentAccess,
     hasAdditionalProviderAccess,
     canUseLiveTrading,
-    canUseAutoTrading
+    canUseAutoTrading,
+    userRoles,
+    roleDetails
   };
 }

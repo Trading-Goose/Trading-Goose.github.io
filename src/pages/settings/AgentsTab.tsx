@@ -20,6 +20,7 @@ import {
   Lock,
 } from "lucide-react";
 import type { AgentsTabProps } from "./types";
+import { useRBAC } from "@/hooks/useRBAC";
 
 export default function AgentsTab({
   aiProviders,
@@ -40,6 +41,7 @@ export default function AgentsTab({
   portfolioManagerModel,
   portfolioManagerCustomModel,
   analysisOptimization,
+  analysisSearchSources,
   analysisHistoryDays,
   analysisMaxTokens,
   researchMaxTokens,
@@ -67,6 +69,7 @@ export default function AgentsTab({
   setPortfolioManagerModel,
   setPortfolioManagerCustomModel,
   setAnalysisOptimization,
+  setAnalysisSearchSources,
   setAnalysisHistoryDays,
   setAnalysisMaxTokens,
   setResearchMaxTokens,
@@ -79,12 +82,17 @@ export default function AgentsTab({
   getDefaultModelValue,
   hasAgentConfigAccess = true,
 }: AgentsTabProps) {
+  const { getMaxSearchSources, getAvailableOptimizationModes } = useRBAC();
   const defaultProviderId = aiProviders.length > 0 ? aiProviders[0].id : '1';
+  const maxSearchSources = getMaxSearchSources();
+  const availableOptimizationModes = getAvailableOptimizationModes();
 
   // Debug logging
   console.log('AgentsTab received props:', {
     analysisOptimization,
-    analysisHistoryDays
+    analysisSearchSources,
+    analysisHistoryDays,
+    maxSearchSources
   });
 
   return (
@@ -202,12 +210,20 @@ export default function AgentsTab({
                   <SelectValue placeholder="Select optimization level" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="speed">Speed</SelectItem>
-                  <SelectItem value="balanced">Balanced</SelectItem>
+                  {availableOptimizationModes.includes('speed') && (
+                    <SelectItem value="speed">Speed</SelectItem>
+                  )}
+                  {availableOptimizationModes.includes('balanced') && (
+                    <SelectItem value="balanced">Balanced</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Normal: Standard analysis Balanced: More thorough coverage for all analysis agents
+                {availableOptimizationModes.includes('speed') && availableOptimizationModes.includes('balanced') 
+                  ? 'Speed: Faster analysis | Balanced: More thorough coverage'
+                  : availableOptimizationModes.includes('balanced')
+                  ? 'Balanced: Thorough analysis coverage'
+                  : 'Speed: Standard analysis coverage'}
               </p>
             </div>
             <div className="space-y-2">
@@ -231,6 +247,24 @@ export default function AgentsTab({
                 How far back to analyze data
               </p>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Number of Search Sources</Label>
+            <div className="flex items-center space-x-4 py-3 min-h-[40px]">
+              <Slider
+                value={[analysisSearchSources]}
+                onValueChange={(value) => setAnalysisSearchSources(value[0])}
+                min={1}
+                max={maxSearchSources}
+                step={1}
+                className="flex-1"
+                disabled={!hasAgentConfigAccess}
+              />
+              <span className="w-12 text-center font-medium">{analysisSearchSources}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Number of search sources for analysis agents (1-{maxSearchSources})
+            </p>
           </div>
           <div className="space-y-2">
             <Label className="flex items-center gap-2">

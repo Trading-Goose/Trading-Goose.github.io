@@ -261,21 +261,21 @@ export default function RecentTrades() {
                         : 'Order details pending'
                   }
                 </span>
-                {decision.alpacaFilledQty && decision.alpacaFilledPrice && (
+                {decision.alpacaFilledQty && decision.alpacaFilledPrice ? (
                   <span className="text-xs font-medium">
                     ${(decision.alpacaFilledQty * decision.alpacaFilledPrice).toLocaleString()}
                   </span>
-                )}
-                {!decision.alpacaFilledQty && !decision.alpacaFilledPrice && decision.dollarAmount && decision.dollarAmount > 0 && (
+                ) : null}
+                {!decision.alpacaFilledQty && !decision.alpacaFilledPrice && decision.dollarAmount && decision.dollarAmount > 0 ? (
                   <span className="text-xs font-medium">
                     ${Number(decision.dollarAmount).toLocaleString()}
                   </span>
-                )}
-                {!decision.alpacaFilledQty && !decision.dollarAmount && decision.price > 0 && (
+                ) : null}
+                {!decision.alpacaFilledQty && !decision.dollarAmount && decision.price > 0 ? (
                   <span className="text-xs font-medium">
                     ${decision.totalValue.toLocaleString()}
                   </span>
-                )}
+                ) : null}
                 {isRejected && (
                   <Badge variant="outline" className="text-xs">
                     <XCircle className="h-3 w-3 mr-1" />
@@ -376,9 +376,9 @@ export default function RecentTrades() {
                         >
                           {icon}
                           {displayText}
-                          {decision.alpacaFilledQty && status === 'partially_filled' && (
+                          {decision.alpacaFilledQty && status === 'partially_filled' ? (
                             <span className="ml-1">({decision.alpacaFilledQty}/{decision.quantity})</span>
-                          )}
+                          ) : null}
                         </Badge>
                       );
                     })()}
@@ -386,11 +386,11 @@ export default function RecentTrades() {
                 )}
 
                 {/* Show filled details if available */}
-                {decision.alpacaFilledQty && decision.alpacaFilledPrice && (
+                {decision.alpacaFilledQty && decision.alpacaFilledPrice ? (
                   <div className="text-xs text-muted-foreground text-center">
                     {Number(decision.alpacaFilledQty).toFixed(2)} @ ${Number(decision.alpacaFilledPrice || 0).toFixed(2)}
                   </div>
-                )}
+                ) : null}
               </>
             )}
 

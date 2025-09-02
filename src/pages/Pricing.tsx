@@ -19,6 +19,7 @@ import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useRBAC } from "@/hooks/useRBAC";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -42,7 +43,14 @@ export default function Pricing() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { hasSubscription, subscriptionStatus, variantName } = useSubscription();
+  const { hasRole, getPrimaryRole, userRoles, roleDetails } = useRBAC();
   const { toast } = useToast();
+  
+  // Debug logging
+  const primaryRole = getPrimaryRole();
+  console.log('[Pricing] Primary role:', primaryRole);
+  console.log('[Pricing] userRoles:', userRoles);
+  console.log('[Pricing] roleDetails:', roleDetails);
   
   const [roles, setRoles] = useState<RoleData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -157,13 +165,15 @@ export default function Pricing() {
   const getButtonText = (role: RoleData) => {
     if (isProcessing === role.id) return "Processing...";
     
-    // Free plan
-    if (!role.price_monthly || role.price_monthly === 0) {
-      return "Current Plan";
-    }
+    // Check if user has this specific role
+    const hasThisRole = hasRole(role.name);
+    const primaryRole = getPrimaryRole();
     
-    // Check if user has this plan
-    if (hasSubscription && variantName?.toLowerCase() === role.name.toLowerCase()) {
+    // User has current plan ONLY if they have this specific role
+    // OR if they have the primary role that matches
+    const isCurrentPlan = hasThisRole || primaryRole?.name === role.name;
+    
+    if (isCurrentPlan) {
       return "Current Plan";
     }
     
@@ -236,8 +246,12 @@ export default function Pricing() {
             }`}>
               {roles.map((role) => {
                 const Icon = role.icon_url ? null : getDefaultIcon(role.name);
-                const isCurrentPlan = !role.price_monthly || 
-                  (hasSubscription && variantName?.toLowerCase() === role.name.toLowerCase());
+                // Check if user has this specific role
+                const hasThisRole = hasRole(role.name);
+                console.log(`[Pricing] Checking role ${role.name}: hasThisRole=${hasThisRole}, primaryRole?.name=${primaryRole?.name}`);
+                // User has current plan ONLY if they have this specific role
+                // OR if they have the primary role that matches
+                const isCurrentPlan = hasThisRole || primaryRole?.name === role.name;
                 const savings = calculateSavings(role.price_monthly, role.price_yearly);
                 
                 // Create custom styles based on role color

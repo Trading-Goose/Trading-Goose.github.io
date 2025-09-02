@@ -1,69 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TradingGoose AI - Multi-Agent Trading System</title>
-    <meta name="description" content="AI-powered trading system with 11 specialized agents for comprehensive market analysis" />
-    <meta name="author" content="TradingGoose" />
 
-    <meta property="og:title" content="TradingGoose AI" />
-    <meta property="og:description" content="AI-powered trading system with 11 specialized agents for comprehensive market analysis" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="/favicon.ico" />
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradingGoose AI - Multi-Agent Trading System</title>
+  <meta name="description"
+    content="AI-powered trading system with 11 specialized agents for comprehensive market analysis" />
+  <meta name="author" content="TradingGoose" />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@tradinggoose" />
-    <meta name="twitter:image" content="/favicon.ico" />
-    
-    <!-- GitHub Pages SPA redirect handling -->
-    <script type="text/javascript">
-      // Single Page Apps for GitHub Pages
-      // This script checks if a redirect is present and handles it
-      (function(l) {
-        if (l.search[1] === '/' ) {
-          var decoded = l.search.slice(1).split('&').map(function(s) { 
-            return s.replace(/~and~/g, '&')
-          }).join('?');
-          window.history.replaceState(null, null,
-              l.pathname.slice(0, -1) + decoded + l.hash
-          );
-        }
-      }(window.location))
-    </script>
-    
-    <!-- GitHub OAuth redirect handler -->
-    <script type="text/javascript">
+  <meta property="og:title" content="TradingGoose AI" />
+  <meta property="og:description"
+    content="AI-powered trading system with 11 specialized agents for comprehensive market analysis" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/favicon.ico" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@tradinggoose" />
+  <meta name="twitter:image" content="/favicon.ico" />
+
+  <!-- GitHub Pages SPA redirect handling -->
+  <script type="text/javascript">
+    // Single Page Apps for GitHub Pages
+    // This script checks if a redirect is present and handles it
+    (function (l) {
+      if (l.search[1] === '/') {
+        var decoded = l.search.slice(1).split('&').map(function (s) {
+          return s.replace(/~and~/g, '&')
+        }).join('?');
+        window.history.replaceState(null, null,
+          l.pathname.slice(0, -1) + decoded + l.hash
+        );
+      }
+    }(window.location))
+  </script>
+
+  <!-- GitHub OAuth redirect handler -->
+  <script type="text/javascript">
       // Handle GitHub OAuth redirect for TradingGoose.github.io
-      (function() {
+      (function () {
         // No path adjustment needed since we're hosting at root domain
         // OAuth redirects should work correctly without path manipulation
       })();
-    </script>
-    
-    <!-- Monetization -->
-    <meta name="monetag" content="aa7657d1e1fd4b0652f23bb7db3cd23e">
+  </script>
 
-    <!-- Google AdSense -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9651663494022087"
-         crossorigin="anonymous"></script>
+  <!-- Google AdSense -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9651663494022087"
+    crossorigin="anonymous"></script>
 
-         <!-- Google tag (gtag.js) Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-HYXMNMH4WX"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+  <!-- Google tag (gtag.js) Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYXMNMH4WX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
 
-  gtag('config', 'G-HYXMNMH4WX');
-</script>
+    // Initial config without user_id
+    gtag('config', 'G-HYXMNMH4WX', {
+      send_page_view: false, // Prevent automatic pageview
+      custom_map: {
+        'dimension1': 'login_status',
+        'dimension2': 'user_type'
+      }
+    });
+
+    // Function to track authenticated users
+    window.trackAuthenticatedUser = function (userId, userType) {
+      if (userId) {
+        gtag('config', 'G-HYXMNMH4WX', {
+          user_id: userId,
+          user_properties: {
+            user_type: userType || 'standard'
+          }
+        });
+
+        // Send custom pageview for authenticated users
+        gtag('event', 'page_view', {
+          login_status: 'logged_in',
+          user_type: userType || 'standard'
+        });
+      }
+    };
+
+    // Function to track anonymous pageviews
+    window.trackAnonymousPageview = function () {
+      gtag('event', 'page_view', {
+        login_status: 'anonymous'
+      });
+    };
+  </script>
 
 
-  </head>
+</head>
 
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

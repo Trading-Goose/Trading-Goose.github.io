@@ -292,11 +292,11 @@ export default function ProfilePage() {
       const discordLinked = identities?.identities?.find((id: any) => id.provider === 'discord');
 
       if (discordLinked) {
-        // Success! Discord was linked (either automatically or manually)
+        // Success! Discord was linked
         setDiscordIdentity(discordLinked);
 
         // Save Discord ID to profile using RPC function or direct update
-        if (discordLinked.provider_id) {
+        if (discordLinked.provider_id && user?.id) {
           console.log('Saving Discord ID after linking:', discordLinked.provider_id);
 
           // Try RPC sync function first
@@ -331,52 +331,77 @@ export default function ProfilePage() {
         setTimeout(() => {
           window.location.reload();
         }, 1500);
-      } else if (linkType === 'auto') {
-        // Auto-linking failed (probably email mismatch), try manual linking
-        console.log('Auto-linking failed, attempting manual linking...');
-
-        // Use linkIdentity for manual linking (requires user to be logged in)
-        const { data, error } = await supabase.auth.linkIdentity({
-          provider: 'discord',
-          options: {
-            redirectTo: `${window.location.origin}/profile?discord_link=manual`,
-            scopes: 'identify guilds' // No email needed for manual
-          }
+      } else {
+        // Linking failed
+        console.log('Discord linking failed');
+        toast({
+          title: "Error",
+          description: "Failed to link Discord account. Please try again.",
+          variant: "destructive"
         });
-
-        if (error) {
-          // Only show error if manual linking also fails
-          toast({
-            title: "Error",
-            description: "Failed to link Discord account. Please try again.",
-            variant: "destructive"
-          });
-        }
-        // User will be redirected again for manual linking
       }
     };
 
     handleDiscordCallback();
-  }, []);
+  }, [user]);
 
   // Handle Discord account linking
   const handleLinkDiscord = async () => {
     setIsLinking(true);
     try {
-      // First, try normal OAuth sign in (for automatic linking with matching emails)
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithOAuth({
+      // Check if user is authenticated first
+      if (!user) {
+        toast({
+          title: "Not Authenticated",
+          description: "Please log in to link your Discord account",
+          variant: "destructive"
+        });
+        setIsLinking(false);
+        return;
+      }
+
+      // Use linkIdentity for manual linking - works with any email
+      const { data, error } = await supabase.auth.linkIdentity({
         provider: 'discord',
         options: {
-          redirectTo: `${window.location.origin}/profile?discord_link=auto`,
-          scopes: 'identify guilds email', // Include email for auto-linking attempt
-          skipBrowserRedirect: false
+          redirectTo: `${window.location.origin}/profile?discord_link=manual`,
+          scopes: 'identify guilds' // Only need identify and guilds, not email
         }
       });
 
-      // If sign in triggers (user will be redirected), the flow continues after redirect
-      // On redirect callback, check if identity was linked
+      if (error) {
+        console.error('Discord linking error:', error);
+        
+        // Handle specific error cases
+        if (error.message?.includes('already linked')) {
+          toast({
+            title: "Already Linked",
+            description: "This Discord account is already linked to another user",
+            variant: "destructive"
+          });
+        } else if (error.message?.includes('rate limit')) {
+          toast({
+            title: "Too Many Requests",
+            description: "Please wait a moment before trying again",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Linking Failed",
+            description: error.message || "Failed to link Discord account. Please try again.",
+            variant: "destructive"
+          });
+        }
+        setIsLinking(false);
+      }
+      // If successful, user will be redirected to Discord OAuth
     } catch (error) {
       console.error('Discord linking error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
       setIsLinking(false);
     }
   };

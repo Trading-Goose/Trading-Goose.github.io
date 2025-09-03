@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   RefreshCw,
+  RefreshCcw,
   Loader2,
   CheckCircle,
   Clock,
@@ -22,7 +23,10 @@ import {
   XCircle,
   X,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  ChartLine,
+  Lightbulb,
+  ChartColumn
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
@@ -201,13 +205,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
         // Determine status using centralized status system
         let status: RebalanceStatus = convertLegacyRebalanceStatus(rebalanceRequest.status);
-        
+
         // If we're in legacy pending_trades state but have a rebalance plan (portfolio manager is done), 
         // consider it as completed since the planning is complete
         if (rebalanceRequest.status === 'pending_trades' && rebalanceRequest.rebalance_plan) {
           status = REBALANCE_STATUS.COMPLETED;
         }
-        
+
         const isRunning = isRebalanceActive(status);
         const isPendingApproval = false; // No longer using AWAITING_APPROVAL status
         const isCompleted = status === REBALANCE_STATUS.COMPLETED;
@@ -275,7 +279,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           .select('*')  // Select all fields including metadata
           .eq('rebalance_request_id', rebalanceId)
           .eq('user_id', user.id);
-        
+
         // Store tradingActions for later use (even if empty)
         let tradingActionsData = tradingActions || [];
 
@@ -368,6 +372,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             id: 'threshold',
             title: 'Threshold Check',
             description: 'Evaluating portfolio drift against rebalance threshold',
+            icon: ChartLine,
             status: thresholdStatus,
             completedAt: thresholdStep.data?.timestamp || thresholdStep.timestamp || thresholdStep.completedAt,
             insights: thresholdStep.data, // Add the insights data
@@ -446,6 +451,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             id: 'opportunity',
             title: 'Opportunity Analysis',
             description: 'Scanning market for new investment opportunities',
+            icon: Lightbulb,
             status: opportunityStatus,
             completedAt: opportunityStep.data?.timestamp || opportunityStep.timestamp || opportunityStep.completedAt,
             insights: insights, // Use the parsed insights
@@ -582,6 +588,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
             id: 'analysis',
             title: 'Stock Analysis',
             description: 'Analyzing individual stocks for rebalancing decisions',
+            icon: ChartColumn,
             status: stockAnalysisStatus,
             agents: stockAnalyses.map((sa: any) => ({
               name: `${sa.ticker} Analysis`,
@@ -611,6 +618,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           id: 'rebalance',
           title: 'Portfolio Manager',
           description: 'Calculating optimal portfolio rebalancing strategy and generating trade orders',
+          icon: RefreshCcw,
           status: portfolioManagerStatus,
           completedAt: rebalanceAgentStep.data?.completedAt || portfolioManagerStep.data?.completedAt || rebalanceRequest.plan_generated_at
         });
@@ -654,7 +662,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
           opportunity_reasoning: rebalanceRequest.opportunity_reasoning,
 
           relatedAnalyses: rebalanceAnalyses || [],
-          
+
           // Include trading_actions data for proper status tracking
           trading_actions: tradingActionsData
         };
@@ -746,7 +754,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                   </Badge>
                 )}
               </div>
-              
+
               {/* Close button */}
               <Button
                 size="sm"
@@ -798,7 +806,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                       if (collapsedCards.size === 0) {
                         // Collapse all - need to get all card keys
                         const allCardKeys = new Set<string>();
-                        
+
                         // Add threshold card if it exists
                         if (!rebalanceData?.skipThresholdCheck) {
                           const thresholdStep = rebalanceData?.workflowSteps?.find((s: any) => s.id === 'threshold');
@@ -806,7 +814,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                             allCardKeys.add('threshold');
                           }
                         }
-                        
+
                         // Add opportunity card if it exists
                         if (!rebalanceData?.skipOpportunityAgent) {
                           const opportunityStep = rebalanceData?.workflowSteps?.find((s: any) => s.id === 'opportunity');
@@ -814,7 +822,7 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                             allCardKeys.add('opportunity');
                           }
                         }
-                        
+
                         // Add portfolio manager card if it exists
                         const portfolioInsights =
                           rebalanceData?.rebalance_plan?.portfolioManagerAnalysis ||
@@ -824,11 +832,11 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                           rebalanceData?.rebalance_plan?.agentInsights?.rebalanceAgent ||
                           rebalanceData?.agentInsights?.portfolioManager ||
                           rebalanceData?.agentInsights?.rebalanceAgent;
-                        
+
                         if (portfolioInsights) {
                           allCardKeys.add('portfolioManager');
                         }
-                        
+
                         setCollapsedCards(allCardKeys);
                       } else {
                         // Expand all
@@ -883,13 +891,13 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
                   />
                 </TabsContent>
 
-                <RebalanceWorkflowTab 
+                <RebalanceWorkflowTab
                   workflowData={rebalanceData}
                   onNavigateToInsight={handleNavigateToInsight}
                   onOpenAnalysisModal={handleOpenAnalysisModal}
                 />
 
-                <RebalanceInsightsTab 
+                <RebalanceInsightsTab
                   rebalanceData={rebalanceData}
                   selectedAnalysis={selectedAnalysis}
                   setSelectedAnalysis={setSelectedAnalysis}

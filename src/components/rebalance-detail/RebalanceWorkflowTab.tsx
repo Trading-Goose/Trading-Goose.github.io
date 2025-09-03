@@ -7,12 +7,14 @@ import {
   AlertCircle,
   Loader2,
   Activity,
-  BarChart3,
-  Brain,
+  ChartBar,
+  MessageSquare,
   Shield,
   XCircle,
-  TrendingUp,
-  Briefcase
+  Lightbulb,
+  ChartColumn,
+  RefreshCcw,
+  ChartCandlestick
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { isRebalanceActive, convertLegacyRebalanceStatus } from "@/lib/statusTypes";
@@ -354,19 +356,19 @@ function RebalanceWorkflowSteps({
                       {
                         name: 'Data Analysis',
                         key: 'dataAnalysis',
-                        icon: BarChart3,
+                        icon: ChartBar,
                         status: getWorkflowStepStatus(['marketAnalyst', 'newsAnalyst', 'socialMediaAnalyst', 'fundamentalsAnalyst'])
                       },
                       {
                         name: 'Research',
                         key: 'research',
-                        icon: Brain,
+                        icon: MessageSquare,
                         status: getStepStatusFromWorkflow('research')
                       },
                       {
                         name: 'Trading Decision',
                         key: 'trading',
-                        icon: Activity,
+                        icon: ChartCandlestick,
                         status: getStepStatusFromWorkflow('trading')
                       },
                       {

@@ -16,7 +16,15 @@ import {
   Users,
   XCircle,
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  History,
+  ChartBar,
+  Grid2x2Check,
+  Share2,
+  ChartCandlestick,
+  OctagonAlert,
+  ShieldCheck,
+  CircleSlash
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -69,20 +77,20 @@ export default function WorkflowStepsLayout({
       id: 'analysis',
       title: 'Market Analysis',
       description: 'Gathering and analyzing market data from multiple sources',
-      icon: BarChart3,
+      icon: ChartBar,
       agents: [
         { name: 'Macro Analyst', key: 'macroAnalyst', icon: BarChart3 },
-        { name: 'Market Analyst', key: 'marketAnalyst', icon: TrendingUp },
+        { name: 'Market Analyst', key: 'marketAnalyst', icon: History },
         { name: 'News Analyst', key: 'newsAnalyst', icon: FileText },
-        { name: 'Social Media Analyst', key: 'socialMediaAnalyst', icon: MessageSquare },
-        { name: 'Fundamentals Analyst', key: 'fundamentalsAnalyst', icon: Brain }
+        { name: 'Social Media Analyst', key: 'socialMediaAnalyst', icon: Share2 },
+        { name: 'Fundamentals Analyst', key: 'fundamentalsAnalyst', icon: Grid2x2Check }
       ]
     },
     {
       id: 'research',
       title: 'Research Debate',
       description: 'Bull vs Bear research analysis with debate rounds',
-      icon: Users,
+      icon: MessageSquare,
       agents: [
         { name: 'Bull Researcher', key: 'bullResearcher', icon: TrendingUp },
         { name: 'Bear Researcher', key: 'bearResearcher', icon: TrendingDown },
@@ -93,9 +101,9 @@ export default function WorkflowStepsLayout({
       id: 'trading',
       title: 'Trading Decision',
       description: 'Making the final trading call based on research',
-      icon: Activity,
+      icon: ChartCandlestick,
       agents: [
-        { name: 'Trader', key: 'trader', icon: Activity }
+        { name: 'Trader', key: 'trader', icon: ChartCandlestick }
       ]
     },
     {
@@ -104,9 +112,9 @@ export default function WorkflowStepsLayout({
       description: 'Evaluating risks and final validation across scenarios',
       icon: Shield,
       agents: [
-        { name: 'Risky Analyst', key: 'riskyAnalyst', icon: TrendingUp },
-        { name: 'Safe Analyst', key: 'safeAnalyst', icon: Shield },
-        { name: 'Neutral Analyst', key: 'neutralAnalyst', icon: Activity },
+        { name: 'Risky Analyst', key: 'riskyAnalyst', icon: OctagonAlert },
+        { name: 'Safe Analyst', key: 'safeAnalyst', icon: ShieldCheck },
+        { name: 'Neutral Analyst', key: 'neutralAnalyst', icon: CircleSlash },
         { name: 'Risk Manager', key: 'riskManager', icon: Shield }
       ]
     }

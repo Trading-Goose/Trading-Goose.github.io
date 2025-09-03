@@ -1,10 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import TradeHistoryTable from '@/components/TradeHistoryTable';
 import { TrendingUp } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
 
 export default function TradeHistory() {
+  const navigate = useNavigate();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
+  // Don't render content until auth is checked
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />

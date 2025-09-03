@@ -276,6 +276,23 @@ export default function ProfilePage() {
     fetchDiscordIdentity();
   }, [user]);
 
+  // Check for #link_discord hash and initiate linking
+  useEffect(() => {
+    const checkHashAndInitiateLink = async () => {
+      // Check if URL has #link_discord hash
+      if (window.location.hash === '#link_discord' && isAuthenticated && user) {
+        // Remove the hash from URL to clean it
+        window.history.replaceState({}, '', window.location.pathname);
+        
+        // Automatically start Discord linking
+        console.log('Auto-initiating Discord link from URL hash');
+        handleLinkDiscord();
+      }
+    };
+
+    checkHashAndInitiateLink();
+  }, [isAuthenticated, user]);
+
   // Handle Discord redirect callback
   useEffect(() => {
     const handleDiscordCallback = async () => {

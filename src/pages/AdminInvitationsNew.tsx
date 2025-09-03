@@ -71,10 +71,10 @@ export default function AdminInvitationsNew() {
     pending: 0
   });
 
-  // Redirect to login if not authenticated
+  // Redirect to home if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      navigate('/login');
+      navigate('/');
     }
   }, [isAuthenticated, authLoading, navigate]);
 
@@ -269,6 +269,11 @@ export default function AdminInvitationsNew() {
         </main>
       </div>
     );
+  }
+
+  // Don't render content until auth is checked
+  if (!isAuthenticated) {
+    return null;
   }
 
   // Main admin interface

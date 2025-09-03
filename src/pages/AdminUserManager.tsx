@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useUserManagement } from "@/hooks/useUserManagement";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +76,7 @@ import { supabase } from "@/lib/supabase";
 export default function AdminUserManager() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const {
     users,
     availableRoles,
@@ -106,6 +108,13 @@ export default function AdminUserManager() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [roleExpirations, setRoleExpirations] = useState<Map<string, string | null>>(new Map());
+
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   // Get current user ID on mount
   useEffect(() => {
@@ -244,6 +253,11 @@ export default function AdminUserManager() {
       return 'Never';
     }
   };
+
+  // Don't render content until auth is checked
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (!canManageUsers) {
     return (

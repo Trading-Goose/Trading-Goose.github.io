@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useRoleManagement, type RoleWithLimits } from "@/hooks/useRoleManagement";
@@ -12,8 +13,11 @@ import RoleCard from "./components/RoleCard";
 import CreateRoleDialog from "./dialogs/CreateRoleDialog";
 import EditRoleDialog from "./dialogs/EditRoleDialog";
 import EditLimitsDialog from "./dialogs/EditLimitsDialog";
+import { useAuth } from "@/lib/auth";
 
 export default function AdminRoleManager() {
+  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const {
     roles,
     users,
@@ -52,6 +56,13 @@ export default function AdminRoleManager() {
     refresh
   });
 
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+
   const handleSaveLimitsWrapper = async () => {
     if (!editingLimits) return;
     const success = await handleSaveLimits(editingLimits);
@@ -84,6 +95,11 @@ export default function AdminRoleManager() {
       setExpandedPermissions([...expandedPermissions, roleId]);
     }
   };
+
+  // Don't render content until auth is checked
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (!canManageRoles) {
     return (

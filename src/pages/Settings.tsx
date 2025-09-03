@@ -166,6 +166,13 @@ export default function SettingsPage() {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [teamSettingsLoaded, setTeamSettingsLoaded] = useState(false);
 
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
   // Debug: Check authentication state - only run when auth state changes
   useEffect(() => {
     console.log('Settings page - Auth state:', {

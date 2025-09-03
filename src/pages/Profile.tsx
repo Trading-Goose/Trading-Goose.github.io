@@ -70,6 +70,7 @@ export default function ProfilePage() {
   const [isLinking, setIsLinking] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [discordIdentity, setDiscordIdentity] = useState<any>(null);
+  const [hasDiscordConnection, setHasDiscordConnection] = useState(false);
 
   const handleSendResetEmail = async () => {
     if (!user?.email) return;
@@ -212,12 +213,16 @@ export default function ProfilePage() {
       if (!user) return;
 
       try {
-        // Get user's linked identities
+        // Check both auth identities and profile discord_id
         const { data: identities, error } = await supabase.auth.getUserIdentities();
 
         if (!error && identities) {
           const discord = identities.identities?.find((id: any) => id.provider === 'discord');
           setDiscordIdentity(discord);
+
+          // Update connection status based on both checks
+          const isConnected = !!(discord || profile?.discord_id);
+          setHasDiscordConnection(isConnected);
 
           // If user has Discord linked, ensure the Discord ID is saved
           if (discord && discord.provider_id) {
@@ -267,6 +272,10 @@ export default function ProfilePage() {
               }
             }
           }
+        } else {
+          // Even if no Discord in auth identities, check if profile has discord_id
+          const isConnected = !!profile?.discord_id;
+          setHasDiscordConnection(isConnected);
         }
       } catch (error) {
         console.error('Error fetching Discord identity:', error);
@@ -274,7 +283,7 @@ export default function ProfilePage() {
     };
 
     fetchDiscordIdentity();
-  }, [user]);
+  }, [user, profile?.discord_id]);
 
   // Check for #link_discord hash and initiate linking
   useEffect(() => {
@@ -483,8 +492,8 @@ export default function ProfilePage() {
     try {
       console.log('Starting Discord role sync for user:', user.id);
 
-      // Check if user has Discord linked
-      if (!profile?.discord_id) {
+      // Check if user has Discord linked (either auth identity or profile discord_id)
+      if (!hasDiscordConnection) {
         toast({
           title: "Discord Not Connected",
           description: "Please connect your Discord account first",
@@ -934,7 +943,7 @@ export default function ProfilePage() {
                       <p className="text-xs text-muted-foreground">Connect for community features</p>
                     </div>
                   </div>
-                  {discordIdentity ? (
+                  {hasDiscordConnection ? (
                     <Badge className="border border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400 font-semibold hover:bg-green-500/20 hover:border-green-500/40 transition-colors cursor-default">
                       <span className="flex items-center gap-1">
                         <CheckCircle className="h-3 w-3" />
@@ -951,7 +960,7 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {!discordIdentity ? (
+                {!hasDiscordConnection ? (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
                       Link your Discord account to sync roles and access exclusive channels in our community server.

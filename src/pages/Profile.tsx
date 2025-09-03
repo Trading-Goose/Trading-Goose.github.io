@@ -434,24 +434,44 @@ export default function ProfilePage() {
 
   // Handle Discord account unlinking
   const handleUnlinkDiscord = async () => {
-    if (!discordIdentity) return;
-
     try {
-      console.log('Attempting to unlink Discord identity:', discordIdentity);
-
-      // According to Supabase docs, we should pass the entire identity object
-      // not just { identity_id: ... }
-      const { data, error } = await supabase.auth.unlinkIdentity(discordIdentity);
-
-      if (error) {
-        console.error('Unlink error details:', error);
-        throw error;
+      // First, call discord-role-sync to remove the role from Discord server
+      // This should happen regardless of whether we have auth identity or just discord_id
+      if (hasDiscordConnection && user?.id) {
+        console.log('Calling discord-role-sync to remove role before disconnecting Discord');
+        const { data: syncData, error: syncError } = await supabase.functions.invoke('discord-role-sync', {
+          body: { userId: user.id }
+        });
+        
+        if (syncError) {
+          console.error('Failed to remove Discord role:', syncError);
+          // Continue with disconnection even if role sync fails
+        } else {
+          console.log('Discord role removal sync completed:', syncData);
+        }
       }
 
-      // Success - identity was unlinked from auth.identities
-      console.log('Discord identity unlinked successfully');
+      // Check if we have an auth identity to unlink
+      if (discordIdentity) {
+        console.log('Attempting to unlink Discord identity:', discordIdentity);
 
-      // Clear discord_id from profile database
+        // According to Supabase docs, we should pass the entire identity object
+        // not just { identity_id: ... }
+        const { error } = await supabase.auth.unlinkIdentity(discordIdentity);
+
+        if (error) {
+          console.error('Unlink error details:', error);
+          throw error;
+        }
+
+        // Success - identity was unlinked from auth.identities
+        console.log('Discord identity unlinked successfully');
+      } else if ((profile as any)?.discord_id) {
+        // If no auth identity but discord_id exists in profile
+        console.log('No auth identity to unlink, but discord_id exists in profile');
+      }
+
+      // Always clear discord_id from profile database
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ discord_id: null })
@@ -459,10 +479,17 @@ export default function ProfilePage() {
 
       if (updateError) {
         console.error('Warning: Failed to clear discord_id from profile:', updateError);
+        toast({
+          title: "Partial Success",
+          description: "Discord disconnected but profile update failed. Please try again.",
+          variant: "destructive"
+        });
+        return;
       }
 
       // Clear local state
       setDiscordIdentity(null);
+      setHasDiscordConnection(false);
 
       toast({
         title: "Success",

@@ -52,6 +52,12 @@ SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy rebal
 echo "📦 Deploying send-invitation..."
 SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy send-invitation --project-ref $SUPABASE_PROJECT_REF --no-verify-jwt
 
+
+# Deploy Discord role sync
+echo "📦 Deploying discord-role-sync..."
+SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy discord-role-sync --project-ref $SUPABASE_PROJECT_REF --no-verify-jwt
+
+
 # Deploy process-scheduled-rebalances
 echo "📦 Deploying process-scheduled-rebalances..."
 SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN npx supabase functions deploy process-scheduled-rebalances --project-ref $SUPABASE_PROJECT_REF

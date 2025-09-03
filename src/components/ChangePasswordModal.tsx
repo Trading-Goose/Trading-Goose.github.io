@@ -94,13 +94,24 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
 
       if (updateError) {
         setError(updateError.message);
-      } else {
-        toast({
-          title: "Password Updated",
-          description: "Your password has been successfully changed.",
-        });
-        handleClose();
+        setIsLoading(false);
+        return;
       }
+      
+      // Success - show toast and close modal
+      toast({
+        title: "Password Updated",
+        description: "Your password has been successfully changed.",
+      });
+      
+      // Reset form and close modal
+      resetForm();
+      onClose();
+      
+      // Optional: Refresh the page after a short delay to ensure auth state is updated
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Password change error:", err);

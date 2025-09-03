@@ -37,6 +37,7 @@ export interface RoleWithLimits {
   price_monthly?: number;
   price_yearly?: number;
   features?: any; // JSONB array of features
+  discord_role_id?: string;
   lemon_squeezy_variant_id_monthly?: string;
   lemon_squeezy_variant_id_yearly?: string;
   // Flattened limits for easier access
@@ -117,6 +118,7 @@ export function useRoleManagement() {
           price_monthly: role.price_monthly,
           price_yearly: role.price_yearly,
           features: role.features,
+          discord_role_id: role.discord_role_id,
           lemon_squeezy_variant_id_monthly: role.lemon_squeezy_variant_id_monthly,
           lemon_squeezy_variant_id_yearly: role.lemon_squeezy_variant_id_yearly,
           // Flatten limits for easier access in the component
@@ -216,7 +218,7 @@ export function useRoleManagement() {
       // Try RPC function first, fall back to direct update if it doesn't exist
       if (updates.name || updates.display_name || updates.description || updates.priority !== undefined || 
           updates.color !== undefined || updates.icon_url !== undefined || updates.price_monthly !== undefined || 
-          updates.price_yearly !== undefined || updates.features !== undefined || 
+          updates.price_yearly !== undefined || updates.features !== undefined || updates.discord_role_id !== undefined ||
           updates.lemon_squeezy_variant_id_monthly !== undefined || updates.lemon_squeezy_variant_id_yearly !== undefined) {
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('update_role_details', {
@@ -242,6 +244,8 @@ export function useRoleManagement() {
           if (updates.price_monthly !== undefined) updateData.price_monthly = updates.price_monthly;
           if (updates.price_yearly !== undefined) updateData.price_yearly = updates.price_yearly;
           if (updates.features !== undefined) updateData.features = updates.features;
+          // Handle Discord Role ID - empty string should be saved as null
+          if (updates.discord_role_id !== undefined) updateData.discord_role_id = updates.discord_role_id || null;
           // Handle Lemon Squeezy IDs - empty strings should be saved as null
           if (updates.lemon_squeezy_variant_id_monthly !== undefined) updateData.lemon_squeezy_variant_id_monthly = updates.lemon_squeezy_variant_id_monthly || null;
           if (updates.lemon_squeezy_variant_id_yearly !== undefined) updateData.lemon_squeezy_variant_id_yearly = updates.lemon_squeezy_variant_id_yearly || null;
@@ -279,6 +283,10 @@ export function useRoleManagement() {
           }
           if (updates.features !== undefined) {
             extendedUpdateData.features = updates.features;
+            hasExtendedUpdates = true;
+          }
+          if (updates.discord_role_id !== undefined) {
+            extendedUpdateData.discord_role_id = updates.discord_role_id || null;
             hasExtendedUpdates = true;
           }
           if (updates.lemon_squeezy_variant_id_monthly !== undefined) {

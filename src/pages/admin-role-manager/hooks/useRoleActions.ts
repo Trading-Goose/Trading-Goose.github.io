@@ -128,6 +128,7 @@ export function useRoleActions({
         price_monthly: editingRoleExtended?.price_monthly,
         price_yearly: editingRoleExtended?.price_yearly,
         features: editingRoleExtended?.features,
+        discord_role_id: editingRoleExtended?.discord_role_id,
         lemon_squeezy_variant_id_monthly: editingRoleExtended?.lemon_squeezy_variant_id_monthly,
         lemon_squeezy_variant_id_yearly: editingRoleExtended?.lemon_squeezy_variant_id_yearly
       });

@@ -114,6 +114,28 @@ export default function EditRoleDialog({
               onUpdate={onUpdateExtended}
             />
 
+            {/* Discord Integration */}
+            <div className="border-t pt-4">
+              <h3 className="font-semibold mb-3">Discord Integration</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="discord_role_id">Discord Role ID</Label>
+                  <Input
+                    id="discord_role_id"
+                    value={editingRoleExtended.discord_role_id || ''}
+                    onChange={(e) => onUpdateExtended({
+                      ...editingRoleExtended,
+                      discord_role_id: e.target.value
+                    })}
+                    placeholder="e.g., 1234567890123456789"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The Discord role ID to assign when users have this subscription role
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Lemon Squeezy Integration */}
             <div className="border-t pt-4">
               <h3 className="font-semibold mb-3">Lemon Squeezy Integration</h3>

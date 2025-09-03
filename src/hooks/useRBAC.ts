@@ -13,6 +13,7 @@ export function useRBAC() {
     priority: number;
     color?: string;
     icon_url?: string;
+    features?: string[];
     max_parallel_analysis?: number;
     max_watchlist_stocks?: number;
     max_rebalance_stocks?: number;
@@ -103,6 +104,7 @@ export function useRBAC() {
                 priority: role.priority || 0,
                 color: role.color,
                 icon_url: role.icon_url,
+                features: role.features || [],
                 max_parallel_analysis: maxParallelAnalysis,
                 max_watchlist_stocks: maxWatchlistStocks,
                 max_rebalance_stocks: maxRebalanceStocks,
@@ -249,7 +251,8 @@ export function useRBAC() {
         name: primaryRole.role_name,
         display_name: roleDetail.display_name,
         color: roleDetail.color,
-        icon_url: roleDetail.icon_url
+        icon_url: roleDetail.icon_url,
+        features: roleDetail.features
       };
       console.log('[useRBAC] Returning role result:', result);
       return result;

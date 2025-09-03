@@ -13,6 +13,7 @@ export interface ExtendedRoleData {
   price_monthly: number | null;
   price_yearly: number | null;
   features: string[];
+  discord_role_id: string;
   lemon_squeezy_variant_id_monthly: string;
   lemon_squeezy_variant_id_yearly: string;
 }

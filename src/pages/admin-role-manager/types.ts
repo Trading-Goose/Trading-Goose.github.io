@@ -14,8 +14,9 @@ export interface ExtendedRoleData {
   price_yearly: number | null;
   features: string[];
   discord_role_id: string;
-  lemon_squeezy_variant_id_monthly: string;
-  lemon_squeezy_variant_id_yearly: string;
+  stripe_product_id: string;
+  stripe_price_id_monthly: string;
+  stripe_price_id_yearly: string;
 }
 
 export interface RoleActionsHandlers {

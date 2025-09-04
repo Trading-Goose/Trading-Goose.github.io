@@ -58,6 +58,7 @@ export function useSubscription() {
 
         if (data && data.length > 0) {
           const subData = data[0];
+          console.log('[useSubscription] Subscription data from RPC:', subData);
           setSubscriptionInfo({
             hasSubscription: subData.has_subscription,
             subscriptionStatus: subData.subscription_status,
@@ -143,18 +144,19 @@ export function useSubscription() {
   const getSubscriptionBadgeColor = (): string => {
     switch (subscriptionInfo.subscriptionStatus) {
       case 'active':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border-green-300';
       case 'on_trial':
-        return 'bg-blue-100 text-blue-800';
+      case 'trialing':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'past_due':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'cancelled':
       case 'expired':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 border-red-300';
       case 'paused':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
 

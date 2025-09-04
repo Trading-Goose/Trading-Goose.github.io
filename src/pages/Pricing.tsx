@@ -34,8 +34,9 @@ interface RoleData {
   price_monthly?: number;
   price_yearly?: number;
   features?: string[];
-  lemon_squeezy_variant_id_monthly?: string;
-  lemon_squeezy_variant_id_yearly?: string;
+  stripe_price_id_monthly?: string;
+  stripe_price_id_yearly?: string;
+  stripe_product_id?: string;
   is_most_popular?: boolean;
 }
 
@@ -105,21 +106,172 @@ export default function Pricing() {
       return;
     }
 
-    // If it's the free/default plan
-    if (!role.price_monthly || role.price_monthly === 0) {
+    const primaryRole = getPrimaryRole();
+    
+    // If user has an active subscription and wants to switch to a different plan
+    if (hasSubscription && primaryRole?.name !== role.name) {
+      setIsProcessing(role.id);
+      try {
+        // Ensure we have a valid session and refresh if needed
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('[Pricing] Session error:', sessionError);
+          toast({
+            title: "Session Error",
+            description: "Please refresh the page and try again",
+            variant: "destructive"
+          });
+          setIsProcessing(null);
+          return;
+        }
+        
+        if (!session) {
+          console.error('[Pricing] No session found, attempting to refresh...');
+          
+          // Try to refresh the session
+          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError || !refreshedSession) {
+            console.error('[Pricing] Session refresh failed:', refreshError);
+            toast({
+              title: "Authentication Required",
+              description: "Please log in to manage your subscription",
+              variant: "destructive"
+            });
+            navigate('/login');
+            setIsProcessing(null);
+            return;
+          }
+          
+          console.log('[Pricing] Session refreshed successfully');
+        }
+        
+        console.log('[Pricing] Session valid, proceeding with plan switch');
+
+        // Get the appropriate Stripe price ID for the target plan
+        const targetPriceId = billingCycle === 'yearly' 
+          ? role.stripe_price_id_yearly 
+          : role.stripe_price_id_monthly;
+
+        // If switching to free plan, handle cancellation
+        if (!role.price_monthly || role.price_monthly === 0) {
+          const { data: result, error: invokeError } = await supabase
+            .functions.invoke('create-smart-session', {
+              body: {
+                action: 'cancel',
+                cancel_url: `${window.location.origin}/pricing`
+              }
+            });
+
+          if (invokeError) throw invokeError;
+          
+          if (result?.url) {
+            window.location.href = result.url;
+          } else {
+            throw new Error(result?.error || 'Failed to create portal session');
+          }
+        } else if (targetPriceId) {
+          // Switch to a different paid plan
+          const { data: result, error: invokeError } = await supabase
+            .functions.invoke('create-smart-session', {
+              body: {
+                action: 'switch_plan',
+                price_id: targetPriceId,
+                success_url: `${window.location.origin}/dashboard?plan_changed=true`,
+                cancel_url: `${window.location.origin}/pricing`
+              }
+            });
+
+          if (invokeError) throw invokeError;
+          
+          if (result?.url) {
+            window.location.href = result.url;
+          } else {
+            throw new Error(result?.error || 'Failed to create plan switch session');
+          }
+        } else {
+          toast({
+            title: "Plan Not Available",
+            description: "This plan is not yet configured for subscriptions.",
+            variant: "destructive"
+          });
+        }
+      } catch (error: any) {
+        console.error('[Pricing] Portal error:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to switch plans",
+          variant: "destructive"
+        });
+      } finally {
+        setIsProcessing(null);
+      }
+      return;
+    }
+    
+    // If user clicks on their current plan, just show a message
+    if (hasSubscription && primaryRole?.name === role.name) {
       toast({
-        title: "Free Plan",
-        description: "You're already on the free plan.",
+        title: "Current Plan",
+        description: "You're already on this plan.",
       });
       return;
     }
 
-    // Get the appropriate variant ID
-    const variantId = billingCycle === 'yearly' 
-      ? role.lemon_squeezy_variant_id_yearly 
-      : role.lemon_squeezy_variant_id_monthly;
+    // If it's the free/default plan
+    if (!role.price_monthly || role.price_monthly === 0) {
+      // Check if user has an active subscription to cancel
+      if (hasSubscription && subscriptionStatus === 'active') {
+        setIsProcessing(role.id);
+        try {
+          // Ensure we have a valid session before calling edge function
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            await supabase.auth.refreshSession();
+          }
+          
+          // Use smart session to handle cancellation
+          const { data: sessionData, error: sessionError } = await supabase
+            .functions.invoke('create-smart-session', {
+              body: {
+                action: 'cancel',
+                cancel_url: window.location.href
+              }
+            });
 
-    if (!variantId) {
+          if (sessionError) throw sessionError;
+
+          if (sessionData?.url) {
+            window.location.href = sessionData.url;
+          } else {
+            throw new Error('No portal URL received');
+          }
+        } catch (err) {
+          console.error('Error creating portal session:', err);
+          toast({
+            title: "Error",
+            description: "Failed to open billing portal. Please try again.",
+            variant: "destructive"
+          });
+        } finally {
+          setIsProcessing(null);
+        }
+      } else {
+        toast({
+          title: "Free Plan",
+          description: "You're already on the free plan.",
+        });
+      }
+      return;
+    }
+
+    // Get the appropriate Stripe price ID
+    const priceId = billingCycle === 'yearly' 
+      ? role.stripe_price_id_yearly 
+      : role.stripe_price_id_monthly;
+
+    if (!priceId) {
       toast({
         title: "Plan Not Available",
         description: "This plan is not yet configured for subscriptions.",
@@ -131,26 +283,35 @@ export default function Pricing() {
     setIsProcessing(role.id);
 
     try {
-      // Create checkout URL via your backend
-      const { data: checkoutData, error: checkoutError } = await supabase
-        .functions.invoke('create-checkout', {
+      // Ensure we have a valid session before calling edge function
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          throw new Error('Session expired. Please log in again.');
+        }
+      }
+      
+      // Use smart session to handle all subscription operations
+      const { data: sessionData, error: sessionError } = await supabase
+        .functions.invoke('create-smart-session', {
           body: {
-            variantId,
-            user_email: user?.email,
-            user_id: user?.id
+            price_id: priceId,
+            success_url: `${window.location.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: window.location.href
           }
         });
 
-      if (checkoutError) throw checkoutError;
+      if (sessionError) throw sessionError;
 
-      if (checkoutData?.checkoutUrl) {
-        // Redirect to Lemon Squeezy checkout
-        window.location.href = checkoutData.checkoutUrl;
+      if (sessionData?.url) {
+        // Redirect to Stripe Checkout or Customer Portal
+        window.location.href = sessionData.url;
       } else {
-        throw new Error('No checkout URL received');
+        throw new Error('No session URL received');
       }
     } catch (err) {
-      console.error('Error creating checkout:', err);
+      console.error('Error creating session:', err);
       toast({
         title: "Error",
         description: "Failed to start checkout process. Please try again.",
@@ -165,18 +326,22 @@ export default function Pricing() {
   const getButtonText = (role: RoleData) => {
     if (isProcessing === role.id) return "Processing...";
     
-    // Check if user has this specific role
-    const hasThisRole = hasRole(role.name);
     const primaryRole = getPrimaryRole();
     
-    // User has current plan ONLY if they have this specific role
-    // OR if they have the primary role that matches
-    const isCurrentPlan = hasThisRole || primaryRole?.name === role.name;
+    // Only show "Current Plan" for the user's primary (highest priority) role
+    const isCurrentPlan = primaryRole?.name === role.name;
     
     if (isCurrentPlan) {
       return "Current Plan";
     }
     
+    // If user has a subscription, show "Switch to [Role Display Name]"
+    if (hasSubscription) {
+      const roleDisplayName = role.display_name || role.name;
+      return `Switch to ${roleDisplayName}`;
+    }
+    
+    // For users without subscription, just show "Get Started"
     return "Get Started";
   };
 
@@ -246,12 +411,8 @@ export default function Pricing() {
             }`}>
               {roles.map((role) => {
                 const Icon = role.icon_url ? null : getDefaultIcon(role.name);
-                // Check if user has this specific role
-                const hasThisRole = hasRole(role.name);
-                console.log(`[Pricing] Checking role ${role.name}: hasThisRole=${hasThisRole}, primaryRole?.name=${primaryRole?.name}`);
-                // User has current plan ONLY if they have this specific role
-                // OR if they have the primary role that matches
-                const isCurrentPlan = hasThisRole || primaryRole?.name === role.name;
+                // Only show "Current Plan" badge for the user's primary (highest priority) role
+                const isCurrentPlan = primaryRole?.name === role.name;
                 const savings = calculateSavings(role.price_monthly, role.price_yearly);
                 
                 // Create custom styles based on role color
@@ -394,7 +555,7 @@ export default function Pricing() {
                           {isProcessing === role.id && (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           )}
-                          {isProcessing === role.id ? "Processing..." : "Get Started"}
+                          {getButtonText(role)}
                         </Button>
                       )}
                     </CardFooter>

@@ -36,8 +36,9 @@ export default function RoleCard({
       price_yearly: role.price_yearly ?? null,
       features: role.features || [],
       discord_role_id: role.discord_role_id || '',
-      lemon_squeezy_variant_id_monthly: role.lemon_squeezy_variant_id_monthly || '',
-      lemon_squeezy_variant_id_yearly: role.lemon_squeezy_variant_id_yearly || ''
+      stripe_product_id: role.stripe_product_id || '',
+      stripe_price_id_monthly: role.stripe_price_id_monthly || '',
+      stripe_price_id_yearly: role.stripe_price_id_yearly || ''
     };
     onEditRole(role, extendedData);
   };

@@ -136,31 +136,51 @@ export default function EditRoleDialog({
               </div>
             </div>
 
-            {/* Lemon Squeezy Integration */}
+            {/* Stripe Integration */}
             <div className="border-t pt-4">
-              <h3 className="font-semibold mb-3">Lemon Squeezy Integration</h3>
+              <h3 className="font-semibold mb-3">Stripe Integration</h3>
               <div className="space-y-4">
                 <div>
-                  <Label>Monthly Variant ID</Label>
+                  <Label>Product ID</Label>
                   <Input
-                    value={editingRoleExtended.lemon_squeezy_variant_id_monthly}
+                    value={editingRoleExtended.stripe_product_id || ''}
                     onChange={(e) => onUpdateExtended({
                       ...editingRoleExtended,
-                      lemon_squeezy_variant_id_monthly: e.target.value
+                      stripe_product_id: e.target.value
                     })}
-                    placeholder="e.g., variant_abc123"
+                    placeholder="e.g., prod_ABC123"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The Stripe product ID for this role
+                  </p>
                 </div>
                 <div>
-                  <Label>Yearly Variant ID</Label>
+                  <Label>Monthly Price ID</Label>
                   <Input
-                    value={editingRoleExtended.lemon_squeezy_variant_id_yearly}
+                    value={editingRoleExtended.stripe_price_id_monthly || ''}
                     onChange={(e) => onUpdateExtended({
                       ...editingRoleExtended,
-                      lemon_squeezy_variant_id_yearly: e.target.value
+                      stripe_price_id_monthly: e.target.value
                     })}
-                    placeholder="e.g., variant_xyz789"
+                    placeholder="e.g., price_1A2B3C4D5E"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The Stripe price ID for monthly billing
+                  </p>
+                </div>
+                <div>
+                  <Label>Yearly Price ID</Label>
+                  <Input
+                    value={editingRoleExtended.stripe_price_id_yearly || ''}
+                    onChange={(e) => onUpdateExtended({
+                      ...editingRoleExtended,
+                      stripe_price_id_yearly: e.target.value
+                    })}
+                    placeholder="e.g., price_9Z8Y7X6W5V"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The Stripe price ID for yearly billing
+                  </p>
                 </div>
               </div>
             </div>

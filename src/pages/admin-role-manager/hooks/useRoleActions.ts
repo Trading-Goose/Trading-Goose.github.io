@@ -118,7 +118,7 @@ export function useRoleActions({
 
   const handleUpdateRole = async (editingRole: RoleWithLimits, editingRoleExtended: any) => {
     try {
-      const result = await updateRole(editingRole.id, {
+      const updateData = {
         name: editingRole.name,
         display_name: editingRole.display_name,
         description: editingRole.description,
@@ -129,15 +129,26 @@ export function useRoleActions({
         price_yearly: editingRoleExtended?.price_yearly,
         features: editingRoleExtended?.features,
         discord_role_id: editingRoleExtended?.discord_role_id,
-        lemon_squeezy_variant_id_monthly: editingRoleExtended?.lemon_squeezy_variant_id_monthly,
-        lemon_squeezy_variant_id_yearly: editingRoleExtended?.lemon_squeezy_variant_id_yearly
+        stripe_product_id: editingRoleExtended?.stripe_product_id,
+        stripe_price_id_monthly: editingRoleExtended?.stripe_price_id_monthly,
+        stripe_price_id_yearly: editingRoleExtended?.stripe_price_id_yearly
+      };
+      
+      console.log('Updating role with data:', updateData);
+      console.log('Stripe fields:', {
+        stripe_product_id: updateData.stripe_product_id,
+        stripe_price_id_monthly: updateData.stripe_price_id_monthly,
+        stripe_price_id_yearly: updateData.stripe_price_id_yearly
       });
+      
+      const result = await updateRole(editingRole.id, updateData);
 
       if (result.success) {
         toast({
           title: "Success",
           description: `Role "${editingRole.display_name}" updated successfully`,
         });
+        await refresh(); // Reload roles from database to get the updated data
         return true;
       } else {
         throw new Error(result.error || 'Failed to update role');

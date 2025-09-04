@@ -38,8 +38,9 @@ export interface RoleWithLimits {
   price_yearly?: number;
   features?: any; // JSONB array of features
   discord_role_id?: string;
-  lemon_squeezy_variant_id_monthly?: string;
-  lemon_squeezy_variant_id_yearly?: string;
+  stripe_product_id?: string;
+  stripe_price_id_monthly?: string;
+  stripe_price_id_yearly?: string;
   // Flattened limits for easier access
   max_parallel_analysis: number;
   max_watchlist_stocks: number;
@@ -119,8 +120,9 @@ export function useRoleManagement() {
           price_yearly: role.price_yearly,
           features: role.features,
           discord_role_id: role.discord_role_id,
-          lemon_squeezy_variant_id_monthly: role.lemon_squeezy_variant_id_monthly,
-          lemon_squeezy_variant_id_yearly: role.lemon_squeezy_variant_id_yearly,
+          stripe_product_id: role.stripe_product_id,
+          stripe_price_id_monthly: role.stripe_price_id_monthly,
+          stripe_price_id_yearly: role.stripe_price_id_yearly,
           // Flatten limits for easier access in the component
           max_parallel_analysis: limits?.max_parallel_analysis ?? 1,
           max_watchlist_stocks: limits?.max_watchlist_stocks ?? 10,
@@ -196,6 +198,16 @@ export function useRoleManagement() {
 
   // Update role - respects built-in role restrictions
   const updateRole = async (roleId: string, updates: Partial<RoleWithLimits>) => {
+    console.log('updateRole called with:', {
+      roleId,
+      updates,
+      stripe_fields: {
+        stripe_product_id: updates.stripe_product_id,
+        stripe_price_id_monthly: updates.stripe_price_id_monthly,
+        stripe_price_id_yearly: updates.stripe_price_id_yearly
+      }
+    });
+    
     if (!isAdmin) {
       return { success: false, error: 'Admin access required' };
     }
@@ -219,7 +231,7 @@ export function useRoleManagement() {
       if (updates.name || updates.display_name || updates.description || updates.priority !== undefined || 
           updates.color !== undefined || updates.icon_url !== undefined || updates.price_monthly !== undefined || 
           updates.price_yearly !== undefined || updates.features !== undefined || updates.discord_role_id !== undefined ||
-          updates.lemon_squeezy_variant_id_monthly !== undefined || updates.lemon_squeezy_variant_id_yearly !== undefined) {
+          updates.stripe_product_id !== undefined || updates.stripe_price_id_monthly !== undefined || updates.stripe_price_id_yearly !== undefined) {
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('update_role_details', {
             p_role_id: roleId,
@@ -246,9 +258,17 @@ export function useRoleManagement() {
           if (updates.features !== undefined) updateData.features = updates.features;
           // Handle Discord Role ID - empty string should be saved as null
           if (updates.discord_role_id !== undefined) updateData.discord_role_id = updates.discord_role_id || null;
-          // Handle Lemon Squeezy IDs - empty strings should be saved as null
-          if (updates.lemon_squeezy_variant_id_monthly !== undefined) updateData.lemon_squeezy_variant_id_monthly = updates.lemon_squeezy_variant_id_monthly || null;
-          if (updates.lemon_squeezy_variant_id_yearly !== undefined) updateData.lemon_squeezy_variant_id_yearly = updates.lemon_squeezy_variant_id_yearly || null;
+          // Handle Stripe IDs - empty strings should be saved as null
+          if (updates.stripe_product_id !== undefined) updateData.stripe_product_id = updates.stripe_product_id || null;
+          if (updates.stripe_price_id_monthly !== undefined) updateData.stripe_price_id_monthly = updates.stripe_price_id_monthly || null;
+          if (updates.stripe_price_id_yearly !== undefined) updateData.stripe_price_id_yearly = updates.stripe_price_id_yearly || null;
+          
+          console.log('Direct update - updateData:', updateData);
+          console.log('Direct update - Stripe fields being saved:', {
+            stripe_product_id: updateData.stripe_product_id,
+            stripe_price_id_monthly: updateData.stripe_price_id_monthly,
+            stripe_price_id_yearly: updateData.stripe_price_id_yearly
+          });
           
           const { error: updateError } = await supabase
             .from('roles')
@@ -289,17 +309,28 @@ export function useRoleManagement() {
             extendedUpdateData.discord_role_id = updates.discord_role_id || null;
             hasExtendedUpdates = true;
           }
-          if (updates.lemon_squeezy_variant_id_monthly !== undefined) {
-            extendedUpdateData.lemon_squeezy_variant_id_monthly = updates.lemon_squeezy_variant_id_monthly || null;
+          if (updates.stripe_product_id !== undefined) {
+            extendedUpdateData.stripe_product_id = updates.stripe_product_id || null;
             hasExtendedUpdates = true;
           }
-          if (updates.lemon_squeezy_variant_id_yearly !== undefined) {
-            extendedUpdateData.lemon_squeezy_variant_id_yearly = updates.lemon_squeezy_variant_id_yearly || null;
+          if (updates.stripe_price_id_monthly !== undefined) {
+            extendedUpdateData.stripe_price_id_monthly = updates.stripe_price_id_monthly || null;
+            hasExtendedUpdates = true;
+          }
+          if (updates.stripe_price_id_yearly !== undefined) {
+            extendedUpdateData.stripe_price_id_yearly = updates.stripe_price_id_yearly || null;
             hasExtendedUpdates = true;
           }
           
           // If there are extended fields to update, do a direct update for those
           if (hasExtendedUpdates) {
+            console.log('Extended update - extendedUpdateData:', extendedUpdateData);
+            console.log('Extended update - Stripe fields being saved:', {
+              stripe_product_id: extendedUpdateData.stripe_product_id,
+              stripe_price_id_monthly: extendedUpdateData.stripe_price_id_monthly,
+              stripe_price_id_yearly: extendedUpdateData.stripe_price_id_yearly
+            });
+            
             const { error: extendedUpdateError } = await supabase
               .from('roles')
               .update(extendedUpdateData)
@@ -323,6 +354,7 @@ export function useRoleManagement() {
       }
 
       await loadRoles();
+      console.log('Role updated successfully');
       return { success: true };
     } catch (err) {
       return { 

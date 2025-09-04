@@ -184,15 +184,33 @@ export default function ProfilePage() {
       if (!user?.id) return;
 
       try {
+        // Get all active roles and find the one with highest priority that has an expiration
         const { data, error } = await supabase
           .from('user_roles')
-          .select('expires_at')
+          .select(`
+            expires_at,
+            current_period_end,
+            roles!inner(
+              priority,
+              name
+            )
+          `)
           .eq('user_id', user.id)
-          .eq('is_active', true)
-          .single();
+          .eq('is_active', true);
 
-        if (!error && data) {
-          setRoleExpiration(data.expires_at);
+        console.log('[Profile] Role expiration data:', data);
+        console.log('[Profile] Role expiration error:', error);
+        
+        if (!error && data && data.length > 0) {
+          // Sort by priority (highest first) and find expiration date
+          const sortedRoles = data.sort((a, b) => (b.roles?.priority || 0) - (a.roles?.priority || 0));
+          const highestPriorityRole = sortedRoles[0];
+          
+          // Use either expires_at or current_period_end, whichever exists
+          const expirationDate = highestPriorityRole?.expires_at || highestPriorityRole?.current_period_end;
+          if (expirationDate) {
+            setRoleExpiration(expirationDate);
+          }
         }
       } catch (error) {
         console.error('Error fetching role expiration:', error);
@@ -852,12 +870,6 @@ export default function ProfilePage() {
                             )}
                             {primaryRole.display_name}
                           </Badge>
-                          {roleExpiration && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              <span>Expires {format(new Date(roleExpiration), 'MMM dd, yyyy')}</span>
-                            </div>
-                          )}
                         </div>
                       </div>
                       
@@ -907,26 +919,65 @@ export default function ProfilePage() {
                   <div className="space-y-3">
                     {hasSubscription ? (
                       <>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className={getSubscriptionBadgeColor()}>
-                            <Zap className="h-3 w-3 mr-1" />
-                            {variantName}
-                          </Badge>
-                          <Badge variant="outline" className="capitalize">
-                            {subscriptionStatus}
-                          </Badge>
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center gap-1.5 text-sm">
+                              {subscriptionStatus === 'active' && (
+                                <>
+                                  <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                  </span>
+                                  <span className="text-green-700">Active</span>
+                                </>
+                              )}
+                              {(subscriptionStatus === 'trialing' || subscriptionStatus === 'on_trial') && (
+                                <>
+                                  <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                                  </span>
+                                  <span className="text-blue-700">Trial</span>
+                                </>
+                              )}
+                              {subscriptionStatus === 'past_due' && (
+                                <span className="text-yellow-700">Past Due</span>
+                              )}
+                              {subscriptionStatus === 'cancelled' && (
+                                <span className="text-red-700">Cancelled</span>
+                              )}
+                              {subscriptionStatus === 'expired' && (
+                                <span className="text-red-700">Expired</span>
+                              )}
+                              {subscriptionStatus === 'paused' && (
+                                <span className="text-gray-700">Paused</span>
+                              )}
+                              {subscriptionStatus === 'inactive' && (
+                                <span className="text-gray-500">Inactive</span>
+                              )}
+                              {subscriptionStatus === 'active_pending_downgrade' && (
+                                <span className="text-amber-600">Cancelled</span>
+                              )}
+                              {subscriptionStatus === 'pending_activation' && (
+                                <span className="text-blue-600">Pending</span>
+                              )}
+                            </span>
+                          </div>
+                          {(currentPeriodEnd || roleExpiration) && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {subscriptionStatus === 'active' ? 'Renews' : 'Expires'} {currentPeriodEnd ? formatPeriodEnd(currentPeriodEnd) : roleExpiration ? format(new Date(roleExpiration), 'MMMM d, yyyy') : ''}
+                            </span>
+                          )}
                         </div>
-                        {currentPeriodEnd && (
-                          <p className="text-xs text-muted-foreground">
-                            {subscriptionStatus === 'active'
-                              ? `Renews ${formatPeriodEnd(currentPeriodEnd)}`
-                              : `Expires ${formatPeriodEnd(currentPeriodEnd)}`
-                            }
-                          </p>
-                        )}
                       </>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No active subscription</p>
+                      <div className="flex items-center gap-2 py-2">
+                        <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center">
+                          <Sparkles className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm text-muted-foreground">No active subscription</p>
+                      </div>
                     )}
                     <div className="flex gap-2 pt-2">
                       <Button
@@ -938,15 +989,36 @@ export default function ProfilePage() {
                         <Sparkles className="h-4 w-4 mr-1" />
                         View Plans
                       </Button>
-                      {customerPortalUrl && (
+                      {hasSubscription && (
                         <Button
-                          variant="outline"
+                          variant="secondary"
                           size="sm"
                           className="flex-1"
-                          onClick={openCustomerPortal}
+                          onClick={async () => {
+                            try {
+                              const { data: sessionData, error } = await supabase
+                                .functions.invoke('create-smart-session', {
+                                  body: {
+                                    action: 'manage',
+                                    cancel_url: window.location.href
+                                  }
+                                });
+                              if (error) throw error;
+                              if (sessionData?.url) {
+                                window.location.href = sessionData.url;
+                              }
+                            } catch (err) {
+                              console.error('Error opening billing portal:', err);
+                              toast({
+                                title: "Error",
+                                description: "Failed to open billing portal.",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
                         >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          Billing
+                          <CreditCard className="h-4 w-4 mr-1" />
+                          Manage Billing
                         </Button>
                       )}
                     </div>

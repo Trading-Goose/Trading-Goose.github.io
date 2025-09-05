@@ -17,7 +17,7 @@ import {
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth";
+import { useAuth, isSessionValid } from "@/lib/auth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useRBAC } from "@/hooks/useRBAC";
 import { useToast } from "@/hooks/use-toast";
@@ -66,6 +66,13 @@ export default function Pricing() {
         setIsLoading(true);
         setError(null);
 
+        // Skip database calls if session is invalid to prevent auth clearing
+        if (!isSessionValid()) {
+          console.log('[Pricing] Skipping role fetch - session invalid');
+          setIsLoading(false);
+          return;
+        }
+
         const { data, error: fetchError } = await supabase
           .from('roles')
           .select('*')
@@ -112,39 +119,17 @@ export default function Pricing() {
     if (hasSubscription && primaryRole?.name !== role.name) {
       setIsProcessing(role.id);
       try {
-        // Ensure we have a valid session and refresh if needed
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.error('[Pricing] Session error:', sessionError);
+        // Check session validity before proceeding
+        if (!isSessionValid()) {
+          console.error('[Pricing] Session invalid');
           toast({
-            title: "Session Error",
-            description: "Please refresh the page and try again",
+            title: "Authentication Required",
+            description: "Please log in to manage your subscription",
             variant: "destructive"
           });
+          navigate('/login');
           setIsProcessing(null);
           return;
-        }
-
-        if (!session) {
-          console.error('[Pricing] No session found, attempting to refresh...');
-
-          // Try to refresh the session
-          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-
-          if (refreshError || !refreshedSession) {
-            console.error('[Pricing] Session refresh failed:', refreshError);
-            toast({
-              title: "Authentication Required",
-              description: "Please log in to manage your subscription",
-              variant: "destructive"
-            });
-            navigate('/login');
-            setIsProcessing(null);
-            return;
-          }
-
-          console.log('[Pricing] Session refreshed successfully');
         }
 
         console.log('[Pricing] Session valid, proceeding with plan switch');
@@ -225,10 +210,17 @@ export default function Pricing() {
       if (hasSubscription && subscriptionStatus === 'active') {
         setIsProcessing(role.id);
         try {
-          // Ensure we have a valid session before calling edge function
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session) {
-            await supabase.auth.refreshSession();
+          // Check session validity before proceeding
+          if (!isSessionValid()) {
+            console.error('[Pricing] Session invalid for cancellation');
+            toast({
+              title: "Authentication Required",
+              description: "Please log in to manage your subscription",
+              variant: "destructive"
+            });
+            navigate('/login');
+            setIsProcessing(null);
+            return;
           }
 
           // Use smart session to handle cancellation
@@ -283,13 +275,17 @@ export default function Pricing() {
     setIsProcessing(role.id);
 
     try {
-      // Ensure we have a valid session before calling edge function
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          throw new Error('Session expired. Please log in again.');
-        }
+      // Check session validity before proceeding
+      if (!isSessionValid()) {
+        console.error('[Pricing] Session invalid for checkout');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to subscribe",
+          variant: "destructive"
+        });
+        navigate('/login');
+        setIsProcessing(null);
+        return;
       }
 
       // Use smart session to handle all subscription operations

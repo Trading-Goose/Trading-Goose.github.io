@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getCachedUser } from '@/lib/cachedAuth';
 import { useRBAC } from './useRBAC';
 
 export interface UserDetails {
@@ -363,7 +364,7 @@ export function useUserManagement() {
     setError(null);
 
     try {
-      const currentUserId = (await supabase.auth.getUser()).data.user?.id;
+      const currentUserId = (await getCachedUser())?.id;
       const promises: Promise<any>[] = [];
       let successCount = 0;
 

@@ -29,7 +29,7 @@ import {
   CheckCircle,
   Loader2
 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { useAuth, isSessionValid } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useRBAC } from "@/hooks/useRBAC";
@@ -144,7 +144,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const fetchActivityStats = async () => {
-      if (!user?.id) return;
+      if (!user?.id || !isSessionValid()) return;
 
       try {
         // Fetch total analyses count
@@ -176,12 +176,14 @@ export default function ProfilePage() {
       }
     };
 
-    fetchActivityStats();
+    // Delay to prevent concurrent API calls on page load
+    const timeoutId = setTimeout(fetchActivityStats, 1500);
+    return () => clearTimeout(timeoutId);
   }, [user]);
 
   useEffect(() => {
     const fetchRoleExpiration = async () => {
-      if (!user?.id) return;
+      if (!user?.id || !isSessionValid()) return;
 
       try {
         // Get all active roles and find the one with highest priority that has an expiration
@@ -217,7 +219,9 @@ export default function ProfilePage() {
       }
     };
 
-    fetchRoleExpiration();
+    // Delay to prevent concurrent API calls on page load
+    const timeoutId = setTimeout(fetchRoleExpiration, 1000);
+    return () => clearTimeout(timeoutId);
   }, [user]);
 
   // Update edited name when profile changes
@@ -228,7 +232,7 @@ export default function ProfilePage() {
   // Fetch Discord identity on mount
   useEffect(() => {
     const fetchDiscordIdentity = async () => {
-      if (!user) return;
+      if (!user || !isSessionValid()) return;
 
       try {
         // Check both auth identities and profile discord_id
@@ -300,7 +304,9 @@ export default function ProfilePage() {
       }
     };
 
-    fetchDiscordIdentity();
+    // Delay to prevent concurrent API calls on page load
+    const timeoutId = setTimeout(fetchDiscordIdentity, 2000);
+    return () => clearTimeout(timeoutId);
   }, [user, profile?.discord_id]);
 
   // Check for #link_discord hash and initiate linking

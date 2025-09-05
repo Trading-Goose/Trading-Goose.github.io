@@ -12,6 +12,12 @@ if (!supabaseUrl || !supabasePublishableKey) {
   });
 }
 
+// Track rate limit status
+let rateLimitedUntil: number = 0;
+
+// Export function to check rate limit status
+export const isRateLimited = () => rateLimitedUntil > Date.now();
+
 export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
     persistSession: true,
@@ -45,13 +51,65 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   // Add global fetch options with timeout and better error handling
   global: {
     fetch: async (url: RequestInfo | URL, options: RequestInit = {}) => {
+      // For all Supabase API calls, ensure we're using the latest session
+      if (typeof url === 'string' && (url.includes('/rest/v1/') || url.includes('/functions/v1/'))) {
+        try {
+          // Get the current session from auth state
+          const currentSession = await supabase.auth.getSession();
+          if (currentSession.data.session?.access_token) {
+            // Ensure the Authorization header is set with the current token
+            const headers = new Headers(options.headers || {});
+            headers.set('Authorization', `Bearer ${currentSession.data.session.access_token}`);
+            options = { ...options, headers };
+          }
+        } catch (e) {
+          // If getting session fails, proceed with original options
+        }
+      }
+      // Check if this is a token refresh request
+      const isTokenRefresh = typeof url === 'string' && url.includes('/auth/v1/token?grant_type=refresh_token');
+      
+      // If we're rate limited and this is a token refresh, skip it
+      if (isTokenRefresh && rateLimitedUntil > Date.now()) {
+        console.log('🔐 Skipping token refresh due to rate limit, waiting', Math.ceil((rateLimitedUntil - Date.now()) / 1000), 'seconds');
+        // Return the current session to avoid triggering sign out
+        // Get the current session from localStorage
+        const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
+        const storedSession = localStorage.getItem(storageKey);
+        if (storedSession) {
+          try {
+            const sessionData = JSON.parse(storedSession);
+            // Return a successful response with the existing session
+            return new Response(JSON.stringify({
+              access_token: sessionData.access_token,
+              token_type: 'bearer',
+              expires_in: 3600,
+              refresh_token: sessionData.refresh_token,
+              user: sessionData.user
+            }), {
+              status: 200,
+              statusText: 'OK',
+              headers: new Headers({ 'content-type': 'application/json' })
+            });
+          } catch (e) {
+            console.error('Failed to parse stored session:', e);
+          }
+        }
+        // If no stored session, return a network error to avoid sign out
+        throw new Error('Rate limited - using cached session');
+      }
+      
       // Check if this is an Edge Function call
       const isEdgeFunction = typeof url === 'string' && url.includes('/functions/v1/');
 
       // For Edge Functions, use a longer timeout and respect existing signals
       if (isEdgeFunction) {
-        // If there's already a signal in options, respect it
+        // If there's already a signal in options, check if it's already aborted
         if (options.signal) {
+          if (options.signal.aborted) {
+            console.log('Skipping fetch - signal already aborted');
+            throw new DOMException('The user aborted a request.', 'AbortError');
+          }
           try {
             const response = await fetch(url, {
               ...options,
@@ -60,7 +118,10 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
             });
             return response;
           } catch (error) {
-            console.error('Supabase Edge Function fetch error:', error);
+            // Only log non-abort errors
+            if (error instanceof Error && error.name !== 'AbortError') {
+              console.error('Supabase Edge Function fetch error:', error);
+            }
             throw error;
           }
         }
@@ -80,7 +141,10 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
           return response;
         } catch (error) {
           clearTimeout(timeoutId);
-          console.error('Supabase Edge Function fetch error:', error);
+          // Only log non-abort errors to reduce console noise
+          if (error instanceof Error && error.name !== 'AbortError') {
+            console.error('Supabase Edge Function fetch error:', error);
+          }
           throw error;
         }
       }
@@ -92,6 +156,12 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
       // Merge signals if one already exists
       let signal = controller.signal;
       if (options.signal) {
+        // Check if the existing signal is already aborted
+        if (options.signal.aborted) {
+          clearTimeout(timeoutId);
+          console.log('Skipping fetch - existing signal already aborted');
+          throw new DOMException('The user aborted a request.', 'AbortError');
+        }
         // Create a combined signal that aborts if either signal aborts
         const combinedController = new AbortController();
         options.signal.addEventListener('abort', () => combinedController.abort());
@@ -107,10 +177,135 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
           cache: 'no-cache'
         });
         clearTimeout(timeoutId);
+        
+        // Handle 401 Unauthorized errors by triggering token refresh
+        if (response.status === 401 && !isTokenRefresh) {
+          console.log('🔐 API call returned 401, triggering token refresh...');
+          
+          // Try to refresh the token using refreshSession which forces an actual refresh
+          try {
+            const refreshResponse = await supabase.auth.refreshSession();
+            if (refreshResponse.data.session && !refreshResponse.error) {
+              console.log('🔐 Token refreshed after 401, retrying original request...');
+              
+              // Update the authorization header with the new token
+              const updatedHeaders = new Headers(options.headers || {});
+              updatedHeaders.set('Authorization', `Bearer ${refreshResponse.data.session.access_token}`);
+              
+              // Retry the original request with the new token
+              const retryResponse = await fetch(url, {
+                ...options,
+                headers: updatedHeaders,
+                signal,
+                credentials: 'same-origin',
+                cache: 'no-cache'
+              });
+              
+              return retryResponse;
+            } else {
+              console.error('🔐 Token refresh failed:', refreshResponse.error);
+            }
+          } catch (refreshError) {
+            console.error('🔐 Failed to refresh token after 401:', refreshError);
+          }
+        }
+        
+        // Immediately check for 429 rate limit on token refresh BEFORE returning
+        if (response.status === 429 && isTokenRefresh) {
+          // Set the flag IMMEDIATELY
+          (window as any).__supabaseRateLimited = true;
+          // Set rate limit for 30 seconds
+          rateLimitedUntil = Date.now() + 30000;
+          console.error('🔐 Token refresh rate limited! Backing off for 30 seconds');
+          
+          // Set a global flag so components know we're rate limited
+          (window as any).__supabaseRateLimited = true;
+          
+          // Clear the rate limit after the timeout
+          setTimeout(async () => {
+            rateLimitedUntil = 0;
+            (window as any).__supabaseRateLimited = false;
+            console.log('🔐 Rate limit cleared, token refresh can resume');
+            
+            // Try to restore the session if auth state was lost
+            try {
+              const authState = (await import('./auth')).useAuth.getState();
+              if (!authState.isAuthenticated) {
+                // Check if we have a valid session in localStorage
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+                const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
+                const storedSession = localStorage.getItem(storageKey);
+                
+                if (storedSession) {
+                  try {
+                    const sessionData = JSON.parse(storedSession);
+                    if (sessionData?.access_token) {
+                      // Check if the stored session is still valid
+                      let timeUntilExpiry = 0;
+                      try {
+                        const payload = JSON.parse(atob(sessionData.access_token.split('.')[1]));
+                        const tokenExp = payload.exp;
+                        const now = Math.floor(Date.now() / 1000);
+                        timeUntilExpiry = tokenExp - now;
+                      } catch (e) {
+                        // Fallback to session expiry
+                        if (sessionData.expires_at) {
+                          const now = Math.floor(Date.now() / 1000);
+                          timeUntilExpiry = sessionData.expires_at - now;
+                        }
+                      }
+                      
+                      // If session is still valid for more than 5 minutes, restore it
+                      if (timeUntilExpiry > 300) {
+                        console.log('🔐 Restoring auth state after rate limit');
+                        await authState.initialize();
+                      } else {
+                        console.log('🔐 Stored session expired, cannot restore');
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Failed to parse stored session:', e);
+                  }
+                }
+              } else {
+                console.log('🔐 Auth state already restored');
+              }
+            } catch (error) {
+              console.error('Error restoring auth state after rate limit:', error);
+            }
+          }, 30000);
+          
+          // Return a fake successful response with the current session to prevent sign out
+          const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
+          const storedSession = localStorage.getItem(storageKey);
+          if (storedSession) {
+            try {
+              const sessionData = JSON.parse(storedSession);
+              // Return a successful response with the existing session
+              return new Response(JSON.stringify({
+                access_token: sessionData.access_token,
+                token_type: 'bearer',
+                expires_in: 3600,
+                refresh_token: sessionData.refresh_token,
+                user: sessionData.user
+              }), {
+                status: 200,
+                statusText: 'OK',
+                headers: new Headers({ 'content-type': 'application/json' })
+              });
+            } catch (e) {
+              console.error('Failed to parse stored session for 429 response:', e);
+            }
+          }
+        }
+        
         return response;
       } catch (error) {
         clearTimeout(timeoutId);
-        console.error('Supabase fetch error:', error);
+        // Only log non-abort errors to reduce console noise
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Supabase fetch error:', error);
+        }
         throw error;
       }
     }

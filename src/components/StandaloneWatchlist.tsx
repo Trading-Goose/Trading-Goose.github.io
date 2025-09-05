@@ -8,7 +8,7 @@ import { useAlpacaConnectionStore } from "@/hooks/useAlpacaConnection";
 import StockTickerAutocomplete from "@/components/StockTickerAutocomplete";
 import { Plus, X, TrendingUp, TrendingDown, Loader2, RefreshCw, Play, Eye, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth";
+import { useAuth, isSessionValid } from "@/lib/auth";
 import { useRBAC } from "@/hooks/useRBAC";
 import { alpacaAPI } from "@/lib/alpaca";
 import AnalysisDetailModal from "./AnalysisDetailModal";
@@ -233,7 +233,11 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
   // Load watchlist from Supabase
   useEffect(() => {
     if (isAuthenticated && user) {
-      loadWatchlist();
+      // Add a small delay on initial mount to ensure session is settled
+      const timeoutId = setTimeout(() => {
+        loadWatchlist();
+      }, 500);
+      return () => clearTimeout(timeoutId);
     } else {
       setWatchlist([]);
       setLoading(false);
@@ -246,7 +250,10 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
   // Check for running rebalances
   useEffect(() => {
     const checkRunningRebalance = async () => {
-      if (!user) return;
+      if (!user || !isAuthenticated || !isSessionValid()) {
+        console.log('StandaloneWatchlist: Skipping rebalance check - session invalid or not authenticated');
+        return;
+      }
 
       try {
         const { data: rebalanceData } = await supabase
@@ -265,10 +272,27 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       }
     };
 
-    checkRunningRebalance();
-    const interval = setInterval(checkRunningRebalance, 10000);
-    return () => clearInterval(interval);
-  }, [user]);
+    // Only set up interval if authenticated
+    if (isAuthenticated && user) {
+      // Add a small delay before first check
+      const timeoutId = setTimeout(() => {
+        checkRunningRebalance();
+        // Then set up interval for subsequent checks
+        const interval = setInterval(checkRunningRebalance, 10000);
+        // Store interval ID for cleanup
+        (window as any).__watchlistRebalanceInterval = interval;
+      }, 500);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        const interval = (window as any).__watchlistRebalanceInterval;
+        if (interval) {
+          clearInterval(interval);
+          delete (window as any).__watchlistRebalanceInterval;
+        }
+      };
+    }
+  }, [user, isAuthenticated]);
 
   // Check for running analyses using unified logic
   useEffect(() => {
@@ -276,7 +300,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       const running = new Set<string>();
 
       // Check database for running analyses if user is authenticated
-      if (user) {
+      if (user && isAuthenticated) {
         try {
           // Get all analyses
           const { data, error } = await supabase
@@ -330,10 +354,27 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       setRunningAnalyses(running);
     };
 
-    checkRunningAnalyses();
-    const interval = setInterval(checkRunningAnalyses, 10000);
-    return () => clearInterval(interval);
-  }, [user]);
+    // Only set up interval if authenticated
+    if (isAuthenticated && user) {
+      // Add a small delay before first check
+      const timeoutId = setTimeout(() => {
+        checkRunningAnalyses();
+        // Then set up interval for subsequent checks
+        const interval = setInterval(checkRunningAnalyses, 10000);
+        // Store interval ID for cleanup
+        (window as any).__watchlistAnalysisInterval = interval;
+      }, 500);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        const interval = (window as any).__watchlistAnalysisInterval;
+        if (interval) {
+          clearInterval(interval);
+          delete (window as any).__watchlistAnalysisInterval;
+        }
+      };
+    }
+  }, [user, isAuthenticated]);
 
   const addToWatchlist = async () => {
     if (!user || !newTicker) return;

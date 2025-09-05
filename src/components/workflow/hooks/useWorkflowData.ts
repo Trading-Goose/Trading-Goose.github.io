@@ -20,12 +20,7 @@ export function useWorkflowData(setIsRebalanceContext: (value: boolean) => void)
     // Check if this is a rebalance analysis
     const isRebalanceAnalysis = !!analysis.rebalance_request_id;
 
-    console.log('Analysis type check:', {
-      ticker: analysis.ticker,
-      rebalance_request_id: analysis.rebalance_request_id,
-      isRebalanceAnalysis,
-      analysis_status: analysis.analysis_status
-    });
+    // Remove debug logging to prevent console spam
 
     // Update the rebalance context state
     setIsRebalanceContext(isRebalanceAnalysis);
@@ -37,7 +32,7 @@ export function useWorkflowData(setIsRebalanceContext: (value: boolean) => void)
 
     // Check if analysis is cancelled - if so, don't display it
     if (currentStatus === ANALYSIS_STATUS.CANCELLED || analysis.is_canceled) {
-      console.log('Analysis is cancelled, not displaying workflow');
+      // Analysis is cancelled, not displaying workflow
       return false; // Don't show cancelled analyses
     }
 
@@ -96,7 +91,7 @@ export function useWorkflowData(setIsRebalanceContext: (value: boolean) => void)
 
         // Debug for research agents
         if (step.id === 'research-debate') {
-          console.log(`Agent status for ${agent.name} (key: ${key}):`, status, '→', agentStatus);
+          // Debug logging removed to prevent console spam
         }
 
         return {
@@ -117,13 +112,7 @@ export function useWorkflowData(setIsRebalanceContext: (value: boolean) => void)
 
       // Debug logging for research-debate step
       if (step.id === 'research-debate') {
-        console.log('Research Debate step status calculation:', {
-          stepId: step.id,
-          agents: updatedAgents.map(a => ({ name: a.name, status: a.status })),
-          completedAgents,
-          runningAgents,
-          totalAgents
-        });
+        // Debug logging removed to prevent console spam
       }
 
       // Improved step status logic:

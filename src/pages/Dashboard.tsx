@@ -26,10 +26,9 @@ const Dashboard = () => {
     // Set a timeout to prevent infinite loading
     if (isLoading) {
       const timer = setTimeout(() => {
-        console.warn('Loading timeout reached, forcing completion');
+        console.warn('Loading timeout reached, showing content anyway');
         setLoadingTimeout(true);
-        // Force the loading state to false if stuck
-        useAuth.setState({ isLoading: false });
+        // Don't force auth state changes - just show the content
       }, 15000); // 15 second timeout to allow for database operations
       return () => clearTimeout(timer);
     } else {

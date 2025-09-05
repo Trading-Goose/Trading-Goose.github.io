@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Lock, CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getCachedUser } from "@/lib/cachedAuth";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChangePasswordModalProps {
@@ -67,7 +68,7 @@ export default function ChangePasswordModal({ isOpen, onClose }: ChangePasswordM
 
     try {
       // First, verify the current password by attempting to sign in
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCachedUser();
       
       if (!user?.email) {
         setError("User email not found");

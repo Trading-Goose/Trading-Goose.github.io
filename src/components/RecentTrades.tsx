@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw, Loader2, ExternalLink, FileText, BarChart3 } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
-import { useAuth } from "@/lib/auth";
+import { useAuth, isSessionValid } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import AnalysisDetailModal from "@/components/AnalysisDetailModal";
@@ -33,18 +33,21 @@ interface TradeDecision {
   createdAt: string;
 }
 
-export default function RecentTrades() {
+function RecentTrades() {
   const [loading, setLoading] = useState(true);
   const [allTrades, setAllTrades] = useState<TradeDecision[]>([]);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const [selectedRebalanceId, setSelectedRebalanceId] = useState<string | null>(null);
   const [executingOrderId, setExecutingOrderId] = useState<string | null>(null);
-  const { apiSettings, user } = useAuth();
+  const { apiSettings, user, isAuthenticated } = useAuth();
   const { toast } = useToast();
 
   // Fetch recent trades from trading_actions table (last 48 hours for dashboard widget)
-  const fetchAllTrades = async () => {
-    if (!user?.id) return;
+  const fetchAllTrades = useCallback(async () => {
+    if (!user?.id || !isAuthenticated || !isSessionValid()) {
+      console.log('RecentTrades: Skipping fetch - session invalid or not authenticated');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -99,11 +102,40 @@ export default function RecentTrades() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, isAuthenticated, toast]); // isSessionValid is a pure function, doesn't need to be in deps
 
+  // Track if we've already fetched for current user
+  const fetchedRef = useRef<string>('');
+  const lastFetchTimeRef = useRef<number>(0);
+  
   useEffect(() => {
-    fetchAllTrades();
-  }, [apiSettings, user]);
+    if (!user?.id || !isAuthenticated) {
+      setAllTrades([]);
+      setLoading(false);
+      return;
+    }
+    
+    const fetchKey = user.id;
+    
+    // Avoid duplicate fetches for the same user
+    if (fetchedRef.current === fetchKey) {
+      // Check if it's been more than 30 seconds since last fetch
+      const now = Date.now();
+      if (now - lastFetchTimeRef.current < 30000) {
+        return;
+      }
+    }
+    
+    fetchedRef.current = fetchKey;
+    lastFetchTimeRef.current = Date.now();
+    
+    // Add a small delay on initial mount to ensure session is settled
+    const timeoutId = setTimeout(() => {
+      fetchAllTrades();
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
+  }, [user?.id, isAuthenticated, fetchAllTrades]); // Include isAuthenticated in dependencies
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -525,3 +557,5 @@ export default function RecentTrades() {
     </Card>
   );
 }
+
+export default React.memo(RecentTrades);

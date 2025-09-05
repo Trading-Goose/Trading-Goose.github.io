@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
+import { useAuth, isSessionValid } from '@/lib/auth';
 
 interface SubscriptionInfo {
   hasSubscription: boolean;
@@ -33,6 +33,17 @@ export function useSubscription() {
   useEffect(() => {
     async function loadSubscription() {
       if (!user) {
+        setSubscriptionInfo(prev => ({
+          ...prev,
+          isLoading: false,
+          hasSubscription: false
+        }));
+        return;
+      }
+
+      // Check session validity before making RPC call
+      if (!isSessionValid()) {
+        console.log('[useSubscription] Skipping subscription load - session invalid');
         setSubscriptionInfo(prev => ({
           ...prev,
           isLoading: false,
@@ -97,26 +108,33 @@ export function useSubscription() {
 
     loadSubscription();
 
-    // Subscribe to subscription changes
-    const subscription = supabase
-      .channel('subscription_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_subscriptions',
-          filter: `user_id=eq.${user?.id}`
-        },
-        () => {
-          // Reload subscription when it changes
-          loadSubscription();
-        }
-      )
-      .subscribe();
+    // Subscribe to subscription changes only if session is valid
+    let subscription = null;
+    if (user && isSessionValid()) {
+      subscription = supabase
+        .channel('subscription_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'user_subscriptions',
+            filter: `user_id=eq.${user?.id}`
+          },
+          () => {
+            // Only reload if session is still valid
+            if (isSessionValid()) {
+              loadSubscription();
+            }
+          }
+        )
+        .subscribe();
+    }
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, [user]);
 

@@ -12,9 +12,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
-    // Initialize authentication when app starts
+    // Initialize authentication when app starts - this is idempotent
     initializeAuth();
-  }, []);
+    
+    // Clean up on unmount (important for preventing memory leaks)
+    return () => {
+      // The cleanup is handled by the global state in auth.ts
+    };
+  }, []); // Empty dependency array ensures this only runs once
 
   useEffect(() => {
     // Track user based on authentication status

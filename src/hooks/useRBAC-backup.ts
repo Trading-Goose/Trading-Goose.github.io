@@ -1,5 +1,5 @@
 // Simple RBAC hook for Header component compatibility
-import { useAuth, isSessionValid } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -19,8 +19,6 @@ export function useRBAC() {
         max_rebalance_stocks?: number;
         max_scheduled_rebalances?: number;
         schedule_resolution?: string;
-        optimization_mode?: string;
-        number_of_search_sources?: number;
         rebalance_access?: boolean;
         opportunity_agent_access?: boolean;
         additional_provider_access?: boolean;
@@ -35,14 +33,6 @@ export function useRBAC() {
                 setPermissions([]);
                 setUserRoles([]);
                 setRoleDetails(new Map());
-                setIsLoading(false);
-                return;
-            }
-
-            // Check session validity before making database calls
-            if (!isSessionValid()) {
-                console.log('[useRBAC] Skipping permission load - session invalid');
-                setIsLoading(false);
                 return;
             }
 
@@ -274,8 +264,6 @@ export function useRBAC() {
     };
 
     const getMaxParallelAnalysis = (): number => {
-        if (isAdmin) return 10;
-
         console.log('[useRBAC] getMaxParallelAnalysis called. userRoles:', userRoles);
         console.log('[useRBAC] roleDetails:', Array.from(roleDetails.entries()));
 
@@ -293,10 +281,10 @@ export function useRBAC() {
             }
         }
 
-        // Return found limit or default fallback
+        // Only return 0 if no limits found - let the database be the source of truth
         if (!foundLimit) {
-            console.log('[useRBAC] No max_parallel_analysis found in any role, returning default 1');
-            return 1;
+            console.log('[useRBAC] No max_parallel_analysis found in any role, returning 0');
+            return 0;
         }
 
         console.log('[useRBAC] Final maxLimit:', maxLimit);
@@ -304,30 +292,36 @@ export function useRBAC() {
     };
 
     const getMaxWatchlistStocks = (): number => {
-        if (isAdmin) return 100;
-
         console.log('[useRBAC] getMaxWatchlistStocks called. userRoles:', userRoles);
+        console.log('[useRBAC] roleDetails:', Array.from(roleDetails.entries()));
 
         // Get the highest limit from all user roles
-        let maxLimit = 0;
+        let maxLimit = 0; // Start at 0 to get actual max from roles
         let foundLimit = false;
 
         for (const userRole of userRoles) {
             const roleDetail = roleDetails.get(userRole.role_id);
+            console.log('[useRBAC] Checking role:', userRole.role_id, 'Detail:', roleDetail);
             if (roleDetail && typeof roleDetail.max_watchlist_stocks === 'number') {
+                console.log('[useRBAC] Found max_watchlist_stocks:', roleDetail.max_watchlist_stocks);
                 maxLimit = Math.max(maxLimit, roleDetail.max_watchlist_stocks);
                 foundLimit = true;
             }
         }
 
-        return foundLimit ? maxLimit : 10; // Default fallback
+        // Only return 0 if no limits found - let the database be the source of truth
+        if (!foundLimit) {
+            console.log('[useRBAC] No max_watchlist_stocks found in any role, returning 0');
+            return 0;
+        }
+
+        console.log('[useRBAC] Final maxLimit:', maxLimit);
+        return maxLimit;
     };
 
     const getMaxRebalanceStocks = (): number => {
-        if (isAdmin) return 50;
-
         // Get the highest limit from all user roles
-        let maxLimit = 0;
+        let maxLimit = 0; // Start at 0 to get actual max from roles
         let foundLimit = false;
 
         for (const userRole of userRoles) {
@@ -338,14 +332,17 @@ export function useRBAC() {
             }
         }
 
-        return foundLimit ? maxLimit : 5; // Default fallback
+        // Only return 0 if no limits found - let the database be the source of truth
+        if (!foundLimit) {
+            return 0;
+        }
+
+        return maxLimit;
     };
 
     const getMaxScheduledRebalances = (): number => {
-        if (isAdmin) return 20;
-
         // Get the highest limit from all user roles
-        let maxLimit = 0;
+        let maxLimit = 0; // Start at 0 to get actual max from roles
         let foundLimit = false;
 
         for (const userRole of userRoles) {
@@ -356,12 +353,15 @@ export function useRBAC() {
             }
         }
 
-        return foundLimit ? maxLimit : 2; // Default fallback
+        // Only return 0 if no limits found - let the database be the source of truth
+        if (!foundLimit) {
+            return 0;
+        }
+
+        return maxLimit;
     };
 
     const getScheduleResolution = (): string[] => {
-        if (isAdmin) return ['Day', 'Week', 'Month'];
-
         // Collect all available resolutions from all user roles
         const resolutions = new Set<string>();
 
@@ -373,12 +373,71 @@ export function useRBAC() {
             }
         }
 
-        return Array.from(resolutions).length > 0 ? Array.from(resolutions) : ['Month'];
+        // Return empty array if no resolutions found - let the database be the source of truth
+        return Array.from(resolutions);
+    };
+
+    const hasRebalanceAccess = (): boolean => {
+        // Check if any role has rebalance access
+        for (const userRole of userRoles) {
+            const roleDetail = roleDetails.get(userRole.role_id);
+            if (roleDetail && roleDetail.rebalance_access) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    const hasOpportunityAgentAccess = (): boolean => {
+        // Check if any role has opportunity agent access
+        for (const userRole of userRoles) {
+            const roleDetail = roleDetails.get(userRole.role_id);
+            if (roleDetail && roleDetail.opportunity_agent_access) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    const hasAdditionalProviderAccess = (): boolean => {
+        // Check if any role has additional provider access
+        for (const userRole of userRoles) {
+            const roleDetail = roleDetails.get(userRole.role_id);
+            if (roleDetail && roleDetail.additional_provider_access) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    const canUseLiveTrading = (): boolean => {
+        // Check if any role has live trading enabled
+        for (const userRole of userRoles) {
+            const roleDetail = roleDetails.get(userRole.role_id);
+            if (roleDetail && roleDetail.enable_live_trading) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    const canUseAutoTrading = (): boolean => {
+        // Check if any role has auto trading enabled
+        for (const userRole of userRoles) {
+            const roleDetail = roleDetails.get(userRole.role_id);
+            if (roleDetail && roleDetail.enable_auto_trading) {
+                return true;
+            }
+        }
+
+        return false;
     };
 
     const getMaxSearchSources = (): number => {
-        if (isAdmin) return 10;
-
         // Get the highest search sources limit from all user roles
         let maxLimit = 0;
         let foundLimit = false;
@@ -397,13 +456,11 @@ export function useRBAC() {
 
         console.log('[useRBAC] getMaxSearchSources - final maxLimit:', maxLimit, 'foundLimit:', foundLimit);
 
-        // Return the found limit or reasonable default
-        return foundLimit ? maxLimit : 3;
+        // Return the found limit or default to 25 if no limits found
+        return foundLimit ? maxLimit : 25;
     };
 
     const getAvailableOptimizationModes = (): string[] => {
-        if (isAdmin) return ['speed', 'balanced', 'quality'];
-
         // Get all available optimization modes from all user roles
         const allModes = new Set<string>();
 
@@ -420,90 +477,15 @@ export function useRBAC() {
             }
         }
 
-        // If no modes found, default to balanced
+        // If no modes found, default to just 'speed'
         if (allModes.size === 0) {
-            allModes.add('balanced');
+            allModes.add('speed');
         }
 
         console.log('[useRBAC] getAvailableOptimizationModes - final modes:', Array.from(allModes));
 
         return Array.from(allModes);
     };
-
-    const hasRebalanceAccess = (): boolean => {
-        if (isAdmin) return true;
-
-        // Check if any role has rebalance access
-        for (const userRole of userRoles) {
-            const roleDetail = roleDetails.get(userRole.role_id);
-            if (roleDetail && roleDetail.rebalance_access) {
-                return true;
-            }
-        }
-
-        return false;
-    };
-
-    const hasOpportunityAgentAccess = (): boolean => {
-        if (isAdmin) return true;
-
-        // Check if any role has opportunity agent access
-        for (const userRole of userRoles) {
-            const roleDetail = roleDetails.get(userRole.role_id);
-            if (roleDetail && roleDetail.opportunity_agent_access) {
-                return true;
-            }
-        }
-
-        return false;
-    };
-
-    const hasAdditionalProviderAccess = (): boolean => {
-        if (isAdmin) return true;
-
-        // Check if any role has additional provider access
-        for (const userRole of userRoles) {
-            const roleDetail = roleDetails.get(userRole.role_id);
-            if (roleDetail && roleDetail.additional_provider_access) {
-                return true;
-            }
-        }
-
-        return false;
-    };
-
-    // These match the function names used in Settings.tsx
-    const canUseLiveTrading = (): boolean => {
-        if (isAdmin) return true;
-
-        // Check if any role has live trading enabled
-        for (const userRole of userRoles) {
-            const roleDetail = roleDetails.get(userRole.role_id);
-            if (roleDetail && roleDetail.enable_live_trading) {
-                return true;
-            }
-        }
-
-        return false;
-    };
-
-    const canUseAutoTrading = (): boolean => {
-        if (isAdmin) return true;
-
-        // Check if any role has auto trading enabled
-        for (const userRole of userRoles) {
-            const roleDetail = roleDetails.get(userRole.role_id);
-            if (roleDetail && roleDetail.enable_auto_trading) {
-                return true;
-            }
-        }
-
-        return false;
-    };
-
-    // Aliases for compatibility with different naming conventions
-    const hasLiveTradingAccess = canUseLiveTrading;
-    const hasAutoTradingAccess = canUseAutoTrading;
 
     return {
         permissions,
@@ -529,8 +511,6 @@ export function useRBAC() {
         hasAdditionalProviderAccess,
         canUseLiveTrading,
         canUseAutoTrading,
-        hasLiveTradingAccess,
-        hasAutoTradingAccess,
         userRoles,
         roleDetails
     };

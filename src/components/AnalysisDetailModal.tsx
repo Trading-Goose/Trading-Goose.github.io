@@ -58,6 +58,7 @@ import {
   isRebalanceFinished
 } from "@/lib/statusTypes";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
 
 interface AnalysisDetailModalProps {
@@ -175,7 +176,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
 
     setIsRetrying(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { user } = useAuth.getState();
       if (!user) {
         toast({
           title: "Authentication required",
@@ -242,7 +243,7 @@ export default function AnalysisDetailModal({ ticker, analysisId, isOpen, onClos
 
     setIsRetrying(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { user } = useAuth.getState();
       if (!user) {
         toast({
           title: "Authentication required",

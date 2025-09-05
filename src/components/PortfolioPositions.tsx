@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity, Clock, AlertCircle, AlertTriangle, Lock } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
-import { useAuth } from "@/lib/auth";
+import { useAuth, isSessionValid } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useAlpacaConnectionStore } from "@/hooks/useAlpacaConnection";
@@ -92,6 +92,13 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   };
 
   const fetchPositions = async () => {
+    // Check session validity before fetching
+    if (!isSessionValid()) {
+      console.log('PortfolioPositions: Skipping fetch - session invalid');
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     setError(null);
 
@@ -214,17 +221,45 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   };
 
   useEffect(() => {
-    fetchPositions();
+    // Don't fetch if not authenticated
+    if (!isAuthenticated) {
+      setPositions([]);
+      setLoading(false);
+      return;
+    }
+    
+    // Add a small delay on initial mount to ensure session is settled
+    const timeoutId = setTimeout(() => {
+      fetchPositions();
+      
+      // Set up refresh interval after initial fetch
+      const interval = setInterval(fetchPositions, 30000);
+      // Store interval ID for cleanup
+      (window as any).__portfolioPositionsInterval = interval;
+    }, 500);
 
-    // Refresh positions every 30 seconds
-    const interval = setInterval(fetchPositions, 30000);
-    return () => clearInterval(interval);
-  }, [apiSettings]);
+    return () => {
+      clearTimeout(timeoutId);
+      const interval = (window as any).__portfolioPositionsInterval;
+      if (interval) {
+        clearInterval(interval);
+        delete (window as any).__portfolioPositionsInterval;
+      }
+    };
+  }, [apiSettings, isAuthenticated]);
 
   // Check for running analyses
   useEffect(() => {
     const checkRunningAnalyses = async () => {
-      if (!user) return;
+      if (!user || !isAuthenticated) {
+        return;
+      }
+      
+      // Double-check session validity inside the async function
+      if (!isSessionValid()) {
+        console.log('PortfolioPositions: Skipping analysis check - session invalid or not authenticated');
+        return;
+      }
 
       try {
         const { data, error } = await supabase
@@ -255,15 +290,43 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       }
     };
 
-    checkRunningAnalyses();
-    const interval = setInterval(checkRunningAnalyses, 10000);
-    return () => clearInterval(interval);
-  }, [user]);
+    // Only set up interval if authenticated
+    if (isAuthenticated && user) {
+      // Add a small delay before first check
+      const timeoutId = setTimeout(() => {
+        checkRunningAnalyses();
+        // Then set up interval for subsequent checks  
+        const interval = setInterval(checkRunningAnalyses, 10000);
+        // Store interval ID for cleanup
+        (window as any).__portfolioAnalysisInterval = interval;
+      }, 500);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        const interval = (window as any).__portfolioAnalysisInterval;
+        if (interval) {
+          clearInterval(interval);
+          delete (window as any).__portfolioAnalysisInterval;
+        }
+      };
+    }
+  }, [user, isAuthenticated]);
 
   // Check for running rebalance requests
   useEffect(() => {
+    // Store interval reference
+    let intervalRef: NodeJS.Timeout | null = null;
+    
     const checkRunningRebalance = async () => {
-      if (!user) return;
+      if (!user || !isAuthenticated) {
+        return;
+      }
+      
+      // Double-check session validity inside the async function
+      if (!isSessionValid()) {
+        console.log('PortfolioPositions: Skipping rebalance check - session invalid or not authenticated');
+        return;
+      }
 
       try {
         // Check for active rebalance requests using centralized status logic
@@ -275,7 +338,10 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
           .limit(10); // Get recent rebalances to check their status
 
         if (error) {
-          console.warn('Error checking rebalance requests:', error);
+          // Don't log permission errors when not authenticated
+          if (error.code !== '42501' && error.message !== 'permission denied for table rebalance_requests') {
+            console.warn('Error checking rebalance requests:', error);
+          }
           return;
         }
 
@@ -343,11 +409,27 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       }
     };
 
-    checkRunningRebalance();
-    // Check every 5 seconds for rebalance status
-    const interval = setInterval(checkRunningRebalance, 5000);
-    return () => clearInterval(interval);
-  }, [user]);
+    // Only set up interval if authenticated
+    if (isAuthenticated && user) {
+      checkRunningRebalance();
+      // Check every 5 seconds for rebalance status
+      intervalRef = setInterval(checkRunningRebalance, 5000);
+      return () => {
+        if (intervalRef) {
+          clearInterval(intervalRef);
+          intervalRef = null;
+        }
+      };
+    } else {
+      // If not authenticated, clean up any existing interval
+      return () => {
+        if (intervalRef) {
+          clearInterval(intervalRef);
+          intervalRef = null;
+        }
+      };
+    }
+  }, [user, isAuthenticated]);
 
   return (
     <>

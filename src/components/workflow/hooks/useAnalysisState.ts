@@ -31,8 +31,8 @@ export function useAnalysisState(updateWorkflowFromAnalysis: (analysis: any) => 
     };
 
     handleCheckRunningAnalyses();
-    // Check periodically - every 10 seconds instead of 2 seconds
-    const interval = setInterval(handleCheckRunningAnalyses, 10000);
+    // Check periodically - every 30 seconds instead of 10 seconds
+    const interval = setInterval(handleCheckRunningAnalyses, 30000);
 
     // Subscribe to real-time updates for new analyses
     const subscription = user ? supabase

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/AuthProvider";
+import { RBACProvider } from "@/contexts/RBACContext";
 import { AlpacaConnectionErrorModal } from "@/components/AlpacaConnectionErrorModal";
 import { useAlpacaConnection } from "@/hooks/useAlpacaConnection";
 import Index from "./pages/Index";
@@ -77,13 +78,15 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter basename={basename}>
-            <AppContent />
-          </BrowserRouter>
-        </TooltipProvider>
+        <RBACProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter basename={basename}>
+              <AppContent />
+            </BrowserRouter>
+          </TooltipProvider>
+        </RBACProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

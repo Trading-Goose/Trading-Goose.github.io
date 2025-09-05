@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { useState, useEffect } from 'react';
 import { alpacaAPI } from '@/lib/alpaca';
+import { useAuth, isSessionValid } from '@/lib/auth';
 
 interface AlpacaConnectionStore {
   isConnected: boolean;
@@ -31,6 +32,12 @@ export const useAlpacaConnectionStore = create<AlpacaConnectionStore>((set, get)
   },
 
   checkConnection: async () => {
+    // Check if session is valid before making API call
+    if (!isSessionValid()) {
+      console.log('useAlpacaConnection: Skipping connection check - session invalid');
+      return;
+    }
+    
     const { setConnectionStatus, setLoading } = get();
     setLoading(true);
     
@@ -77,18 +84,40 @@ export const useAlpacaConnectionStore = create<AlpacaConnectionStore>((set, get)
 // Hook to monitor Alpaca connection status
 export function useAlpacaConnection() {
   const store = useAlpacaConnectionStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   
   useEffect(() => {
-    // Initial check
-    store.checkConnection();
+    // Don't check connection until auth is ready and session is valid
+    if (authLoading || !isAuthenticated || !isSessionValid()) {
+      return;
+    }
     
-    // Check periodically (every 30 seconds)
-    const interval = setInterval(() => {
+    // Add a small delay on initial mount to ensure session is settled
+    const timeoutId = setTimeout(() => {
+      // Initial check after auth is ready
       store.checkConnection();
-    }, 30000);
+      
+      // Check periodically (every 30 seconds)
+      const interval = setInterval(() => {
+        // Only check if session is still valid
+        if (isSessionValid()) {
+          store.checkConnection();
+        }
+      }, 30000);
+      
+      // Store interval for cleanup
+      (window as any).__alpacaConnectionInterval = interval;
+    }, 500);
     
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearTimeout(timeoutId);
+      const interval = (window as any).__alpacaConnectionInterval;
+      if (interval) {
+        clearInterval(interval);
+        delete (window as any).__alpacaConnectionInterval;
+      }
+    };
+  }, [authLoading, isAuthenticated]);
   
   return {
     isConnected: store.isConnected,

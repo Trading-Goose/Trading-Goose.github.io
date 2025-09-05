@@ -12,7 +12,7 @@ interface WorkflowStepsProps {
   setSelectedStep: (step: WorkflowStep) => void;
 }
 
-export function WorkflowSteps({
+export const WorkflowSteps = React.memo(function WorkflowSteps({
   workflowData,
   isRebalanceContext,
   setSelectedStep
@@ -24,12 +24,7 @@ export function WorkflowSteps({
       !step.name.toLowerCase().includes('portfolio'))
     : workflowData;
 
-  console.log('Displaying workflow steps:', {
-    isRebalanceContext,
-    totalSteps: workflowData.length,
-    filteredSteps: filteredSteps.length,
-    stepNames: filteredSteps.map(s => s.name)
-  });
+  // Remove console.log to prevent re-render logging
 
   return (
     <div className="flex items-center justify-center overflow-hidden">
@@ -66,4 +61,4 @@ export function WorkflowSteps({
       })}
     </div>
   );
-}
+});

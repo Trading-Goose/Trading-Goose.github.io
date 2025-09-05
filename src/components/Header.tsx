@@ -15,7 +15,7 @@ import {
   Menu,
   Loader2
 } from "lucide-react";
-import { useAuth, hasRequiredApiKeys } from "@/lib/auth";
+import { useAuth, hasRequiredApiKeys, isSessionValid } from "@/lib/auth";
 import { RoleBadge, RoleGate } from "@/components/RoleBasedAccess";
 import { useRBAC } from "@/hooks/useRBAC";
 import { supabase } from "@/lib/supabase";
@@ -48,6 +48,12 @@ export default function Header() {
   useEffect(() => {
     const checkRunningTasks = async () => {
       if (!user) return;
+
+      // Skip database calls if session is invalid to prevent auth clearing
+      if (!isSessionValid()) {
+        console.log('[Header] Skipping task check - session invalid');
+        return;
+      }
 
       try {
         // Check running analyses

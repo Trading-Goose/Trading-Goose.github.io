@@ -1099,34 +1099,29 @@ export default function SettingsPage() {
     }
   };
 
-  // Check authentication on mount - wait for auth state to be restored
+  // Check authentication on mount - simplified since auth restoration is now automatic
   useEffect(() => {
-    const initAuth = async () => {
-      console.log('Settings page initializing auth check...');
-
-      // First, wait a bit for persisted state to be restored from localStorage
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Then initialize auth to refresh session
-      await initialize();
-      setSessionChecked(true);
-
-      // Give the auth state time to update after session check
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Now we can safely check authentication
-      // Can't use useAuth.getState() here since useAuth is destructured as a hook above
-      // Use the hook values directly instead
-      if (!isAuthenticated && !isLoading) {
-        console.log('Not authenticated after session check, redirecting to home...');
+    const checkAuth = () => {
+      console.log('Settings page - checking auth state...');
+      
+      // Since auth restoration is now automatic, we just need to wait briefly for it to complete
+      if (isAuthenticated) {
+        console.log('Settings page - user is authenticated');
+        setAuthChecking(false);
+        setSessionChecked(true);
+      } else if (!isLoading) {
+        console.log('Settings page - not authenticated and not loading, redirecting...');
         navigate('/');
       } else {
-        setAuthChecking(false);
+        console.log('Settings page - still loading auth, waiting...');
+        // Try again in a moment
+        setTimeout(checkAuth, 500);
       }
     };
 
-    initAuth();
-  }, []); // Only run once on mount
+    // Small delay to allow auth restoration to complete
+    setTimeout(checkAuth, 100);
+  }, [isAuthenticated, isLoading, navigate]); // React to auth state changes
 
   // Monitor auth state changes after initial check
   useEffect(() => {

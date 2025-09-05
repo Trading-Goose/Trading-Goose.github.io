@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { alpacaAPI } from "@/lib/alpaca";
-import { useAuth } from "@/lib/auth";
+import { useAuth, isSessionValid } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { fetchPortfolioData, fetchStockData, type PortfolioData, type StockData } from "@/lib/portfolio-data";
 import { useNavigate } from "react-router-dom";
@@ -34,7 +34,7 @@ const periods: Array<{ value: TimePeriod; label: string }> = [
 
 // Remove the old hardcoded function - we'll create a dynamic one in the component
 
-const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartProps) => {
+const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: PerformanceChartProps) => {
   const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("1D");
   const [loading, setLoading] = useState(false);
@@ -44,15 +44,21 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
   const [stockData, setStockData] = useState<StockData>({});
   const [positions, setPositions] = useState<any[]>([]);
   const [hasAlpacaConfig, setHasAlpacaConfig] = useState(true); // Assume configured initially
-  const { apiSettings } = useAuth();
+  const { apiSettings, isAuthenticated } = useAuth();
   const { toast } = useToast();
 
-  // Fetch data on component mount and when selectedStock changes
-  useEffect(() => {
-    fetchData();
-  }, [apiSettings, selectedStock]);
+  // Track if we've already fetched for current apiSettings and selectedStock
+  const fetchedRef = useRef<string>('');
+  const lastFetchTimeRef = useRef<number>(0);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    // Debounce fetches - don't fetch if we just fetched less than 2 seconds ago
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current < 2000) {
+      return;
+    }
+    lastFetchTimeRef.current = now;
+
     setLoading(true);
     setError(null);
 
@@ -109,18 +115,12 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
       // If a stock is selected, fetch its data (uses Alpaca API)
       if (selectedStock) {
         try {
-          console.log(`Fetching stock data for ${selectedStock}...`);
+          // console.log(`Fetching stock data for ${selectedStock}...`);
           const stockHistoryData = await fetchStockData(selectedStock);
-          console.log(`Received stock data for ${selectedStock}:`, {
-            hasData: !!stockHistoryData,
-            periods: Object.keys(stockHistoryData || {}),
-            '1D_length': stockHistoryData?.['1D']?.length || 0,
-            '1W_length': stockHistoryData?.['1W']?.length || 0,
-            '1M_length': stockHistoryData?.['1M']?.length || 0
-          });
+          // Debug logging removed to prevent console spam
           setStockData(prev => {
             const newState = { ...prev, [selectedStock]: stockHistoryData };
-            console.log(`Updated stockData state for ${selectedStock}`);
+            // console.log(`Updated stockData state for ${selectedStock}`);
             return newState;
           });
 
@@ -138,12 +138,7 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
               const dayChange = currentPrice - previousClose;
               const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;
 
-              setStockDailyChanges(prev => ({
-                ...prev,
-                [selectedStock]: { change: dayChange, changePercent: dayChangePercent }
-              }));
-
-              console.log(`Daily change for ${selectedStock}: $${dayChange.toFixed(2)} (${dayChangePercent.toFixed(2)}%)`);
+              // console.log(`Daily change for ${selectedStock}: $${dayChange.toFixed(2)} (${dayChangePercent.toFixed(2)}%`);
             }
           } catch (err) {
             console.warn(`Could not fetch daily change for ${selectedStock}:`, err);
@@ -184,10 +179,35 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiSettings, selectedStock, toast]);
+
+  // Fetch data on component mount and when selectedStock changes
+  useEffect(() => {
+    // Don't fetch if not authenticated or session is invalid
+    if (!isAuthenticated || !isSessionValid()) {
+      console.log('PerformanceChart: Skipping fetch - session invalid or not authenticated');
+      return;
+    }
+    
+    const fetchKey = `${apiSettings?.apiKey || 'none'}-${selectedStock || 'portfolio'}`;
+    
+    // Avoid duplicate fetches for the same configuration
+    if (fetchedRef.current === fetchKey) {
+      return;
+    }
+    
+    fetchedRef.current = fetchKey;
+    
+    // Add a small delay on initial mount to ensure session is settled
+    const timeoutId = setTimeout(() => {
+      fetchData();
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
+  }, [selectedStock, fetchData, isAuthenticated]); // Include fetchData and isAuthenticated in dependencies
 
   // Get real stock metrics from positions
-  const getStockMetrics = (symbol: string) => {
+  const getStockMetrics = useCallback((symbol: string) => {
     const position = positions.find((p: any) => p.symbol === symbol);
 
     if (!position) {
@@ -241,55 +261,39 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
       currentPrice,
       lastdayPrice
     };
-  };
+  }, [positions, metrics]);
 
   // Get appropriate data based on selection
-  const getCurrentData = () => {
-    // Debug logging
-    console.log('getCurrentData called:', {
-      selectedStock,
-      selectedPeriod,
-      hasPortfolioData: !!portfolioData,
-      stockDataKeys: Object.keys(stockData),
-      stockDataForSelected: selectedStock ? stockData[selectedStock] : null,
-      stockDataPeriods: selectedStock && stockData[selectedStock] ? Object.keys(stockData[selectedStock]) : [],
-    });
+  const getCurrentData = useCallback(() => {
+    // Debug logging removed to prevent console spam
 
     // Check for real stock data first (even if no portfolio data)
     if (selectedStock && stockData[selectedStock]) {
       const periodData = stockData[selectedStock][selectedPeriod];
-      console.log(`Stock data for ${selectedStock} ${selectedPeriod}:`, {
-        exists: !!periodData,
-        length: periodData?.length || 0,
-        sample: periodData?.[0]
-      });
+      // Debug logging removed to prevent console spam
 
       if (periodData && Array.isArray(periodData) && periodData.length > 0) {
-        console.log(`Returning ${periodData.length} real data points for ${selectedStock} ${selectedPeriod}`);
+        // console.log(`Returning ${periodData.length} real data points for ${selectedStock} ${selectedPeriod}`);
         return periodData;
       } else {
-        console.warn(`No valid data for ${selectedStock} ${selectedPeriod} - periodData:`, periodData);
+        // console.warn(`No valid data for ${selectedStock} ${selectedPeriod} - periodData:`, periodData);
       }
     }
 
     // Check for portfolio data
     if (!selectedStock && portfolioData && portfolioData[selectedPeriod]) {
       const data = portfolioData[selectedPeriod];
-      console.log(`Returning ${data.length} portfolio data points for ${selectedPeriod}`);
+      // console.log(`Returning ${data.length} portfolio data points for ${selectedPeriod}`);
       return data;
     }
 
     // No data available
-    console.log('No data available for display', {
-      selectedStock,
-      selectedPeriod,
-      hasStockData: !!stockData[selectedStock],
-      hasPortfolioData: !!portfolioData?.[selectedPeriod]
-    });
+    // Debug logging removed to prevent console spam
     return [];
-  };
+  }, [selectedStock, stockData, selectedPeriod, portfolioData]);
 
-  const currentData = getCurrentData();
+  const currentData = useMemo(() => getCurrentData(), [getCurrentData]);
+  
   const latestValue = currentData[currentData.length - 1] || { value: 0, pnl: 0 };
   const firstValue = currentData[0] || { value: 0, pnl: 0 };
   const totalReturn = latestValue.pnl || (latestValue.value - firstValue.value);
@@ -299,7 +303,7 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
   const isPositive = totalReturn >= 0;
 
   // Calculate dynamic Y-axis domain for better visibility of small changes
-  const getYAxisDomain = () => {
+  const getYAxisDomain = useCallback(() => {
     if (currentData.length === 0 || !firstValue || firstValue.value === 0) {
       return ['auto', 'auto'];
     }
@@ -349,37 +353,20 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
       return ['auto', 'auto'];
     }
 
-    console.log('Y-axis domain calculation:', {
-      lowestValue,
-      highestValue,
-      range,
-      padding: actualPadding,
-      domainMin,
-      domainMax,
-      viewportRange: domainMax - domainMin,
-      isStock: !!selectedStock,
-      period: selectedPeriod
-    });
+    // Debug logging removed to prevent console spam
 
     return [domainMin, domainMax];
-  };
+  }, [currentData, selectedStock, selectedPeriod, firstValue]);
 
-  const yAxisDomain = getYAxisDomain();
+  const yAxisDomain = useMemo(() => getYAxisDomain(), [getYAxisDomain]);
+  
   // For 1D view with selected stock, use the reference price (previous close)
   // which would make the first value show 0 change
   const startPrice = selectedPeriod === '1D' && selectedStock && firstValue?.pnl === 0
     ? firstValue.value
     : (firstValue?.value || 0);
 
-  // Debug logging for chart data
-  console.log('Chart rendering debug:', {
-    currentDataLength: currentData.length,
-    firstValue,
-    latestValue,
-    yAxisDomain,
-    startPrice,
-    isPositive
-  });
+  // Debug logging removed to prevent console spam
 
   return (
     <Card>
@@ -666,6 +653,6 @@ const PerformanceChart = ({ selectedStock, onClearSelection }: PerformanceChartP
       </CardContent>
     </Card>
   );
-};
+});
 
 export default PerformanceChart;

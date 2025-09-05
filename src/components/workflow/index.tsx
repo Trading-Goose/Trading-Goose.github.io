@@ -2,7 +2,7 @@
  * Main HorizontalWorkflow component - orchestrates the workflow visualization
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Loader2 } from 'lucide-react';
@@ -29,7 +29,7 @@ import { startAnalysis } from './services/analysisService';
 // Import types
 import type { WorkflowStep } from './types';
 
-export default function HorizontalWorkflow() {
+function HorizontalWorkflow() {
   const { user } = useAuth();
   const { getMaxParallelAnalysis } = useRBAC();
   const { toast } = useToast();
@@ -199,3 +199,5 @@ export default function HorizontalWorkflow() {
     </>
   );
 }
+
+export default React.memo(HorizontalWorkflow);

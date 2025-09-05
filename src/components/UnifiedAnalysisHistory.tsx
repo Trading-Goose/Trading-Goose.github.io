@@ -146,6 +146,23 @@ export default function UnifiedAnalysisHistory() {
 
       if (error) {
         console.error('Error loading analyses:', error);
+        
+        // Handle 500 errors gracefully - don't throw, just return
+        if (error.message?.includes('500') || error.code === '500') {
+          console.log('Server error, skipping update');
+          return;
+        }
+        
+        // Handle authentication errors
+        if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+          console.log('JWT error detected, will attempt refresh on next poll');
+          // Try to refresh the session
+          supabase.auth.refreshSession().catch(err => {
+            console.error('Failed to refresh session:', err);
+          });
+          return;
+        }
+        
         throw error;
       }
 
@@ -230,19 +247,36 @@ export default function UnifiedAnalysisHistory() {
     }
   }, [isAuthenticated, user]);
 
-  // Poll for updates only when there are running analyses
+  // Poll for updates with smart retry logic
   useEffect(() => {
     if (!user) return;
 
+    let errorCount = 0;
+    const maxErrors = 3;
+    
     const interval = setInterval(() => {
-      // Only poll if there are running analyses
-      if (runningAnalyses.length > 0) {
-        loadAllAnalyses();
+      // Only poll if there are running analyses or we haven't loaded yet
+      if (runningAnalyses.length > 0 || (history.length === 0 && !loading)) {
+        loadAllAnalyses().then(() => {
+          errorCount = 0; // Reset error count on success
+        }).catch(() => {
+          errorCount++;
+          if (errorCount >= maxErrors) {
+            console.log('Too many errors, stopping polling temporarily');
+            clearInterval(interval);
+            // Restart polling after 30 seconds
+            setTimeout(() => {
+              if (user) {
+                loadAllAnalyses();
+              }
+            }, 30000);
+          }
+        });
       }
-    }, 3000); // Poll every 3 seconds instead of 2
+    }, runningAnalyses.length > 0 ? 3000 : 10000); // Poll every 3s if running, 10s otherwise
 
     return () => clearInterval(interval);
-  }, [user, runningAnalyses.length]);
+  }, [user, runningAnalyses.length, history.length]);
 
   const viewRunningAnalysis = (ticker: string) => {
     setSelectedTicker(ticker);

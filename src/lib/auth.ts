@@ -854,8 +854,25 @@ export const initializeAuth = () => {
         supabase.auth.refreshSession().then(({ data: { session }, error }) => {
           if (error) {
             console.error('🔐 Error refreshing session:', error);
+            
+            // Handle invalid refresh token (400 error)
+            if (error.status === 400 || error.message?.includes('refresh_token')) {
+              console.error('🔐 Refresh token is invalid, user needs to re-authenticate');
+              // Mark that we need to sign out soon
+              (window as any).__invalidRefreshToken = true;
+              
+              // Give user time to save work (wait until token expires)
+              setTimeout(() => {
+                if ((window as any).__invalidRefreshToken) {
+                  console.log('🔐 Logging out due to invalid refresh token');
+                  (window as any).__sessionExpiredNaturally = true;
+                  useAuth.getState().logout();
+                }
+              }, Math.max(0, timeUntilExpiry * 1000));
+            }
           } else if (session) {
             console.log('🔐 Session refreshed proactively');
+            delete (window as any).__invalidRefreshToken;
             // The TOKEN_REFRESHED event handler will update the state
           }
         });
@@ -1199,11 +1216,33 @@ export const isAdmin = () => useAuth.getState().isAdmin;
 export const isSessionValid = (): boolean => {
   const state = useAuth.getState();
   
-  // ALWAYS return true if we're authenticated to prevent components from clearing auth state
-  // Only return false if we're absolutely sure the session is completely invalid
-  if (state.isAuthenticated) {
-    console.log('🔐 isSessionValid: User is authenticated, returning true');
-    return true;
+  // Check if we have an invalid refresh token flag
+  if ((window as any).__invalidRefreshToken) {
+    console.log('🔐 isSessionValid: Invalid refresh token detected, returning false');
+    return false;
+  }
+  
+  // If authenticated, check if the token is actually valid
+  if (state.isAuthenticated && state.session?.access_token) {
+    try {
+      const payload = JSON.parse(atob(state.session.access_token.split('.')[1]));
+      const tokenExp = payload.exp;
+      const now = Math.floor(Date.now() / 1000);
+      const timeUntilExpiry = tokenExp - now;
+      
+      // If token is expired by more than 5 minutes, it's invalid
+      if (timeUntilExpiry < -300) {
+        console.log('🔐 isSessionValid: Token expired, returning false');
+        return false;
+      }
+      
+      console.log('🔐 isSessionValid: User is authenticated, returning true');
+      return true;
+    } catch (e) {
+      // If we can't decode the token, still return true if authenticated
+      console.log('🔐 isSessionValid: User is authenticated (fallback), returning true');
+      return true;
+    }
   }
   
   // If we're rate limited, consider session as valid to prevent unnecessary API calls

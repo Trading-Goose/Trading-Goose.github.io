@@ -10,9 +10,9 @@
     content="AI-powered trading system with 11 specialized agents for comprehensive market analysis" />
   <meta name="author" content="TradingGoose" />
 
-  <meta property="og:title" content="TradingGoose AI" />
+  <meta property="og:title" content="TradingGoose" />
   <meta property="og:description"
-    content="AI-powered trading system with 11 specialized agents for comprehensive market analysis" />
+    content="AI-powered LLM portfolio management with 15 specialized agents for comprehensive market analysis" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="/Social-Preview.png" />
 
@@ -97,6 +97,42 @@
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
+
+  <!-- Widgetbot Crate for Discord -->
+  <script src="https://cdn.jsdelivr.net/npm/@widgetbot/crate@3" async defer></script>
+  <script>
+    // Wait for page to fully load before initializing Widgetbot
+    window.addEventListener('load', function () {
+      // 3 second delay after page load with fade-in animation
+      setTimeout(function () {
+        new Crate({
+          server: '1410785898273964166', // Replace with your Discord server ID
+          channel: '1411021392983363616', // Replace with your Discord channel ID
+          location: ['bottom', 'right'], // Position at bottom right
+          color: '#ffcc00', // Discord's default color, you can change this
+          notifications: true, // Show notification badge
+          indicator: true, // Show unread message indicator
+          defer: true,
+          css: `
+            @keyframes fadeInScale {
+              0% {
+                opacity: 0;
+                transform: scale(0.8);
+              }
+              100% {
+                opacity: 1;
+                transform: scale(1);
+              }
+            }
+            
+            &[open="false"] {
+              animation: fadeInScale 0.5s ease-out forwards;
+            }
+          `
+        });
+      }, 2000); // 2 seconds delay after page load
+    });
+  </script>
 </body>
 
 </html>

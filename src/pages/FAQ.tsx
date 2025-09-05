@@ -259,10 +259,10 @@ const FAQ = () => {
                     If you couldn't find the answer you're looking for, please don't hesitate to reach out to our support team.
                     We're here to help you get the most out of TradingGoose.
                   </p>
-                  <Button 
-                    className="mt-4" 
+                  <Button
+                    className="mt-4"
                     variant="default"
-                    onClick={() => window.open('https://discord.gg/3dkTaNyp', '_blank')}
+                    onClick={() => window.open('https://mee6.xyz/i/mcEBEcvpOu', '_blank')}
                   >
                     Contact Support
                   </Button>
@@ -274,7 +274,7 @@ const FAQ = () => {
           {/* Footer Note */}
           <div className="text-center text-sm text-muted-foreground pt-8 pb-4">
             <p className="italic">
-              <strong className="text-primary">TradingGoose</strong> - Providing structured AI analysis workflows for 
+              <strong className="text-primary">TradingGoose</strong> - Providing structured AI analysis workflows for
               informational purposes only.
             </p>
           </div>

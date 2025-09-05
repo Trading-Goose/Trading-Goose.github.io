@@ -316,10 +316,10 @@ const PrivacyPolicy = () => {
                     If you couldn't find the answer you're looking for, please don't hesitate to reach out to our support team.
                     We're here to help you get the most out of TradingGoose.
                   </p>
-                  <Button 
-                    className="mt-4" 
+                  <Button
+                    className="mt-4"
                     variant="default"
-                    onClick={() => window.open('https://discord.gg/3dkTaNyp', '_blank')}
+                    onClick={() => window.open('https://mee6.xyz/i/mcEBEcvpOu', '_blank')}
                   >
                     Contact Support
                   </Button>

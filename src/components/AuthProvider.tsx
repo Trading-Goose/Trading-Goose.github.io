@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { initializeAuth, useAuth } from '@/lib/auth';
+import { identifyUser } from '@/hooks/usePostHog';
+import posthog from '@/lib/posthog';
 
 declare global {
   interface Window {
@@ -23,12 +25,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Track user based on authentication status
-    if (isAuthenticated && user?.id && window.trackAuthenticatedUser) {
-      // Track authenticated user with their unique ID
-      window.trackAuthenticatedUser(user.id, user.role || 'standard');
-    } else if (!isAuthenticated && window.trackAnonymousPageview) {
-      // Track anonymous pageview
-      window.trackAnonymousPageview();
+    if (isAuthenticated && user?.id) {
+      // Identify user in PostHog
+      identifyUser(user.id, {
+        email: user.email,
+        role: user.role || 'standard',
+        created_at: user.created_at,
+      });
+      
+      // Also track in Google Analytics if available
+      if (window.trackAuthenticatedUser) {
+        window.trackAuthenticatedUser(user.id, user.role || 'standard');
+      }
+    } else if (!isAuthenticated) {
+      // Reset PostHog user when logged out
+      posthog.reset();
+      
+      // Track anonymous pageview in Google Analytics if available
+      if (window.trackAnonymousPageview) {
+        window.trackAnonymousPageview();
+      }
     }
   }, [isAuthenticated, user]);
 

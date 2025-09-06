@@ -287,7 +287,7 @@ const Disclaimer = () => {
                   <Button
                     className="mt-4"
                     variant="default"
-                    onClick={() => window.open('https://mee6.xyz/i/mcEBEcvpOu', '_blank')}
+                    onClick={() => window.open('https://discord.gg/wavf5JWhuT', '_blank')}
                   >
                     Contact Support
                   </Button>

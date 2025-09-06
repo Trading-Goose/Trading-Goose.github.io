@@ -274,8 +274,7 @@ export function useRBAC() {
     };
 
     const getMaxParallelAnalysis = (): number => {
-        if (isAdmin) return 10;
-
+        // Don't hardcode for admin - use database values
         console.log('[useRBAC] getMaxParallelAnalysis called. userRoles:', userRoles);
         console.log('[useRBAC] roleDetails:', Array.from(roleDetails.entries()));
 
@@ -304,8 +303,7 @@ export function useRBAC() {
     };
 
     const getMaxWatchlistStocks = (): number => {
-        if (isAdmin) return 100;
-
+        // Don't hardcode for admin - use database values
         console.log('[useRBAC] getMaxWatchlistStocks called. userRoles:', userRoles);
 
         // Get the highest limit from all user roles
@@ -324,8 +322,7 @@ export function useRBAC() {
     };
 
     const getMaxRebalanceStocks = (): number => {
-        if (isAdmin) return 50;
-
+        // Don't hardcode for admin - use database values
         // Get the highest limit from all user roles
         let maxLimit = 0;
         let foundLimit = false;
@@ -342,8 +339,7 @@ export function useRBAC() {
     };
 
     const getMaxScheduledRebalances = (): number => {
-        if (isAdmin) return 20;
-
+        // Don't hardcode for admin - use database values
         // Get the highest limit from all user roles
         let maxLimit = 0;
         let foundLimit = false;
@@ -360,8 +356,7 @@ export function useRBAC() {
     };
 
     const getScheduleResolution = (): string[] => {
-        if (isAdmin) return ['Day', 'Week', 'Month'];
-
+        // Don't hardcode for admin - use database values
         // Collect all available resolutions from all user roles
         const resolutions = new Set<string>();
 
@@ -377,7 +372,7 @@ export function useRBAC() {
     };
 
     const getMaxSearchSources = (): number => {
-        if (isAdmin) return 10;
+        // Don't hardcode for admin - use database values
 
         // Get the highest search sources limit from all user roles
         let maxLimit = 0;

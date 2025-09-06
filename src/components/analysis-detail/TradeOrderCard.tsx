@@ -165,10 +165,11 @@ export default function TradeOrderCard({
     }
   }
 
-  // Check the actual order status from database
+  // Check the actual order status from database or props
+  // The tradeOrder status is updated immediately in the parent component
   const orderStatus = tradeOrder?.status as TradeOrderStatus;
   const isPending = !orderStatus || isTradeOrderPending(orderStatus);
-  const isApproved = isTradeOrderApproved(orderStatus);
+  const isApproved = isTradeOrderApproved(orderStatus) || isExecuted;  // Also check isExecuted prop
   const isRejected = isTradeOrderRejected(orderStatus);
   const isOrderExecuted = orderStatus === 'executed' || isExecuted;
   
@@ -301,7 +302,7 @@ export default function TradeOrderCard({
           )}
 
           {/* Show status badge for approved/rejected orders */}
-          {isApproved && !alpacaOrderId && (
+          {isApproved && !alpacaOrderStatus && (
             <Badge variant="secondary" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
               <CheckCircle className="h-3 w-3 mr-1" />
               Approved

@@ -55,7 +55,7 @@ const Footer = () => {
             {/* Right Section - Social Media Icons */}
             <div className="flex items-center justify-center md:justify-end space-x-4">
               <a
-                href="https://mee6.xyz/i/mcEBEcvpOu"
+                href="https://discord.gg/wavf5JWhuT"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-primary transition-colors"

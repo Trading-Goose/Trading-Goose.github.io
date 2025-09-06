@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route } from "react-router-dom";
+import { AdminRouteProtection } from "@/components/AdminRouteProtection";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import LoginPage from "./pages/LoginPage";
@@ -33,8 +34,16 @@ const AppRoutes = () => {
       <Route path="/profile" element={<Profile />} />
       <Route path="/analysis-records" element={<AnalysisRecords />} />
       <Route path="/rebalance-records" element={<RebalanceRecords />} />
-      <Route path="/admin/invitations" element={<AdminInvitations />} />
-      <Route path="/admin/debug" element={<AdminInvitationsDebug />} />
+      <Route path="/admin/invitations" element={
+        <AdminRouteProtection>
+          <AdminInvitations />
+        </AdminRouteProtection>
+      } />
+      <Route path="/admin/debug" element={
+        <AdminRouteProtection>
+          <AdminInvitationsDebug />
+        </AdminRouteProtection>
+      } />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="*" element={<NotFound />} />

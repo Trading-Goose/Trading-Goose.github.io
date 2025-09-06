@@ -55,42 +55,8 @@
     window.dataLayer = window.dataLayer || [];
     function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
-
-    // Initial config without user_id
-    gtag('config', 'G-HYXMNMH4WX', {
-      send_page_view: false, // Prevent automatic pageview
-      custom_map: {
-        'dimension1': 'login_status',
-        'dimension2': 'user_type'
-      }
-    });
-
-    // Function to track authenticated users
-    window.trackAuthenticatedUser = function (userId, userType) {
-      if (userId) {
-        gtag('config', 'G-HYXMNMH4WX', {
-          user_id: userId,
-          user_properties: {
-            user_type: userType || 'standard'
-          }
-        });
-
-        // Send custom pageview for authenticated users
-        gtag('event', 'page_view', {
-          login_status: 'logged_in',
-          user_type: userType || 'standard'
-        });
-      }
-    };
-
-    // Function to track anonymous pageviews
-    window.trackAnonymousPageview = function () {
-      gtag('event', 'page_view', {
-        login_status: 'anonymous'
-      });
-    };
+    gtag('config', 'G-HYXMNMH4WX');
   </script>
-
 
 </head>
 
@@ -101,37 +67,80 @@
   <!-- Widgetbot Crate for Discord -->
   <script src="https://cdn.jsdelivr.net/npm/@widgetbot/crate@3" async defer></script>
   <script>
+    // Pages where the widget should be hidden
+    const HIDDEN_PAGES = [
+      '/login',
+      '/register',
+      '/reset-password',
+      '/admin',
+      '/settings'
+    ];
+
+    // Function to check if widget should be shown on current page
+    function shouldShowWidget() {
+      const currentPath = window.location.pathname.toLowerCase();
+      return !HIDDEN_PAGES.some(page => currentPath.startsWith(page));
+    }
+
     // Wait for page to fully load before initializing Widgetbot
     window.addEventListener('load', function () {
-      // 3 second delay after page load with fade-in animation
-      setTimeout(function () {
-        new Crate({
-          server: '1410785898273964166', // Replace with your Discord server ID
-          channel: '1411021392983363616', // Replace with your Discord channel ID
-          location: ['bottom', 'right'], // Position at bottom right
-          color: '#ffcc00', // Discord's default color, you can change this
-          notifications: true, // Show notification badge
-          indicator: true, // Show unread message indicator
-          defer: true,
-          css: `
-            @keyframes fadeInScale {
-              0% {
-                opacity: 0;
-                transform: scale(0.8);
+      // Only initialize widget if it should be shown on this page
+      if (shouldShowWidget()) {
+        // 3 second delay after page load with fade-in animation
+        setTimeout(function () {
+          window.discordCrate = new Crate({
+            server: '1410785898273964166', // Replace with your Discord server ID
+            channel: '1411021392983363616', // Replace with your Discord channel ID
+            location: ['bottom', 'right'], // Position at bottom right
+            color: '#ffcc00', // Discord's default color, you can change this
+            notifications: true, // Show notification badge
+            indicator: true, // Show unread message indicator
+            defer: true,
+            css: `
+              @keyframes fadeInScale {
+                0% {
+                  opacity: 0;
+                  transform: scale(0.8);
+                }
+                100% {
+                  opacity: 1;
+                  transform: scale(1);
+                }
               }
-              100% {
-                opacity: 1;
-                transform: scale(1);
+              
+              &[open="false"] {
+                animation: fadeInScale 0.5s ease-out forwards;
               }
-            }
-            
-            &[open="false"] {
-              animation: fadeInScale 0.5s ease-out forwards;
-            }
-          `
-        });
-      }, 2000); // 2 seconds delay after page load
+            `
+          });
+        }, 2000); // 2 seconds delay after page load
+      }
     });
+
+    // Listen for route changes (for single-page applications)
+    let lastPath = window.location.pathname;
+    setInterval(function () {
+      if (window.location.pathname !== lastPath) {
+        lastPath = window.location.pathname;
+
+        // Hide or show widget based on new page
+        if (window.discordCrate) {
+          if (shouldShowWidget()) {
+            // Show the widget if it was hidden
+            const crateElement = document.querySelector('widgetbot-crate');
+            if (crateElement) {
+              crateElement.style.display = 'block';
+            }
+          } else {
+            // Hide the widget
+            const crateElement = document.querySelector('widgetbot-crate');
+            if (crateElement) {
+              crateElement.style.display = 'none';
+            }
+          }
+        }
+      }
+    }, 100); // Check every 100ms for route changes
   </script>
 </body>
 

@@ -268,7 +268,7 @@ const Index = () => {
                         size="sm"
                         className="w-full mt-4"
                         style={{ backgroundColor: '#5865F2' }}
-                        onClick={() => window.open('https://mee6.xyz/i/mcEBEcvpOu', '_blank')}
+                        onClick={() => window.open('https://discord.gg/wavf5JWhuT', '_blank')}
                       >
                         <svg
                           className="mr-2 h-4 w-4 fill-current"

@@ -366,7 +366,8 @@ export default function RebalanceActionsTab({
 
         setOrderStatuses(prev => new Map(prev.set(ticker, {
           status: 'approved',
-          alpacaOrderId: data.alpacaOrderId
+          alpacaOrderId: data.alpacaOrderId,
+          alpacaStatus: data.alpacaStatus
         })));
 
         // Update the local position data
@@ -375,6 +376,27 @@ export default function RebalanceActionsTab({
           position.executed = true;
           position.orderStatus = 'approved';
           position.alpacaOrderId = data.alpacaOrderId;
+        }
+
+        // Update trading_actions in rebalanceData to reflect the approval
+        if (position?.tradeActionId && rebalanceData.trading_actions) {
+          const tradeActionIndex = rebalanceData.trading_actions.findIndex((ta: any) => 
+            ta.id === position.tradeActionId
+          );
+          if (tradeActionIndex >= 0) {
+            rebalanceData.trading_actions[tradeActionIndex] = {
+              ...rebalanceData.trading_actions[tradeActionIndex],
+              status: 'approved',
+              alpaca_order_id: data.alpacaOrderId,
+              metadata: {
+                ...rebalanceData.trading_actions[tradeActionIndex].metadata,
+                alpaca_order: {
+                  id: data.alpacaOrderId,
+                  status: data.alpacaStatus
+                }
+              }
+            };
+          }
         }
 
         toast({
@@ -466,6 +488,19 @@ export default function RebalanceActionsTab({
         const position = rebalanceData.recommendedPositions.find((p: RebalancePosition) => p.ticker === ticker);
         if (position) {
           position.orderStatus = 'rejected';
+          
+          // Update trading_actions in rebalanceData to reflect the rejection
+          if (position.tradeActionId && rebalanceData.trading_actions) {
+            const tradeActionIndex = rebalanceData.trading_actions.findIndex((ta: any) => 
+              ta.id === position.tradeActionId
+            );
+            if (tradeActionIndex >= 0) {
+              rebalanceData.trading_actions[tradeActionIndex] = {
+                ...rebalanceData.trading_actions[tradeActionIndex],
+                status: 'rejected'
+              };
+            }
+          }
         }
 
         toast({
@@ -573,6 +608,27 @@ export default function RebalanceActionsTab({
               alpacaOrderId: data.alpacaOrderId,
               alpacaStatus: data.alpacaStatus
             })));
+            
+            // Update trading_actions in rebalanceData to reflect the approval
+            if (position.tradeActionId && rebalanceData.trading_actions) {
+              const tradeActionIndex = rebalanceData.trading_actions.findIndex((ta: any) => 
+                ta.id === position.tradeActionId
+              );
+              if (tradeActionIndex >= 0) {
+                rebalanceData.trading_actions[tradeActionIndex] = {
+                  ...rebalanceData.trading_actions[tradeActionIndex],
+                  status: 'approved',
+                  alpaca_order_id: data.alpacaOrderId,
+                  metadata: {
+                    ...rebalanceData.trading_actions[tradeActionIndex].metadata,
+                    alpaca_order: {
+                      id: data.alpacaOrderId,
+                      status: data.alpacaStatus
+                    }
+                  }
+                };
+              }
+            }
           } else {
             // Unexpected response format
             failedCount++;
@@ -999,52 +1055,42 @@ export default function RebalanceActionsTab({
                   </Card>
                 </div>
 
-                {/* Approved Orders Section - VERY SIMPLE */}
+                {/* Approved Orders Section */}
                 {(() => {
-                  // Check if we have any approved trading actions
-                  const approvedTradingActions = rebalanceData?.trading_actions?.filter((ta: any) => 
-                    ta.status === 'approved'
-                  ) || [];
-                  
-                  console.log('Checking for approved orders:', {
-                    tradingActions: rebalanceData?.trading_actions,
-                    approvedCount: approvedTradingActions.length
-                  });
-                  
-                  if (approvedTradingActions.length === 0) {
-                    return null;
-                  }
-                  
-                  // For each approved trading action, find the corresponding position
-                  const approvedPositions = approvedTradingActions.map((ta: any) => {
-                    // Find position by ticker
-                    const position = rebalanceData.recommendedPositions?.find((p: RebalancePosition) => 
-                      p.ticker === ta.ticker
-                    );
+                  // Get approved positions from multiple sources
+                  const approvedPositions = rebalanceData?.recommendedPositions?.filter((position: RebalancePosition) => {
+                    // Skip HOLD positions
+                    if (position.shareChange === 0) return false;
                     
-                    if (!position) {
-                      // Create a position from the trading action data if not found
-                      return {
-                        ticker: ta.ticker,
-                        action: ta.action_type || ta.action || 'UNKNOWN',
-                        shareChange: ta.quantity || ta.shares || 0,
-                        currentShares: 0,
-                        currentValue: 0,
-                        currentAllocation: 0,
-                        targetAllocation: 0,
-                        recommendedShares: ta.quantity || ta.shares || 0,
-                        reasoning: ta.reasoning || '',
-                        tradeActionId: ta.id,
-                        alpacaOrderId: ta.metadata?.alpaca_order?.id || ta.alpaca_order_id
-                      };
+                    // Check if this position has been approved via orderStatuses (immediate update)
+                    const orderStatus = orderStatuses.get(position.ticker);
+                    if (orderStatus?.status === 'approved') {
+                      return true;
                     }
                     
-                    return {
-                      ...position,
-                      tradeActionId: ta.id,
-                      alpacaOrderId: ta.metadata?.alpaca_order?.id || ta.alpaca_order_id || position.alpacaOrderId
-                    };
-                  }).filter(Boolean); // Remove any null entries
+                    // Check if it's in executedTickers (immediate update)
+                    if (executedTickers.has(position.ticker)) {
+                      return true;
+                    }
+                    
+                    // Also check trading_actions for persisted approved status
+                    if (rebalanceData.trading_actions && position.tradeActionId) {
+                      const tradeAction = rebalanceData.trading_actions.find((ta: any) => 
+                        ta.id === position.tradeActionId
+                      );
+                      if (tradeAction && tradeAction.status === 'approved') {
+                        return true;
+                      }
+                    }
+                    
+                    return false;
+                  }) || [];
+                  
+                  console.log('Checking for approved orders:', {
+                    approvedCount: approvedPositions.length,
+                    orderStatuses: Array.from(orderStatuses.entries()),
+                    executedTickers: Array.from(executedTickers)
+                  });
                   
                   if (approvedPositions.length === 0) {
                     return null;
@@ -1065,21 +1111,29 @@ export default function RebalanceActionsTab({
                         </Badge>
                       </div>
                       <div className="space-y-3">
-                        {approvedPositions.map((position: RebalancePosition, index: number) => {
-                          // Find the trading action for metadata
-                          const tradeAction = approvedTradingActions.find((ta: any) => 
-                            ta.ticker === position.ticker
+                        {approvedPositions.map((position: RebalancePosition) => {
+                          // Find the trading action for metadata if it exists
+                          const tradeAction = rebalanceData.trading_actions?.find((ta: any) => 
+                            ta.id === position.tradeActionId || 
+                            (ta.ticker === position.ticker && ta.status === 'approved')
                           );
+                          
+                          // Get the order status from local state first (most up-to-date)
+                          const localOrderStatus = orderStatuses.get(position.ticker);
                           
                           const effectiveOrderStatus = {
                             status: 'approved',
-                            alpacaOrderId: tradeAction?.metadata?.alpaca_order?.id || tradeAction?.alpaca_order_id,
-                            alpacaStatus: tradeAction?.metadata?.alpaca_order?.status
+                            alpacaOrderId: localOrderStatus?.alpacaOrderId || 
+                                          tradeAction?.metadata?.alpaca_order?.id || 
+                                          tradeAction?.alpaca_order_id ||
+                                          position.alpacaOrderId,
+                            alpacaStatus: localOrderStatus?.alpacaStatus ||
+                                         tradeAction?.metadata?.alpaca_order?.status
                           };
                           
                           return (
                             <RebalancePositionCard
-                              key={`approved-${position.ticker}-${index}`}
+                              key={`approved-${position.ticker}`}
                               position={position}
                               isExecuted={true}
                               orderStatus={effectiveOrderStatus}

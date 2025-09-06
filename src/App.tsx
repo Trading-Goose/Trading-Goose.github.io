@@ -6,8 +6,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/AuthProvider";
 import { RBACProvider } from "@/contexts/RBACContext";
+import { PostHogProvider } from "@/components/PostHogProvider";
 import { AlpacaConnectionErrorModal } from "@/components/AlpacaConnectionErrorModal";
 import { useAlpacaConnection } from "@/hooks/useAlpacaConnection";
+import { AdminRouteProtection } from "@/components/AdminRouteProtection";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import LoginPage from "./pages/LoginPage";
@@ -43,9 +45,21 @@ const AppRoutes = () => {
       <Route path="/analysis-records" element={<AnalysisRecords />} />
       <Route path="/rebalance-records" element={<RebalanceRecords />} />
       <Route path="/trade-history" element={<TradeHistory />} />
-      <Route path="/admin/invitations" element={<AdminInvitations />} />
-      <Route path="/admin/roles" element={<AdminRoleManager />} />
-      <Route path="/admin/users" element={<AdminUserManager />} />
+      <Route path="/admin/invitations" element={
+        <AdminRouteProtection>
+          <AdminInvitations />
+        </AdminRouteProtection>
+      } />
+      <Route path="/admin/roles" element={
+        <AdminRouteProtection>
+          <AdminRoleManager />
+        </AdminRouteProtection>
+      } />
+      <Route path="/admin/users" element={
+        <AdminRouteProtection>
+          <AdminUserManager />
+        </AdminRouteProtection>
+      } />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/invitation-setup" element={<InvitationSetup />} />
@@ -83,7 +97,9 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter basename={basename}>
-              <AppContent />
+              <PostHogProvider>
+                <AppContent />
+              </PostHogProvider>
             </BrowserRouter>
           </TooltipProvider>
         </RBACProvider>

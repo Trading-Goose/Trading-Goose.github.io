@@ -25,6 +25,20 @@ export default function NumericLimitsSection({
         />
       </div>
       <div>
+        <Label>Max Debate Rounds: {limits.max_debate_rounds || 2}</Label>
+        <Slider
+          value={[limits.max_debate_rounds || 2]}
+          onValueChange={(v) => onUpdate({ ...limits, max_debate_rounds: v[0] })}
+          min={1}
+          max={5}
+          step={1}
+          className="mt-2"
+        />
+        <p className="text-sm text-muted-foreground mt-1">
+          Number of debate rounds between bull and bear researchers. More rounds provide deeper analysis.
+        </p>
+      </div>
+      <div>
         <Label>Max Watchlist Stocks: {limits.max_watchlist_stocks}</Label>
         <Slider
           value={[limits.max_watchlist_stocks]}

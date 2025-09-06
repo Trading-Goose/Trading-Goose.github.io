@@ -82,9 +82,10 @@ export default function AgentsTab({
   getDefaultModelValue,
   hasAgentConfigAccess = true,
 }: AgentsTabProps) {
-  const { getMaxSearchSources, getAvailableOptimizationModes } = useRBAC();
+  const { getMaxSearchSources, getAvailableOptimizationModes, getMaxDebateRounds } = useRBAC();
   const defaultProviderId = aiProviders.length > 0 ? aiProviders[0].id : '1';
   const maxSearchSources = getMaxSearchSources();
+  const maxDebateRounds = getMaxDebateRounds();
   const availableOptimizationModes = getAvailableOptimizationModes();
 
   // Debug logging
@@ -369,7 +370,7 @@ export default function AgentsTab({
                 value={[researchDebateRounds]}
                 onValueChange={(value) => setResearchDebateRounds(value[0])}
                 min={1}
-                max={5}
+                max={maxDebateRounds}
                 step={1}
                 className="flex-1"
                 disabled={!hasAgentConfigAccess}
@@ -377,7 +378,7 @@ export default function AgentsTab({
               <span className="w-12 text-center font-medium">{researchDebateRounds}</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              How many rounds of bull vs bear debate
+              How many rounds of bull vs bear debate (1-{maxDebateRounds} based on your subscription)
             </p>
           </div>
           <div className="space-y-2">

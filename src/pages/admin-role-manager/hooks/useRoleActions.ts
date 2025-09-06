@@ -29,6 +29,7 @@ export function useRoleActions({
         max_watchlist_stocks: editingLimits.max_watchlist_stocks,
         max_rebalance_stocks: editingLimits.max_rebalance_stocks,
         max_scheduled_rebalances: editingLimits.max_scheduled_rebalances,
+        max_debate_rounds: editingLimits.max_debate_rounds,
         schedule_resolution: editingLimits.schedule_resolution,
         optimization_mode: editingLimits.optimization_mode,
         number_of_search_sources: editingLimits.number_of_search_sources,

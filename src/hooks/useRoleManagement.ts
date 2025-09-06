@@ -9,6 +9,7 @@ export interface RoleLimit {
   max_watchlist_stocks: number;
   max_rebalance_stocks: number;
   max_scheduled_rebalances: number;
+  max_debate_rounds?: number;
   schedule_resolution: string;
   optimization_mode?: string;
   number_of_search_sources?: number;
@@ -46,6 +47,7 @@ export interface RoleWithLimits {
   max_watchlist_stocks: number;
   max_rebalance_stocks: number;
   max_scheduled_rebalances: number;
+  max_debate_rounds?: number;
   schedule_resolution: string;
   optimization_mode?: string;
   number_of_search_sources?: number;
@@ -128,6 +130,7 @@ export function useRoleManagement() {
           max_watchlist_stocks: limits?.max_watchlist_stocks ?? 10,
           max_rebalance_stocks: limits?.max_rebalance_stocks ?? 5,
           max_scheduled_rebalances: limits?.max_scheduled_rebalances ?? 2,
+          max_debate_rounds: limits?.max_debate_rounds ?? 2,
           schedule_resolution: limits?.schedule_resolution ?? 'Month',
           optimization_mode: limits?.optimization_mode ?? 'speed',
           number_of_search_sources: limits?.number_of_search_sources ?? 5,

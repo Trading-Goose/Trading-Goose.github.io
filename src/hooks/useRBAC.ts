@@ -18,6 +18,7 @@ export function useRBAC() {
         max_watchlist_stocks?: number;
         max_rebalance_stocks?: number;
         max_scheduled_rebalances?: number;
+        max_debate_rounds?: number;
         schedule_resolution?: string;
         optimization_mode?: string;
         number_of_search_sources?: number;
@@ -97,6 +98,7 @@ export function useRBAC() {
                             const maxWatchlistStocks = limits?.max_watchlist_stocks !== undefined ? Number(limits.max_watchlist_stocks) : undefined;
                             const maxRebalanceStocks = limits?.max_rebalance_stocks !== undefined ? Number(limits.max_rebalance_stocks) : undefined;
                             const maxScheduledRebalances = limits?.max_scheduled_rebalances !== undefined ? Number(limits.max_scheduled_rebalances) : undefined;
+                            const maxDebateRounds = limits?.max_debate_rounds !== undefined ? Number(limits.max_debate_rounds) : undefined;
                             const scheduleResolution = limits?.schedule_resolution || undefined;
                             const optimizationMode = limits?.optimization_mode || undefined;
                             const numberOfSearchSources = limits?.number_of_search_sources !== undefined ? Number(limits.number_of_search_sources) : undefined;
@@ -119,6 +121,7 @@ export function useRBAC() {
                                 max_watchlist_stocks: maxWatchlistStocks,
                                 max_rebalance_stocks: maxRebalanceStocks,
                                 max_scheduled_rebalances: maxScheduledRebalances,
+                                max_debate_rounds: maxDebateRounds,
                                 schedule_resolution: scheduleResolution,
                                 optimization_mode: optimizationMode,
                                 number_of_search_sources: numberOfSearchSources,
@@ -355,6 +358,22 @@ export function useRBAC() {
         return foundLimit ? maxLimit : 2; // Default fallback
     };
 
+    const getMaxDebateRounds = (): number => {
+        // Get the highest debate rounds limit from all user roles
+        let maxLimit = 0;
+        let foundLimit = false;
+
+        for (const userRole of userRoles) {
+            const roleDetail = roleDetails.get(userRole.role_id);
+            if (roleDetail && typeof roleDetail.max_debate_rounds === 'number') {
+                maxLimit = Math.max(maxLimit, roleDetail.max_debate_rounds);
+                foundLimit = true;
+            }
+        }
+
+        return foundLimit ? maxLimit : 2; // Default to 2 debate rounds
+    };
+
     const getScheduleResolution = (): string[] => {
         // Don't hardcode for admin - use database values
         // Collect all available resolutions from all user roles
@@ -516,6 +535,7 @@ export function useRBAC() {
         getMaxWatchlistStocks,
         getMaxRebalanceStocks,
         getMaxScheduledRebalances,
+        getMaxDebateRounds,
         getScheduleResolution,
         getMaxSearchSources,
         getAvailableOptimizationModes,

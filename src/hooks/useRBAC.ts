@@ -39,9 +39,9 @@ export function useRBAC() {
                 return;
             }
 
-            // Check session validity before making database calls
-            if (!isSessionValid()) {
-                console.log('[useRBAC] Skipping permission load - session invalid');
+            // Only skip if we have an invalid refresh token
+            if ((window as any).__invalidRefreshToken) {
+                console.log('[useRBAC] Skipping permission load - invalid refresh token');
                 setIsLoading(false);
                 return;
             }

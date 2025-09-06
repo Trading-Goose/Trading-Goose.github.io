@@ -1222,7 +1222,7 @@ export const isSessionValid = (): boolean => {
     return false;
   }
   
-  // If authenticated, check if the token is actually valid
+  // If authenticated, allow it - the token refresh system will handle expiry
   if (state.isAuthenticated && state.session?.access_token) {
     try {
       const payload = JSON.parse(atob(state.session.access_token.split('.')[1]));
@@ -1230,9 +1230,10 @@ export const isSessionValid = (): boolean => {
       const now = Math.floor(Date.now() / 1000);
       const timeUntilExpiry = tokenExp - now;
       
-      // If token is expired by more than 5 minutes, it's invalid
-      if (timeUntilExpiry < -300) {
-        console.log('🔐 isSessionValid: Token expired, returning false');
+      // Only return false if token is expired by more than 2 hours (very expired)
+      // This prevents normal token refresh scenarios from blocking the UI
+      if (timeUntilExpiry < -7200) {
+        console.log('🔐 isSessionValid: Token very expired (>2h), returning false');
         return false;
       }
       

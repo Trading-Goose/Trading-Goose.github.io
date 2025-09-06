@@ -47,17 +47,20 @@ export default function Pricing() {
   const { hasRole, getPrimaryRole, userRoles, roleDetails } = useRBAC();
   const { toast } = useToast();
 
-  // Debug logging
-  const primaryRole = getPrimaryRole();
-  console.log('[Pricing] Primary role:', primaryRole);
-  console.log('[Pricing] userRoles:', userRoles);
-  console.log('[Pricing] roleDetails:', roleDetails);
+  // Debug logging - only log if authenticated
+  const primaryRole = isAuthenticated ? getPrimaryRole() : null;
+  if (isAuthenticated) {
+    console.log('[Pricing] Primary role:', primaryRole);
+    console.log('[Pricing] userRoles:', userRoles);
+    console.log('[Pricing] roleDetails:', roleDetails);
+  }
 
   const [roles, setRoles] = useState<RoleData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+
 
   // Fetch all roles except admin
   useEffect(() => {
@@ -66,30 +69,39 @@ export default function Pricing() {
         setIsLoading(true);
         setError(null);
 
-        // Skip database calls if session is invalid to prevent auth clearing
-        if (!isSessionValid()) {
-          console.log('[Pricing] Skipping role fetch - session invalid');
-          setIsLoading(false);
-          return;
-        }
-
+        console.log('[Pricing] Fetching roles from database...');
+        
+        // Fetch roles without authentication requirement
+        // Using anon key which should have read access to roles table
         const { data, error: fetchError } = await supabase
           .from('roles')
           .select('*')
           .neq('name', 'admin') // Exclude admin role
           .order('priority', { ascending: true }); // Lower priority first (free plan first)
 
-        if (fetchError) throw fetchError;
+        console.log('[Pricing] Roles fetch result:', { data, error: fetchError });
+
+        if (fetchError) {
+          console.error('[Pricing] Error fetching roles:', fetchError);
+          throw fetchError;
+        }
+
+        if (!data || data.length === 0) {
+          console.warn('[Pricing] No roles found in database');
+          setError('No pricing plans available at this time');
+          return;
+        }
 
         // Mark pro as most popular if it exists
-        const rolesWithPopular = (data || []).map(role => ({
+        const rolesWithPopular = data.map(role => ({
           ...role,
           is_most_popular: role.name === 'pro'
         }));
 
+        console.log('[Pricing] Roles loaded successfully:', rolesWithPopular.length);
         setRoles(rolesWithPopular);
       } catch (err) {
-        console.error('Error fetching roles:', err);
+        console.error('[Pricing] Error in fetchRoles:', err);
         setError(err instanceof Error ? err.message : 'Failed to load pricing plans');
       } finally {
         setIsLoading(false);
@@ -108,6 +120,7 @@ export default function Pricing() {
 
   // Handle subscription selection
   const handleSelectPlan = async (role: RoleData) => {
+    // If user is not authenticated, redirect to login page
     if (!isAuthenticated) {
       navigate('/login');
       return;
@@ -322,6 +335,11 @@ export default function Pricing() {
   const getButtonText = (role: RoleData) => {
     if (isProcessing === role.id) return "Processing...";
 
+    // If user is not authenticated, always show "Get Started"
+    if (!isAuthenticated) {
+      return "Get Started";
+    }
+
     const primaryRole = getPrimaryRole();
 
     // Only show "Current Plan" for the user's primary (highest priority) role
@@ -392,9 +410,8 @@ export default function Pricing() {
                   'md:grid-cols-2 lg:grid-cols-4'
               }`}>
               {roles.map((role) => {
-                const Icon = role.icon_url;
-                // Only show "Current Plan" badge for the user's primary (highest priority) role
-                const isCurrentPlan = primaryRole?.name === role.name;
+                // Only show "Current Plan" badge for authenticated users with the primary role
+                const isCurrentPlan = isAuthenticated && primaryRole?.name === role.name;
                 const savings = calculateSavings(role.price_monthly, role.price_yearly);
 
                 // Create custom styles based on role color
@@ -438,19 +455,6 @@ export default function Pricing() {
                             className="h-12 w-12 object-contain"
                             style={{ filter: role.color ? `drop-shadow(0 0 8px ${role.color}40)` : undefined }}
                           />
-                        ) : Icon ? (
-                          <div
-                            className="p-3 rounded-lg"
-                            style={isCurrentPlan ? {
-                              backgroundColor: 'rgba(255, 204, 0, 0.2)',
-                              color: '#fc0'
-                            } : {
-                              backgroundColor: role.color ? `${role.color}20` : undefined,
-                              color: role.color || undefined
-                            }}
-                          >
-                            <Icon className="h-8 w-8" />
-                          </div>
                         ) : null}
                       </div>
                       <CardTitle className="text-2xl text-center">

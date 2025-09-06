@@ -27,3 +27,4 @@ dist-ssr
 /todo-list
 deploy-functions.sh
 console.txt
+console.json

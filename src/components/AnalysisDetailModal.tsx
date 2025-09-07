@@ -59,7 +59,7 @@ import {
 } from "@/lib/statusTypes";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface AnalysisDetailModalProps {
   ticker?: string;

@@ -136,6 +136,8 @@ export interface TradingTabProps {
   autoExecuteTrades: boolean;
   userRiskLevel: string;
   defaultPositionSizeDollars: number;
+  profitTarget: number;
+  stopLoss: number;
   configuredProviders: Record<string, boolean>;
   showKeys: Record<string, boolean>;
   saved: boolean;
@@ -148,6 +150,8 @@ export interface TradingTabProps {
   setAutoExecuteTrades: (enabled: boolean) => void;
   setUserRiskLevel: (level: string) => void;
   setDefaultPositionSizeDollars: (amount: number) => void;
+  setProfitTarget: (target: number) => void;
+  setStopLoss: (loss: number) => void;
   toggleShowKey: (key: string) => void;
   handleSaveTab: (tab: string) => void;
   canUseLiveTrading?: boolean;

@@ -161,6 +161,8 @@ export default function SettingsPage() {
   const [autoExecuteTrades, setAutoExecuteTrades] = useState(apiSettings?.auto_execute_trades ?? false);
   const [userRiskLevel, setUserRiskLevel] = useState(apiSettings?.user_risk_level || 'moderate');
   const [defaultPositionSizeDollars, setDefaultPositionSizeDollars] = useState(apiSettings?.default_position_size_dollars || 1000);
+  const [profitTarget, setProfitTarget] = useState(apiSettings?.profit_target || 25);
+  const [stopLoss, setStopLoss] = useState(apiSettings?.stop_loss || 10);
 
   // Track if initial load is complete to prevent re-loading
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -262,6 +264,10 @@ export default function SettingsPage() {
       setAutoExecuteTrades(apiSettings.auto_execute_trades ?? false);
       setUserRiskLevel(apiSettings.user_risk_level || 'moderate');
       setDefaultPositionSizeDollars(apiSettings.default_position_size_dollars || 1000);
+      
+      // Position management preferences
+      setProfitTarget(apiSettings.profit_target || 25);
+      setStopLoss(apiSettings.stop_loss || 10);
 
       // Team-specific settings
       setResearchDebateRounds(apiSettings.research_debate_rounds || 2);
@@ -689,7 +695,9 @@ export default function SettingsPage() {
           alpaca_paper_trading: alpacaPaperTrading,
           auto_execute_trades: autoExecuteTrades,
           user_risk_level: userRiskLevel,
-          default_position_size_dollars: defaultPositionSizeDollars
+          default_position_size_dollars: defaultPositionSizeDollars,
+          profit_target: profitTarget,
+          stop_loss: stopLoss
         };
 
         // Use settings-proxy to save with credential masking
@@ -1608,6 +1616,8 @@ export default function SettingsPage() {
               autoExecuteTrades={autoExecuteTrades}
               userRiskLevel={userRiskLevel}
               defaultPositionSizeDollars={defaultPositionSizeDollars}
+              profitTarget={profitTarget}
+              stopLoss={stopLoss}
               configuredProviders={configuredProviders}
               showKeys={showKeys}
               saved={saved}
@@ -1620,6 +1630,8 @@ export default function SettingsPage() {
               setAutoExecuteTrades={setAutoExecuteTrades}
               setUserRiskLevel={setUserRiskLevel}
               setDefaultPositionSizeDollars={setDefaultPositionSizeDollars}
+              setProfitTarget={setProfitTarget}
+              setStopLoss={setStopLoss}
               toggleShowKey={toggleShowKey}
               handleSaveTab={handleSaveTab}
               canUseLiveTrading={canUseLiveTrading()}

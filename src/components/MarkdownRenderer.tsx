@@ -1,3 +1,4 @@
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -13,6 +14,16 @@ export default function MarkdownRenderer({ content, className = '' }: MarkdownRe
   }
 
   try {
+    // Preprocess content to handle both regular and HTML-escaped <br> tags
+    let processedContent = content
+      // First handle HTML-escaped br tags (&lt;br&gt;, &lt;br/&gt;, etc.)
+      // Use a unique marker that won't be interpreted by markdown
+      .replace(/&lt;br\s*\/?&gt;/gi, '{{BR}}')
+      // Then handle regular br tags (<br>, <br/>, etc.)
+      .replace(/<br\s*\/?>/gi, '{{BR}}')
+      // Handle escaped newlines
+      .replace(/\\n/g, '\n');
+
     return (
       <div className={`prose prose-base dark:prose-invert max-w-none ${className}`}>
         <ReactMarkdown
@@ -28,9 +39,29 @@ export default function MarkdownRenderer({ content, className = '' }: MarkdownRe
             h3: ({ children }) => (
               <h3 className="text-lg font-bold mb-2 text-foreground">{children}</h3>
             ),
-            p: ({ children }) => (
-              <p className="text-base mb-3 text-foreground font-light leading-relaxed">{children}</p>
-            ),
+            p: ({ children }) => {
+              // Handle line breaks in paragraphs
+              const processChildren = (child: any): any => {
+                if (typeof child === 'string') {
+                  const parts = child.split('{{BR}}');
+                  return parts.map((part, index) => (
+                    <React.Fragment key={index}>
+                      {part}
+                      {index < parts.length - 1 && <br />}
+                    </React.Fragment>
+                  ));
+                }
+                return child;
+              };
+
+              const processedChildren = React.Children.map(children, processChildren);
+              
+              return (
+                <p className="text-base mb-3 text-foreground font-light leading-relaxed">
+                  {processedChildren}
+                </p>
+              );
+            },
             ul: ({ children }) => (
               <ul className="list-disc list-inside mb-3 text-base space-y-1.5">{children}</ul>
             ),
@@ -83,9 +114,35 @@ export default function MarkdownRenderer({ content, className = '' }: MarkdownRe
                 {children}
               </th>
             ),
-            td: ({ children }) => (
-              <td className="border border-border px-2 py-1 font-light text-foreground">{children}</td>
-            ),
+            td: ({ children }) => {
+              // Handle line breaks in table cells
+              const processChildren = (child: any): any => {
+                if (typeof child === 'string') {
+                  const parts = child.split('{{BR}}');
+                  return parts.map((part, index) => (
+                    <React.Fragment key={index}>
+                      {part}
+                      {index < parts.length - 1 && <br />}
+                    </React.Fragment>
+                  ));
+                }
+                if (React.isValidElement(child)) {
+                  // Recursively process children of React elements
+                  return React.cloneElement(child as React.ReactElement<any>, {
+                    children: React.Children.map((child as React.ReactElement<any>).props.children, processChildren)
+                  });
+                }
+                return child;
+              };
+
+              const processedChildren = React.Children.map(children, processChildren);
+              
+              return (
+                <td className="border border-border px-2 py-1 font-light text-foreground">
+                  {processedChildren}
+                </td>
+              );
+            },
             // Links
             a: ({ href, children }) => (
               <a
@@ -103,7 +160,7 @@ export default function MarkdownRenderer({ content, className = '' }: MarkdownRe
             ),
           }}
         >
-          {content}
+          {processedContent}
         </ReactMarkdown>
       </div>
     );

@@ -360,18 +360,31 @@ export function useRBAC() {
 
     const getMaxDebateRounds = (): number => {
         // Get the highest debate rounds limit from all user roles
+        console.log('[useRBAC] getMaxDebateRounds called.');
+        console.log('[useRBAC] userRoles:', userRoles);
+        console.log('[useRBAC] roleDetails size:', roleDetails.size);
+        
         let maxLimit = 0;
         let foundLimit = false;
 
         for (const userRole of userRoles) {
             const roleDetail = roleDetails.get(userRole.role_id);
+            console.log('[useRBAC] Checking role ID:', userRole.role_id);
+            console.log('[useRBAC] Role detail found:', roleDetail);
+            console.log('[useRBAC] max_debate_rounds value:', roleDetail?.max_debate_rounds);
+            console.log('[useRBAC] max_debate_rounds type:', typeof roleDetail?.max_debate_rounds);
+            
             if (roleDetail && typeof roleDetail.max_debate_rounds === 'number') {
+                console.log('[useRBAC] Using max_debate_rounds:', roleDetail.max_debate_rounds);
                 maxLimit = Math.max(maxLimit, roleDetail.max_debate_rounds);
                 foundLimit = true;
             }
         }
 
-        return foundLimit ? maxLimit : 2; // Default to 2 debate rounds
+        const result = foundLimit ? maxLimit : 2; // Default to 2 debate rounds
+        console.log('[useRBAC] getMaxDebateRounds final result:', result, 'foundLimit:', foundLimit, 'maxLimit:', maxLimit);
+        
+        return result;
     };
 
     const getScheduleResolution = (): string[] => {

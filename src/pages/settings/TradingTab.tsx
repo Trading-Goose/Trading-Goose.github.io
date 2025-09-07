@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -22,6 +24,8 @@ import {
   RefreshCw,
   DollarSign,
   Lock,
+  Target,
+  ShieldAlert,
 } from "lucide-react";
 import type { TradingTabProps } from "./types";
 
@@ -34,6 +38,8 @@ export default function TradingTab({
   autoExecuteTrades,
   userRiskLevel,
   defaultPositionSizeDollars,
+  profitTarget,
+  stopLoss,
   configuredProviders,
   showKeys,
   saved,
@@ -46,6 +52,8 @@ export default function TradingTab({
   setAutoExecuteTrades,
   setUserRiskLevel,
   setDefaultPositionSizeDollars,
+  setProfitTarget,
+  setStopLoss,
   toggleShowKey,
   handleSaveTab,
   canUseLiveTrading = true,
@@ -96,32 +104,39 @@ export default function TradingTab({
                 </AlertDescription>
               </Alert>
             )}
-            <div className={`flex items-start space-x-3 ${!canUseLiveTrading ? 'opacity-50' : ''}`} >
-              <div className="flex items-center h-5">
-                <input
-                  type="checkbox"
-                  id="paper-trading"
-                  checked={alpacaPaperTrading}
-                  onChange={(e) => {
-                    // If trying to switch to live trading, check permission
-                    if (!e.target.checked && !canUseLiveTrading) {
-                      return; // Don't allow switching to live trading
-                    }
-                    setAlpacaPaperTrading(e.target.checked);
-                  }}
-                  disabled={!canUseLiveTrading && !alpacaPaperTrading}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-2 focus:ring-2 focus:ring-offset-background transition-all cursor-pointer disabled:cursor-not-allowed"
-                />
+            <div className="space-y-3">
+              <Label className="text-base font-medium">Trading Mode</Label>
+              <div className={`flex items-center justify-center gap-4 ${!canUseLiveTrading ? 'opacity-50' : ''}`}>
+                <div className={`flex items-center gap-2 ${!alpacaPaperTrading ? 'font-semibold' : 'text-muted-foreground'}`}>
+                  <TrendingDown className={`h-4 w-4 ${!alpacaPaperTrading ? 'text-red-500' : ''}`} />
+                  <span>Live Trading</span>
+                  {!canUseLiveTrading && !alpacaPaperTrading && <Lock className="h-3 w-3" />}
+                </div>
+                <div className="relative">
+                  <Switch
+                    id="paper-trading"
+                    checked={alpacaPaperTrading}
+                    onCheckedChange={(checked) => {
+                      // If trying to switch to live trading, check permission
+                      if (!checked && !canUseLiveTrading) {
+                        return; // Don't allow switching to live trading
+                      }
+                      setAlpacaPaperTrading(checked);
+                    }}
+                    disabled={!canUseLiveTrading && !alpacaPaperTrading}
+                    className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-red-500/80"
+                  />
+                </div>
+                <div className={`flex items-center gap-2 ${alpacaPaperTrading ? 'font-semibold' : 'text-muted-foreground'}`}>
+                  <span>Paper Trading</span>
+                  <TrendingUp className={`h-4 w-4 ${alpacaPaperTrading ? 'text-green-500' : ''}`} />
+                </div>
               </div>
-              <div className="flex-1">
-                <Label htmlFor="paper-trading" className="text-base font-medium cursor-pointer leading-none flex items-center gap-2">
-                  Use Paper Trading
-                  {!canUseLiveTrading && !alpacaPaperTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Recommended for testing strategies with simulated money
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                {alpacaPaperTrading
+                  ? "Testing mode with simulated money - no real funds at risk"
+                  : "⚠️ Real money trading - actual funds will be used"}
+              </p>
             </div>
           </div>
         </div>
@@ -133,67 +148,6 @@ export default function TradingTab({
             Trade Execution Settings
           </h3>
 
-          {/* User Risk Level */}
-          <div className="space-y-2">
-            <Label htmlFor="risk-level">Risk Tolerance Level</Label>
-            <Select value={userRiskLevel} onValueChange={setUserRiskLevel}>
-              <SelectTrigger id="risk-level">
-                <SelectValue placeholder="Select risk level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="conservative">
-                  <div className="flex items-center gap-2">
-                    <TrendingDown className="h-4 w-4 text-blue-500" />
-                    <span>Conservative</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="moderate">
-                  <div className="flex items-center gap-2">
-                    <RefreshCw className="h-4 w-4 text-yellow-500" />
-                    <span>Moderate (Recommended)</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="aggressive">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-red-500" />
-                    <span>Aggressive</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {userRiskLevel === 'conservative' &&
-                "Lower position sizes, focuses on capital preservation and steady growth"
-              }
-              {userRiskLevel === 'moderate' &&
-                "Balanced approach between risk and reward, suitable for most investors"
-              }
-              {userRiskLevel === 'aggressive' &&
-                "Larger position sizes, maximizes growth potential with higher risk tolerance"
-              }
-            </p>
-          </div>
-
-          {/* Default Position Size */}
-          <div className="space-y-2">
-            <Label htmlFor="position-size">Default Position Size</Label>
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <Input
-                id="position-size"
-                type="number"
-                min="100"
-                step="100"
-                value={defaultPositionSizeDollars}
-                onChange={(e) => setDefaultPositionSizeDollars(Number(e.target.value))}
-                className="flex-1"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Base amount in dollars for each trade position. Will be adjusted based on confidence and risk level.
-            </p>
-          </div>
-
           {/* Auto-Execute Trade Orders */}
           <div className={`rounded-lg border bg-muted/30 p-4 `}>
             {!canUseAutoTrading && (
@@ -204,36 +158,157 @@ export default function TradingTab({
                 </AlertDescription>
               </Alert>
             )}
-            <div className={`flex items-start space-x-3 ${!canUseAutoTrading ? 'opacity-50' : ''}`} >
-              <div className="flex items-center h-5">
-                <input
-                  type="checkbox"
+            <div className={`space-y-3 ${!canUseAutoTrading ? 'opacity-50' : ''}`}>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="auto-execute" className="text-base font-medium cursor-pointer flex items-center gap-2">
+                    Auto-Execute Trade Orders
+                    {!canUseAutoTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically execute approved trade recommendations
+                  </p>
+                </div>
+                <Switch
                   id="auto-execute"
                   checked={autoExecuteTrades}
-                  onChange={(e) => setAutoExecuteTrades(e.target.checked)}
+                  onCheckedChange={setAutoExecuteTrades}
                   disabled={!canUseAutoTrading}
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-2 focus:ring-2 focus:ring-offset-background transition-all cursor-pointer disabled:cursor-not-allowed"
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
                 />
               </div>
-              <div className="flex-1">
-                <Label htmlFor="auto-execute" className="text-base font-medium cursor-pointer leading-none flex items-center gap-2">
-                  Auto-Execute Trade Orders
-                  {!canUseAutoTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  When enabled, approved trade recommendations will be automatically executed without manual confirmation
-                </p>
-                {autoExecuteTrades && canUseAutoTrading && (
-                  <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
-                    <p className="text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      <span>Auto-execution will use {alpacaPaperTrading ? 'paper' : 'live'} trading mode</span>
-                    </p>
-                  </div>
-                )}
-              </div>
+              {autoExecuteTrades && canUseAutoTrading && (
+                <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
+                  <p className="text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    <span>Auto-execution will use {alpacaPaperTrading ? 'paper' : 'live'} trading mode</span>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Risk Level and Position Size on same line */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* User Risk Level */}
+            <div className="space-y-2">
+              <Label htmlFor="risk-level">Risk Tolerance Level</Label>
+              <Select value={userRiskLevel} onValueChange={setUserRiskLevel}>
+                <SelectTrigger id="risk-level">
+                  <SelectValue placeholder="Select risk level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="conservative">
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="h-4 w-4 text-blue-500" />
+                      <span>Conservative</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="moderate">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 text-yellow-500" />
+                      <span>Moderate (Recommended)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="aggressive">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-red-500" />
+                      <span>Aggressive</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {userRiskLevel === 'conservative' &&
+                  "Lower position sizes, focuses on capital preservation"
+                }
+                {userRiskLevel === 'moderate' &&
+                  "Balanced approach between risk and reward"
+                }
+                {userRiskLevel === 'aggressive' &&
+                  "Larger position sizes, maximizes growth potential"
+                }
+              </p>
+            </div>
+
+            {/* Default Position Size */}
+            <div className="space-y-2">
+              <Label htmlFor="position-size">Default Position Size</Label>
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="position-size"
+                  type="number"
+                  min="100"
+                  step="100"
+                  value={defaultPositionSizeDollars}
+                  onChange={(e) => setDefaultPositionSizeDollars(Number(e.target.value))}
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Base amount in dollars for each trade position
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Position Management Preferences */}
+        <div className="space-y-4 p-4 border rounded-lg bg-card">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            Position Management Preferences
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            These preferences guide (but don't dictate) trading decisions to help manage your positions effectively.
+          </p>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Profit Target */}
+            <div className="space-y-2">
+              <Label htmlFor="profit-target" className="text-sm">
+                Profit Target: {profitTarget}%
+              </Label>
+              <Slider
+                id="profit-target"
+                min={5}
+                max={100}
+                step={1}
+                value={[profitTarget]}
+                onValueChange={(value) => setProfitTarget(value[0])}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Consider taking profits when positions gain this percentage
+              </p>
+            </div>
+
+            {/* Stop Loss */}
+            <div className="space-y-2">
+              <Label htmlFor="stop-loss" className="text-sm">
+                Stop Loss: {stopLoss}%
+              </Label>
+              <Slider
+                id="stop-loss"
+                min={5}
+                max={25}
+                step={1}
+                value={[stopLoss]}
+                onValueChange={(value) => setStopLoss(value[0])}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Consider exiting when positions lose this percentage
+              </p>
+            </div>
+          </div>
+
+          <Alert className="mt-4">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertDescription>
+              These are preferences that influence AI recommendations, not hard rules. The AI will consider these targets along with market conditions, technical analysis, and other factors when making trading decisions.
+            </AlertDescription>
+          </Alert>
         </div>
 
         {/* Paper Trading Credentials */}

@@ -44,7 +44,6 @@ This project's multi-agent analysis workflow architecture is based on the [Tauri
 - **Social Media Analyst**: Monitors social sentiment and trending topics
 - **Risk Analysts** (Safe/Neutral/Risky): Provides multi-perspective risk assessments
 - **Portfolio Manager**: Optimizes portfolio allocation and rebalancing
-- **Trader Agent**: Executes trades based on collective intelligence
 
 ### 📊 Core Capabilities
 

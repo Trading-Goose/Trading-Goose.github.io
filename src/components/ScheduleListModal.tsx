@@ -46,6 +46,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useRBAC } from "@/hooks/useRBAC";
+import { getTrueUTCTime, calculateNextRunUTC } from "@/lib/timeUtils";
 import ScheduleRebalanceModal from "./schedule-rebalance/ScheduleRebalanceModal";
 
 interface ScheduleListModalProps {
@@ -274,183 +275,66 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
     return days.map(d => dayNames[d]).join(', ');
   };
 
-  const calculateNextRun = (schedule: Schedule): Date | null => {
-    const now = new Date();
-    const [hours, minutes] = schedule.time_of_day.split(':').map(Number);
+  // State for storing calculated next run times and true UTC time
+  const [nextRunTimes, setNextRunTimes] = useState<Map<string, Date | null>>(new Map());
+  const [trueCurrentTime, setTrueCurrentTime] = useState<Date | null>(null);
+  const [calculatingTimes, setCalculatingTimes] = useState(false);
 
-    // Helper function to convert schedule time to UTC-aware date
-    const createScheduledDate = (localDate: Date): Date => {
-      // Format date for the target timezone
-      const year = localDate.getFullYear();
-      const month = String(localDate.getMonth() + 1).padStart(2, '0');
-      const day = String(localDate.getDate()).padStart(2, '0');
-      const hourStr = String(hours).padStart(2, '0');
-      const minuteStr = String(minutes).padStart(2, '0');
+  // Calculate next run times when schedules change
+  useEffect(() => {
+    const calculateAllNextRuns = async () => {
+      if (schedules.length === 0) return;
       
-      // Create an ISO string for the target timezone time
-      const dateTimeStr = `${year}-${month}-${day}T${hourStr}:${minuteStr}:00`;
+      setCalculatingTimes(true);
+      const times = new Map<string, Date | null>();
       
-      // Use Intl.DateTimeFormat to handle timezone conversion properly
-      // This simulates the SQL AT TIME ZONE behavior
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: schedule.timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      });
+      // Get true UTC time once for all calculations
+      const currentTime = await getTrueUTCTime();
+      setTrueCurrentTime(currentTime);
       
-      // Parse the target date/time in the schedule's timezone
-      const testDate = new Date(dateTimeStr);
-      const parts = formatter.formatToParts(testDate);
-      const dateParts: any = {};
-      parts.forEach(part => dateParts[part.type] = part.value);
-      
-      // Get timezone offset for this specific date/time
-      const tzFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: schedule.timezone,
-        timeZoneName: 'longOffset'
-      });
-      const tzParts = tzFormatter.formatToParts(new Date(dateTimeStr));
-      const offsetStr = tzParts.find(p => p.type === 'timeZoneName')?.value || 'GMT+00:00';
-      const match = offsetStr.match(/GMT([+-]\d{2}):(\d{2})/);
-      let offsetMinutes = 0;
-      if (match) {
-        const offsetHours = parseInt(match[1]);
-        const offsetMins = parseInt(match[2]);
-        offsetMinutes = offsetHours * 60 + (offsetHours < 0 ? -offsetMins : offsetMins);
-      }
-      
-      // Create the date in the local timezone and adjust for the schedule's timezone offset
-      const localTime = new Date(dateTimeStr);
-      const utcTime = localTime.getTime() - (offsetMinutes * 60 * 1000);
-      return new Date(utcTime);
-    };
-
-    // Helper function to find next occurrence for weekly schedules with specific days
-    const findNextWeeklyOccurrence = (startDate: Date, daysOfWeek: number[]): Date => {
-      let checkDate = new Date(startDate);
-      
-      // Check up to 7 days ahead
-      for (let i = 0; i < 7; i++) {
-        // Get day of week in the schedule's timezone
-        const formatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: schedule.timezone,
-          weekday: 'long'
-        });
-        const dayName = formatter.format(checkDate);
-        const dayMap: { [key: string]: number } = {
-          'Sunday': 0,
-          'Monday': 1,
-          'Tuesday': 2,
-          'Wednesday': 3,
-          'Thursday': 4,
-          'Friday': 5,
-          'Saturday': 6
-        };
-        const currentDay = dayMap[dayName];
-        
-        if (daysOfWeek.includes(currentDay)) {
-          const scheduledTime = createScheduledDate(checkDate);
-          if (scheduledTime > now) {
-            return scheduledTime;
-          }
+      for (const schedule of schedules) {
+        try {
+          const nextRun = await calculateNextRunUTC(schedule);
+          times.set(schedule.id, nextRun);
+        } catch (error) {
+          console.error(`Failed to calculate next run for schedule ${schedule.id}:`, error);
+          times.set(schedule.id, null);
         }
-        
-        checkDate.setDate(checkDate.getDate() + 1);
       }
       
-      // Fallback
-      return createScheduledDate(checkDate);
+      setNextRunTimes(times);
+      setCalculatingTimes(false);
     };
+    
+    calculateAllNextRuns();
+  }, [schedules]);
 
-    // If never executed, calculate from current date
-    if (!schedule.last_executed_at) {
-      // For weekly schedules with specific days
-      if (schedule.interval_unit === 'weeks' && schedule.day_of_week && schedule.day_of_week.length > 0) {
-        return findNextWeeklyOccurrence(now, schedule.day_of_week);
-      }
-
-      // Create a date at the scheduled time in the target timezone
-      let nextRun = createScheduledDate(now);
-
-      // If that time has already passed today, add the interval
-      if (nextRun <= now) {
-        const nextDate = new Date(now);
-        switch (schedule.interval_unit) {
-          case 'days':
-            nextDate.setDate(nextDate.getDate() + schedule.interval_value);
-            break;
-          case 'weeks':
-            nextDate.setDate(nextDate.getDate() + (schedule.interval_value * 7));
-            break;
-          case 'months':
-            nextDate.setMonth(nextDate.getMonth() + schedule.interval_value);
-            break;
-        }
-        nextRun = createScheduledDate(nextDate);
-      }
-
-      return nextRun;
-    }
-
-    // Calculate from last execution
-    const lastRun = new Date(schedule.last_executed_at);
-    let nextDate = new Date(lastRun);
-
-    // For weekly schedules with specific days
-    if (schedule.interval_unit === 'weeks' && schedule.day_of_week && schedule.day_of_week.length > 0) {
-      // Start from the day after last execution
-      nextDate.setDate(nextDate.getDate() + 1);
-      return findNextWeeklyOccurrence(nextDate, schedule.day_of_week);
-    }
-
-    // Add the interval for regular schedules
-    switch (schedule.interval_unit) {
-      case 'days':
-        nextDate.setDate(nextDate.getDate() + schedule.interval_value);
-        break;
-      case 'weeks':
-        nextDate.setDate(nextDate.getDate() + (schedule.interval_value * 7));
-        break;
-      case 'months':
-        nextDate.setMonth(nextDate.getMonth() + schedule.interval_value);
-        break;
-    }
-
-    let nextRun = createScheduledDate(nextDate);
-
-    // IMPORTANT: If the calculated next run is in the past (e.g., schedule was paused),
-    // advance it to the next valid future time
-    while (nextRun <= now) {
-      switch (schedule.interval_unit) {
-        case 'days':
-          nextDate.setDate(nextDate.getDate() + schedule.interval_value);
-          break;
-        case 'weeks':
-          nextDate.setDate(nextDate.getDate() + (schedule.interval_value * 7));
-          break;
-        case 'months':
-          nextDate.setMonth(nextDate.getMonth() + schedule.interval_value);
-          break;
-      }
-      nextRun = createScheduledDate(nextDate);
-    }
-
-    return nextRun;
-  };
+  // Refresh true time periodically for accurate countdown
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const updateTrueTime = async () => {
+      const currentTime = await getTrueUTCTime();
+      setTrueCurrentTime(currentTime);
+    };
+    
+    // Update immediately and then every 30 seconds
+    updateTrueTime();
+    const interval = setInterval(updateTrueTime, 30000);
+    
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
   const formatNextRun = (schedule: Schedule) => {
     if (!schedule.enabled) return 'Paused';
-
-    const nextRun = calculateNextRun(schedule);
+    
+    const nextRun = nextRunTimes.get(schedule.id);
+    if (calculatingTimes) return 'Calculating...';
     if (!nextRun) return 'Not scheduled';
+    if (!trueCurrentTime) return 'Loading...';
 
-    const now = new Date();
-    const diffMs = nextRun.getTime() - now.getTime();
+    // Use true UTC time instead of client time
+    const diffMs = nextRun.getTime() - trueCurrentTime.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 

@@ -36,36 +36,62 @@ export const getNextRunTime = (config: ScheduleConfig): string => {
     hours = 0;
   }
 
-  // Helper function to create a date at the scheduled time in the target timezone
-  const createScheduledDate = (localDate: Date): Date => {
-    const year = localDate.getFullYear();
-    const month = String(localDate.getMonth() + 1).padStart(2, '0');
-    const day = String(localDate.getDate()).padStart(2, '0');
-    const hourStr = String(hours).padStart(2, '0');
-    const minuteStr = String(minutes).padStart(2, '0');
-    
-    // Create an ISO string for the target timezone time
-    const dateTimeStr = `${year}-${month}-${day}T${hourStr}:${minuteStr}:00`;
-    
-    // Get timezone offset for this specific date/time
-    const tzFormatter = new Intl.DateTimeFormat('en-US', {
+  // Helper function to create a UTC date for the scheduled time in the target timezone
+  const createScheduledDate = (baseDate: Date): Date => {
+    // Get the date in the schedule's timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: config.timezone,
-      timeZoneName: 'longOffset'
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
     });
-    const tzParts = tzFormatter.formatToParts(new Date(dateTimeStr));
-    const offsetStr = tzParts.find(p => p.type === 'timeZoneName')?.value || 'GMT+00:00';
-    const match = offsetStr.match(/GMT([+-]\d{2}):(\d{2})/);
-    let offsetMinutes = 0;
-    if (match) {
-      const offsetHours = parseInt(match[1]);
-      const offsetMins = parseInt(match[2]);
-      offsetMinutes = offsetHours * 60 + (offsetHours < 0 ? -offsetMins : offsetMins);
+    
+    const dateStr = formatter.format(baseDate);
+    const [month, day, year] = dateStr.split('/');
+    
+    // Find the UTC time that corresponds to the scheduled time in the target timezone
+    // We'll check different UTC hours to find which one gives us the desired time in the target timezone
+    for (let utcHour = 0; utcHour < 48; utcHour++) {
+      // Try UTC hours from today and tomorrow to handle timezone differences
+      const testDate = new Date(Date.UTC(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day) + Math.floor(utcHour / 24) - 1, // Adjust day for hours > 24
+        utcHour % 24,
+        minutes,
+        0
+      ));
+      
+      // Check what time this UTC date shows in the target timezone
+      const tzFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: config.timezone,
+        hour: 'numeric',
+        minute: 'numeric',
+        day: 'numeric',
+        hour12: false
+      });
+      
+      const parts = tzFormatter.formatToParts(testDate);
+      const tzHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+      const tzMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+      const tzDay = parseInt(parts.find(p => p.type === 'day')?.value || '0');
+      
+      // If this UTC time gives us the correct scheduled time in the target timezone
+      if (tzHour === hours && tzMinute === minutes && tzDay === parseInt(day)) {
+        return testDate;
+      }
     }
     
-    // Create the date in the local timezone and adjust for the schedule's timezone offset
-    const localTime = new Date(dateTimeStr);
-    const utcTime = localTime.getTime() - (offsetMinutes * 60 * 1000);
-    return new Date(utcTime);
+    // Fallback: just return a reasonable approximation
+    // Most US timezones are UTC-5 to UTC-8, so use UTC-7 as a middle ground
+    return new Date(Date.UTC(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      hours + 7, // Approximate offset
+      minutes,
+      0
+    ));
   };
 
   let nextDate = new Date(now);

@@ -21,6 +21,7 @@ import {
   Lock,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { HelpButton, LabelWithHelp, HelpContent } from "@/components/ui/help-button";
 import type { ProvidersTabProps } from "./types";
 
 export default function ProvidersTab({
@@ -56,9 +57,19 @@ export default function ProvidersTab({
 
         {/* Default AI Provider Configuration */}
         <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold">Default AI Provider</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold">Default AI Provider</h3>
+            <HelpButton 
+              content={
+                <HelpContent
+                  title="Default AI Provider"
+                  description="This provider serves as the fallback when other providers fail or when no specific provider is assigned to an agent. It ensures your analysis always has an available AI provider."
+                />
+              }
+            />
+          </div>
           <p className="text-sm text-muted-foreground">
-            Configure your primary AI provider. This will be used by default for all analysis.
+            Configure your fallback AI provider. This will be used when other providers fail or for agents using "Default AI".
           </p>
 
           {aiProviders.length > 0 && aiProviders[0] && (() => {
@@ -67,7 +78,11 @@ export default function ProvidersTab({
               <div className="space-y-3">
                 <div className="flex gap-4 items-start">
                   <div className="flex-1">
-                    <Label className="text-xs mb-1">Nickname</Label>
+                    <LabelWithHelp
+                      label="Nickname"
+                      helpContent="A friendly name to identify this provider configuration. For example: 'Production API' or 'Fast Model'"
+                      className="text-xs mb-1"
+                    />
                     <Input
                       placeholder="e.g., Production API"
                       value={provider.nickname}
@@ -77,9 +92,12 @@ export default function ProvidersTab({
                     />
                   </div>
                   <div className="flex-1">
-                    <Label className="text-xs mb-1">
-                      Provider <span className="text-red-500">*</span>
-                    </Label>
+                    <LabelWithHelp
+                      label="Provider"
+                      required={true}
+                      helpContent="Choose your AI provider. Each has different models, pricing, and capabilities."
+                      className="text-xs mb-1"
+                    />
                     <Select
                       value={provider.provider}
                       onValueChange={(value) => updateAiProvider(provider.id, 'provider', value)}
@@ -103,9 +121,25 @@ export default function ProvidersTab({
                 </div>
                 <div className="flex gap-4 items-start">
                   <div className="flex-1">
-                    <Label className="text-xs mb-1">
-                      API Key <span className="text-red-500">*</span>
-                    </Label>
+                    <LabelWithHelp
+                      label="API Key"
+                      required={true}
+                      helpContent={
+                        <HelpContent
+                          title="API Key Configuration"
+                          description="Your secret API key from the selected provider. This key authenticates your requests to the AI service."
+                          tips={[
+                            "Keep your API key secure - never share it publicly",
+                            "Use environment variables in production",
+                            "Set usage limits in your provider's dashboard",
+                            "Monitor your API usage to control costs"
+                          ]}
+                          example="sk-proj-abc123xyz..."
+                          warning="Your API key is encrypted before storage, but treat it as sensitive data."
+                        />
+                      }
+                      className="text-xs mb-1"
+                    />
                     <div className="relative">
                       <Input
                         type={showKeys[`provider_${provider.id}`] ? "text" : "password"}
@@ -139,7 +173,22 @@ export default function ProvidersTab({
                 </div>
                 {provider.provider && (
                   <div className="space-y-2">
-                    <Label className="text-xs mb-1">Default Model</Label>
+                    <LabelWithHelp
+                      label="Default Model"
+                      helpContent={
+                        <HelpContent
+                          title="Fallback Model Selection"
+                          description="The AI model used when other providers fail or for agents set to 'Default AI'. This model handles all fallback operations."
+                          tips={[
+                            "Choose a reliable model with good uptime for fallback operations",
+                            "Balance cost vs quality - this may be used frequently if other providers fail",
+                            "GPT-4 or Claude 3 recommended for critical fallback analysis",
+                            "This model is used by all agents when their assigned provider is unavailable"
+                          ]}
+                        />
+                      }
+                      className="text-xs mb-1"
+                    />
                     <Select value={defaultAiModel} onValueChange={setDefaultAiModel}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select default model" />
@@ -153,13 +202,32 @@ export default function ProvidersTab({
                       </SelectContent>
                     </Select>
                     {defaultAiModel === 'custom' && (
-                      <Input
-                        className={`mt-2 ${!defaultCustomModel ? 'border-red-500' : ''}`}
-                        placeholder="Enter custom model name *"
-                        value={defaultCustomModel}
-                        onChange={(e) => setDefaultCustomModel(e.target.value)}
-                        required
-                      />
+                      <>
+                        <LabelWithHelp
+                          label="Custom Model Name"
+                          required={true}
+                          helpContent={
+                            <HelpContent
+                              title="Custom Model Configuration"
+                              description="Enter the exact model name from your provider's documentation. This allows you to use newer models not yet in our list."
+                              example="gpt-4-turbo-2024-04-09"
+                              tips={[
+                                "Check your provider's API documentation for valid model names",
+                                "Ensure the model is available in your API tier",
+                                "Model names are case-sensitive"
+                              ]}
+                            />
+                          }
+                          className="text-xs mb-1 mt-2"
+                        />
+                        <Input
+                          className={`${!defaultCustomModel ? 'border-red-500' : ''}`}
+                          placeholder="Enter custom model name *"
+                          value={defaultCustomModel}
+                          onChange={(e) => setDefaultCustomModel(e.target.value)}
+                          required
+                        />
+                      </>
                     )}
                     {defaultAiModel === 'custom' && !defaultCustomModel && (
                       <p className="text-sm text-red-500 mt-1">Custom model name is required</p>
@@ -191,10 +259,26 @@ export default function ProvidersTab({
 
         {/* Additional AI Providers */}
         <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasAdditionalProviderAccess ? 'opacity-50' : ''}`}>
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            Additional AI Providers
-            {!hasAdditionalProviderAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              Additional AI Providers
+              {!hasAdditionalProviderAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+            </h3>
+            <HelpButton
+              content={
+                <HelpContent
+                  title="Additional Providers"
+                  description="Configure multiple API keys from the same or different providers for rate limit distribution and failover."
+                  tips={[
+                    "Use multiple keys to avoid rate limits",
+                    "Set up different models for different agent teams",
+                    "Configure backup providers for high availability",
+                    "Mix providers to leverage their unique strengths"
+                  ]}
+                />
+              }
+            />
+          </div>
           {!hasAdditionalProviderAccess ? null : (
             <p className="text-sm text-muted-foreground">
               Configure additional AI providers for team-specific assignments.
@@ -206,7 +290,11 @@ export default function ProvidersTab({
               <div key={provider.id} className="space-y-3 p-4 border rounded-lg">
                 <div className="flex gap-4 items-start">
                   <div className="flex-1">
-                    <Label className="text-xs mb-1">Nickname</Label>
+                    <LabelWithHelp
+                      label="Nickname"
+                      helpContent="A friendly name to identify this provider configuration. For example: 'Fast Model' or 'Backup API'"
+                      className="text-xs mb-1"
+                    />
                     <Input
                       placeholder="e.g., Fast Model"
                       value={provider.nickname}
@@ -215,9 +303,12 @@ export default function ProvidersTab({
                     />
                   </div>
                   <div className="flex-1">
-                    <Label className="text-xs mb-1">
-                      Provider <span className="text-red-500">*</span>
-                    </Label>
+                    <LabelWithHelp
+                      label="Provider"
+                      required={true}
+                      helpContent="Choose your AI provider. Each has different models, pricing, and capabilities."
+                      className="text-xs mb-1"
+                    />
                     <Select
                       value={provider.provider}
                       onValueChange={(value) => updateAiProvider(provider.id, 'provider', value)}
@@ -242,9 +333,25 @@ export default function ProvidersTab({
                 </div>
                 <div className="flex gap-4 items-start">
                   <div className="flex-1">
-                    <Label className="text-xs mb-1">
-                      API Key <span className="text-red-500">*</span>
-                    </Label>
+                    <LabelWithHelp
+                      label="API Key"
+                      required={true}
+                      helpContent={
+                        <HelpContent
+                          title="API Key Configuration"
+                          description="Your secret API key from the selected provider. This key authenticates your requests to the AI service."
+                          tips={[
+                            "Keep your API key secure - never share it publicly",
+                            "Use environment variables in production",
+                            "Set usage limits in your provider's dashboard",
+                            "Monitor your API usage to control costs"
+                          ]}
+                          example="sk-proj-abc123xyz..."
+                          warning="Your API key is encrypted before storage, but treat it as sensitive data."
+                        />
+                      }
+                      className="text-xs mb-1"
+                    />
                     <div className="relative">
                       <Input
                         type={showKeys[`provider_${provider.id}`] ? "text" : "password"}

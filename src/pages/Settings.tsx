@@ -134,8 +134,8 @@ export default function SettingsPage() {
 
   // Rebalance configuration state
   const [rebalanceThreshold, setRebalanceThreshold] = useState(apiSettings?.rebalance_threshold || apiSettings?.default_rebalance_threshold || 10);
-  const [rebalanceMinPositionSize, setRebalanceMinPositionSize] = useState(apiSettings?.rebalance_min_position_size || apiSettings?.default_min_position_size || 100);
-  const [rebalanceMaxPositionSize, setRebalanceMaxPositionSize] = useState(apiSettings?.rebalance_max_position_size || apiSettings?.default_max_position_size || 10000);
+  const [rebalanceMinPositionSize, setRebalanceMinPositionSize] = useState(apiSettings?.rebalance_min_position_size || 2); // Default 2%
+  const [rebalanceMaxPositionSize, setRebalanceMaxPositionSize] = useState(apiSettings?.rebalance_max_position_size || 25); // Default 25%
   const [targetStockAllocation, setTargetStockAllocation] = useState(apiSettings?.target_stock_allocation || 80);
   const [targetCashAllocation, setTargetCashAllocation] = useState(apiSettings?.target_cash_allocation || 20);
 
@@ -282,8 +282,8 @@ export default function SettingsPage() {
 
       // Rebalance settings
       setRebalanceThreshold(apiSettings.rebalance_threshold || apiSettings.default_rebalance_threshold || 10);
-      setRebalanceMinPositionSize(apiSettings.rebalance_min_position_size || apiSettings.default_min_position_size || 100);
-      setRebalanceMaxPositionSize(apiSettings.rebalance_max_position_size || apiSettings.default_max_position_size || 10000);
+      setRebalanceMinPositionSize(apiSettings.rebalance_min_position_size || 2); // 2% default
+      setRebalanceMaxPositionSize(apiSettings.rebalance_max_position_size || 25); // 25% default
       setTargetStockAllocation(apiSettings.target_stock_allocation || 80);
       setTargetCashAllocation(apiSettings.target_cash_allocation || 20);
 
@@ -798,10 +798,6 @@ export default function SettingsPage() {
           rebalance_threshold: rebalanceThreshold,
           rebalance_min_position_size: rebalanceMinPositionSize,
           rebalance_max_position_size: rebalanceMaxPositionSize,
-          // Also save to old columns for backward compatibility
-          default_rebalance_threshold: rebalanceThreshold,
-          default_min_position_size: rebalanceMinPositionSize,
-          default_max_position_size: rebalanceMaxPositionSize,
           target_stock_allocation: targetStockAllocation,
           target_cash_allocation: targetCashAllocation,
           opportunity_market_range: opportunityMarketRange,

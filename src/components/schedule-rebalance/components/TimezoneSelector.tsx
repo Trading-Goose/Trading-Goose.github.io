@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LabelWithHelp } from "@/components/ui/help-button";
 import {
   Select,
   SelectContent,
@@ -24,7 +25,10 @@ export function TimezoneSelector({ value, onChange }: TimezoneSelectorProps) {
 
   return (
     <div className="space-y-2">
-      <Label>Timezone</Label>
+      <LabelWithHelp
+        label="Timezone"
+        helpContent="Your local timezone for scheduling. The rebalance will execute at the specified time in this timezone. Market hours are in Eastern Time (ET)."
+      />
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger>
           <SelectValue placeholder="Select timezone">

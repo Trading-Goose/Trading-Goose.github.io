@@ -17,9 +17,9 @@ import {
   Save,
   AlertCircle,
   Check,
-  Info,
   Lock,
 } from "lucide-react";
+import { HelpButton, LabelWithHelp } from "@/components/ui/help-button";
 import type { RebalanceTabProps } from "./types";
 
 export default function RebalanceTab({
@@ -83,15 +83,19 @@ export default function RebalanceTab({
         <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasRebalanceAccess ? 'opacity-50' : ''}`}>
           <h3 className="text-lg font-semibold flex items-center gap-2">
             Rebalance Settings
+            <HelpButton 
+              content="Controls when and how your portfolio gets rebalanced. Rebalancing helps maintain your target asset allocation and manages risk."
+              iconSize={16}
+            />
             {!hasRebalanceAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
           </h3>
 
           {/* Rebalance Threshold */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              Rebalance Threshold (%)
-              <Info className="h-3 w-3 text-muted-foreground" />
-            </Label>
+            <LabelWithHelp
+              label="Rebalance Threshold (%)"
+              helpContent="Triggers rebalance when portfolio drifts by this percentage. Lower values (1-5%) result in frequent rebalancing, higher values (10-20%) result in less frequent rebalancing. Recommended: 5-10%"
+            />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
               <Slider
                 value={[rebalanceThreshold]}
@@ -110,68 +114,108 @@ export default function RebalanceTab({
           </div>
 
           {/* Position Size Limits */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Min Position Size ($)</Label>
-              <Input
-                type="number"
-                value={rebalanceMinPositionSize}
-                onChange={(e) => setRebalanceMinPositionSize(Number(e.target.value))}
-                min={0}
-                step={100}
-                disabled={!hasRebalanceAccess}
-              />
-              <p className="text-xs text-muted-foreground">
-                Minimum dollar amount per position
-              </p>
+          <div className="space-y-2">
+            <LabelWithHelp
+              label="Position Size Limits"
+              helpContent="Set minimum and maximum position sizes as percentage of portfolio. Min prevents too many small positions, Max ensures diversification. Recommended: Min 5-10%, Max 20-30%"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <LabelWithHelp
+                  label={`Min Size: ${rebalanceMinPositionSize}%`}
+                  helpContent="Minimum position size prevents too many small positions"
+                  className="text-sm"
+                />
+                <Slider
+                  value={[rebalanceMinPositionSize]}
+                  onValueChange={(value) => {
+                    const newMin = value[0];
+                    setRebalanceMinPositionSize(newMin);
+                    // Ensure max is always greater than min
+                    if (rebalanceMaxPositionSize <= newMin) {
+                      setRebalanceMaxPositionSize(Math.min(newMin + 5, 50));
+                    }
+                  }}
+                  min={5}
+                  max={25}
+                  step={5}
+                  className="w-full"
+                  disabled={!hasRebalanceAccess}
+                />
+              </div>
+              <div className="space-y-2">
+                <LabelWithHelp
+                  label={`Max Size: ${rebalanceMaxPositionSize}%`}
+                  helpContent="Maximum position size ensures diversification"
+                  className="text-sm"
+                />
+                <Slider
+                  value={[rebalanceMaxPositionSize]}
+                  onValueChange={(value) => {
+                    setRebalanceMaxPositionSize(value[0]);
+                  }}
+                  min={rebalanceMinPositionSize}
+                  max={50}
+                  step={5}
+                  className="w-full"
+                  disabled={!hasRebalanceAccess}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Max Position Size ($)</Label>
-              <Input
-                type="number"
-                value={rebalanceMaxPositionSize}
-                onChange={(e) => setRebalanceMaxPositionSize(Number(e.target.value))}
-                min={0}
-                step={1000}
-                disabled={!hasRebalanceAccess}
-              />
-              <p className="text-xs text-muted-foreground">
-                Maximum dollar amount per position
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Position sizes must be between {rebalanceMinPositionSize}% and {rebalanceMaxPositionSize}% of portfolio
+            </p>
           </div>
 
           {/* Portfolio Allocation */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Portfolio Allocation</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm">Stock Allocation: {targetStockAllocation}%</Label>
-                  <Slider
-                    value={[targetStockAllocation]}
-                    onValueChange={(value) => {
-                      setTargetStockAllocation(value[0]);
-                      setTargetCashAllocation(100 - value[0]);
-                    }}
-                    min={0}
-                    max={100}
-                    step={5}
-                    className="w-full"
-                    disabled={!hasRebalanceAccess}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm">Cash Allocation: {targetCashAllocation}%</Label>
-                  <div className="h-10 flex items-center">
-                    <Progress value={targetCashAllocation} className="h-2 w-full" />
-                  </div>
-                </div>
+          <div className="space-y-2">
+            <LabelWithHelp
+              label="Portfolio Allocation"
+              helpContent="Target allocation between stocks and cash"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <LabelWithHelp
+                  label={`Stock Allocation: ${targetStockAllocation}%`}
+                  helpContent="Percentage to invest in stocks. Higher = more growth potential, more risk. Age-based rule: 100 minus your age = stock percentage"
+                  className="text-sm"
+                />
+                <Slider
+                  value={[targetStockAllocation]}
+                  onValueChange={(value) => {
+                    setTargetStockAllocation(value[0]);
+                    setTargetCashAllocation(100 - value[0]);
+                  }}
+                  min={0}
+                  max={100}
+                  step={5}
+                  className="w-full"
+                  disabled={!hasRebalanceAccess}
+                />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Target allocation between stocks and cash in your portfolio. These values must total 100%.
-              </p>
+              <div className="space-y-2">
+                <LabelWithHelp
+                  label={`Cash Allocation: ${targetCashAllocation}%`}
+                  helpContent="Percentage to keep in cash for opportunities and stability. Higher cash = more defensive, lower returns"
+                  className="text-sm"
+                />
+                <Slider
+                  value={[targetCashAllocation]}
+                  onValueChange={(value) => {
+                    setTargetCashAllocation(value[0]);
+                    setTargetStockAllocation(100 - value[0]);
+                  }}
+                  min={0}
+                  max={100}
+                  step={5}
+                  className="w-full"
+                  disabled={!hasRebalanceAccess}
+                />
+              </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Target allocation between stocks and cash in your portfolio. These values must total 100%.
+            </p>
           </div>
         </div>
 
@@ -190,6 +234,10 @@ export default function RebalanceTab({
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 Opportunity Agent
+                <HelpButton 
+                  content="Scans market for new investment opportunities when portfolio is balanced. Only activates when within rebalance threshold"
+                  iconSize={16}
+                />
                 {!hasOpportunityAgentAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
               </h3>
               <p className="text-sm text-muted-foreground">
@@ -200,7 +248,10 @@ export default function RebalanceTab({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>AI Provider</Label>
+              <LabelWithHelp
+                label="AI Provider"
+                helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
+              />
               <Select
                 value={opportunityAgentProviderId}
                 onValueChange={setOpportunityAgentProviderId}
@@ -218,7 +269,10 @@ export default function RebalanceTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Model</Label>
+              <LabelWithHelp
+                label="Model"
+                helpContent="Choose the AI model for opportunity scanning"
+              />
               {opportunityAgentProviderId === defaultProviderId ? (
                 <div>
                   <Select
@@ -269,7 +323,10 @@ export default function RebalanceTab({
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Market Data Time Range</Label>
+            <LabelWithHelp
+              label="Market Data Time Range"
+              helpContent="Historical data range. 1D: momentum plays, 1W: short-term, 1M: swing trading, 3M-1Y: value opportunities"
+            />
             <Select
               value={opportunityMarketRange}
               onValueChange={setOpportunityMarketRange}
@@ -291,10 +348,10 @@ export default function RebalanceTab({
             </p>
           </div>
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              Max Tokens
-              <Info className="h-3 w-3 text-muted-foreground" />
-            </Label>
+            <LabelWithHelp
+              label="Max Tokens"
+              helpContent="Response length limit. Higher = more detailed analysis"
+            />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
               <Slider
                 value={[opportunityMaxTokens]}

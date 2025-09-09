@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { LabelWithHelp } from "@/components/ui/help-button";
 import { AlertCircle, Loader2, Eye, Lock } from "lucide-react";
 import { PortfolioComposition } from "../components/PortfolioComposition";
 import { StockPositionCard } from "../components/StockPositionCard";
@@ -91,9 +92,12 @@ export function StockSelectionTab({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <Label htmlFor="include-watchlist" className="text-sm font-semibold">
-                    Include Watchlist Stocks
-                  </Label>
+                  <LabelWithHelp
+                    htmlFor="include-watchlist"
+                    label="Include Watchlist Stocks"
+                    helpContent="Add stocks from your watchlist to the rebalancing analysis. These stocks will be considered for potential new positions even though you don't currently own them."
+                    className="text-sm font-semibold"
+                  />
                   <p className="text-xs text-muted-foreground">
                     Add stocks from your watchlist to the rebalancing analysis
                   </p>

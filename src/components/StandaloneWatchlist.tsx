@@ -665,6 +665,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
               <StockTickerAutocomplete
                 value={newTicker}
                 onChange={setNewTicker}
+                onEnterPress={addToWatchlist}
                 placeholder="Add ticker to watchlist"
               />
             </div>

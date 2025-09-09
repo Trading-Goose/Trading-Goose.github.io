@@ -17,6 +17,7 @@ interface StockTickerAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   onSelect?: (suggestion: StockSuggestion) => void;
+  onEnterPress?: () => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -28,6 +29,7 @@ export default function StockTickerAutocomplete({
   value,
   onChange,
   onSelect,
+  onEnterPress,
   placeholder = "Enter stock symbol...",
   className,
   disabled = false,
@@ -147,9 +149,16 @@ export default function StockTickerAutocomplete({
         if (showSuggestions && suggestions.length > 0 && selectedIndex >= 0) {
           e.preventDefault();
           handleSelectSuggestion(suggestions[selectedIndex]);
-        } else if (value.trim() && onSelect) {
-          // Allow Enter to trigger onSelect even without suggestions
-          onSelect({ symbol: value.trim(), description: '' });
+        } else if (value.trim()) {
+          e.preventDefault();
+          // If onEnterPress is provided, call it (for adding to watchlist)
+          if (onEnterPress) {
+            onEnterPress();
+          }
+          // Also call onSelect if provided (for backward compatibility)
+          else if (onSelect) {
+            onSelect({ symbol: value.trim(), description: '' });
+          }
         }
         break;
       case 'Escape':

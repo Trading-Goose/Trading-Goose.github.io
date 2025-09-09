@@ -16,11 +16,11 @@ import {
   Save,
   AlertCircle,
   Check,
-  Info,
   Lock,
 } from "lucide-react";
 import type { AgentsTabProps } from "./types";
 import { useRBAC } from "@/hooks/useRBAC";
+import { HelpButton, LabelWithHelp } from "@/components/ui/help-button";
 
 export default function AgentsTab({
   aiProviders,
@@ -131,10 +131,14 @@ export default function AgentsTab({
           <h3 className="text-lg font-semibold flex items-center gap-2">
             Analysis Agent
             {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+            <HelpButton content="Coordinates 5 specialist analysts: Market (technical analysis), News (sentiment), Macro (economic), Social Media (sentiment), and Fundamentals (financials)" />
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>AI Provider</Label>
+              <LabelWithHelp 
+                label="AI Provider" 
+                helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
+              />
               <Select value={analysisTeamProviderId} onValueChange={setAnalysisTeamProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
@@ -149,7 +153,10 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Model</Label>
+              <LabelWithHelp 
+                label="Model" 
+                helpContent="Choose the AI model for analysis tasks"
+              />
               {analysisTeamProviderId === defaultProviderId ? (
                 <div>
                   <Select
@@ -201,7 +208,10 @@ export default function AgentsTab({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Analysis Optimization</Label>
+              <LabelWithHelp 
+                label="Analysis Optimization" 
+                helpContent="Speed: Faster but may skip some sources | Balanced: Thorough analysis with all data"
+              />
               <Select
                 value={analysisOptimization}
                 onValueChange={setAnalysisOptimization}
@@ -228,7 +238,10 @@ export default function AgentsTab({
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Historical Data Range</Label>
+              <LabelWithHelp 
+                label="Historical Data Range" 
+                helpContent="How far back to analyze. 1M for day trading, 3M for swing, 6M+ for investing"
+              />
               <Select
                 value={analysisHistoryDays}
                 onValueChange={setAnalysisHistoryDays}
@@ -250,7 +263,10 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Number of Search Sources</Label>
+            <LabelWithHelp 
+              label="Number of Search Sources" 
+              helpContent="More sources = better coverage but higher cost. Recommended: 15-25"
+            />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
               <Slider
                 value={[analysisSearchSources]}
@@ -268,10 +284,10 @@ export default function AgentsTab({
             </p>
           </div>
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              Max Tokens
-              <Info className="h-3 w-3 text-muted-foreground" />
-            </Label>
+            <LabelWithHelp 
+              label="Max Tokens" 
+              helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
+            />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
               <Slider
                 value={[analysisMaxTokens]}
@@ -295,10 +311,14 @@ export default function AgentsTab({
           <h3 className="text-lg font-semibold flex items-center gap-2">
             Research Agent
             {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+            <HelpButton content="Conducts bull vs bear debate to provide balanced perspective" />
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>AI Provider</Label>
+              <LabelWithHelp 
+                label="AI Provider" 
+                helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
+              />
               <Select value={researchTeamProviderId} onValueChange={setResearchTeamProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
@@ -313,7 +333,10 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Model</Label>
+              <LabelWithHelp 
+                label="Model" 
+                helpContent="Choose the AI model for research tasks"
+              />
               {researchTeamProviderId === defaultProviderId ? (
                 <div>
                   <Select
@@ -364,7 +387,10 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Number of Debate Rounds</Label>
+            <LabelWithHelp 
+              label="Number of Debate Rounds" 
+              helpContent="More rounds = deeper analysis. Each round refines arguments. Recommended: 2-3"
+            />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
               <Slider
                 value={[researchDebateRounds]}
@@ -382,10 +408,10 @@ export default function AgentsTab({
             </p>
           </div>
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              Max Tokens
-              <Info className="h-3 w-3 text-muted-foreground" />
-            </Label>
+            <LabelWithHelp 
+              label="Max Tokens" 
+              helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
+            />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
               <Slider
                 value={[researchMaxTokens]}
@@ -409,10 +435,14 @@ export default function AgentsTab({
           <h3 className="text-lg font-semibold flex items-center gap-2">
             Trading Decision Agent
             {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+            <HelpButton content="Synthesizes all analysis to generate specific trading recommendations" />
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>AI Provider</Label>
+              <LabelWithHelp 
+                label="AI Provider" 
+                helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
+              />
               <Select value={tradingTeamProviderId} onValueChange={setTradingTeamProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
@@ -427,7 +457,10 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Model</Label>
+              <LabelWithHelp 
+                label="Model" 
+                helpContent="Choose the AI model for trading decision tasks"
+              />
               {tradingTeamProviderId === defaultProviderId ? (
                 <div>
                   <Select
@@ -478,10 +511,10 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              Max Tokens
-              <Info className="h-3 w-3 text-muted-foreground" />
-            </Label>
+            <LabelWithHelp 
+              label="Max Tokens" 
+              helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
+            />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
               <Slider
                 value={[tradingMaxTokens]}
@@ -505,10 +538,14 @@ export default function AgentsTab({
           <h3 className="text-lg font-semibold flex items-center gap-2">
             Risk Management Agent
             {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+            <HelpButton content="Evaluates portfolio risk and position sizing recommendations" />
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>AI Provider</Label>
+              <LabelWithHelp 
+                label="AI Provider" 
+                helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
+              />
               <Select value={riskTeamProviderId} onValueChange={setRiskTeamProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
@@ -523,7 +560,10 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Model</Label>
+              <LabelWithHelp 
+                label="Model" 
+                helpContent="Choose the AI model for risk management tasks"
+              />
               {riskTeamProviderId === defaultProviderId ? (
                 <div>
                   <Select
@@ -574,10 +614,10 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              Max Tokens
-              <Info className="h-3 w-3 text-muted-foreground" />
-            </Label>
+            <LabelWithHelp 
+              label="Max Tokens" 
+              helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
+            />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
               <Slider
                 value={[riskMaxTokens]}
@@ -601,13 +641,17 @@ export default function AgentsTab({
           <h3 className="text-lg font-semibold flex items-center gap-2">
             Portfolio Manager
             {!hasAgentConfigAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+            <HelpButton content="Analyzes current holdings and generates optimal trade orders" />
           </h3>
           <p className="text-sm text-muted-foreground">
             Analyzes portfolio positions and generates optimal allocation strategy with trade orders
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>AI Provider</Label>
+              <LabelWithHelp 
+                label="AI Provider" 
+                helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
+              />
               <Select value={portfolioManagerProviderId} onValueChange={setPortfolioManagerProviderId} disabled={!hasAgentConfigAccess}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
@@ -622,7 +666,10 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Model</Label>
+              <LabelWithHelp 
+                label="Model" 
+                helpContent="Choose the AI model for portfolio management tasks"
+              />
               {portfolioManagerProviderId === defaultProviderId ? (
                 <div>
                   <Select
@@ -673,10 +720,10 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              Max Tokens
-              <Info className="h-3 w-3 text-muted-foreground" />
-            </Label>
+            <LabelWithHelp 
+              label="Max Tokens" 
+              helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
+            />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
               <Slider
                 value={[portfolioManagerMaxTokens]}

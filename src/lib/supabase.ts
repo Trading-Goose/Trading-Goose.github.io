@@ -362,15 +362,16 @@ export interface ApiSettings {
   analysis_optimization?: string;
   analysis_depth?: number;
   analysis_history_days?: number | string;  // Can be number or string like "1M", "3M", etc.
+  analysis_search_sources?: number;
+  // Position management preferences
+  profit_target?: number;
+  stop_loss?: number;
   // Max tokens settings
   analysis_max_tokens?: number;
   research_max_tokens?: number;
   trading_max_tokens?: number;
   risk_max_tokens?: number;
   // Rebalance settings
-  default_rebalance_threshold?: number;
-  default_min_position_size?: number;
-  default_max_position_size?: number;
   rebalance_threshold?: number;
   rebalance_min_position_size?: number;
   rebalance_max_position_size?: number;

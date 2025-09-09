@@ -2,6 +2,7 @@
 // Extracted from ScheduleTab.tsx to reduce file size
 
 import { Label } from "@/components/ui/label";
+import { LabelWithHelp } from "@/components/ui/help-button";
 import {
   Select,
   SelectContent,
@@ -38,7 +39,10 @@ export function TimeSelector({ value, onChange }: TimeSelectorProps) {
 
   return (
     <div className="space-y-2">
-      <Label>Time of Day</Label>
+      <LabelWithHelp
+        label="Time of Day"
+        helpContent="The time when the rebalance will execute. Choose a time when markets are closed to avoid mid-day volatility. Recommended: Before market open (9:30 AM ET) or after market close (4:00 PM ET)."
+      />
       <div className="flex gap-2">
         {/* Hour Selection */}
         <Select value={hourStr} onValueChange={handleHourChange}>

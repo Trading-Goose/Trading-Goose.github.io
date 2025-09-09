@@ -3,6 +3,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { LabelWithHelp } from "@/components/ui/help-button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -44,7 +45,10 @@ export function ScheduleTab({ loading, config, setConfig }: ScheduleTabProps) {
             <div className="space-y-4">
               {/* Interval Configuration */}
               <div className="space-y-2">
-                <Label>Rebalance Frequency</Label>
+                <LabelWithHelp
+                  label="Rebalance Frequency"
+                  helpContent="How often to automatically rebalance your portfolio. Daily for active management, Weekly for regular adjustments, Monthly for long-term investing. Your subscription determines available frequencies."
+                />
                 <div className="flex gap-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="interval-value" className="text-sm font-normal">
@@ -111,7 +115,10 @@ export function ScheduleTab({ loading, config, setConfig }: ScheduleTabProps) {
               {/* Day Selection for Weekly intervals */}
               {config.intervalUnit === 'weeks' && (
                 <div className="space-y-2">
-                  <Label>On Which Day(s)</Label>
+                  <LabelWithHelp
+                    label="On Which Day(s)"
+                    helpContent="Select which day(s) of the week to run the rebalance. With higher tier subscriptions, you can select multiple days for more frequent rebalancing."
+                  />
                   {hasDayAccess ? (
                     // Multi-selection for users with Day access
                     <div className="grid grid-cols-4 gap-2">
@@ -171,7 +178,10 @@ export function ScheduleTab({ loading, config, setConfig }: ScheduleTabProps) {
               {/* Day of Month for Monthly intervals */}
               {config.intervalUnit === 'months' && (
                 <div className="space-y-2">
-                  <Label>On Which Day(s) of the Month</Label>
+                  <LabelWithHelp
+                    label="On Which Day(s) of the Month"
+                    helpContent="Select the day of the month for rebalancing. Day 31 will automatically adjust for shorter months (e.g., will run on Feb 28/29)."
+                  />
                   <Select
                     value={config.daysOfMonth[0]?.toString() || '1'}
                     onValueChange={(value) => {

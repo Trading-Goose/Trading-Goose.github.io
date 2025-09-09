@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { HelpButton, LabelWithHelp, HelpContent } from "@/components/ui/help-button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -105,7 +106,21 @@ export default function TradingTab({
               </Alert>
             )}
             <div className="space-y-3">
-              <Label className="text-base font-medium">Trading Mode</Label>
+              <LabelWithHelp
+                label="Trading Mode"
+                helpContent={
+                  <HelpContent
+                    description="Choose between paper trading (safe testing with simulated money) or live trading (real money at risk)."
+                    tips={[
+                      "Always start with paper trading to test strategies",
+                      "Switch to live only when consistently profitable",
+                      "Paper trading uses simulated money - no real funds at risk"
+                    ]}
+                    warning={!alpacaPaperTrading ? "Live trading uses real money - actual funds will be used" : undefined}
+                  />
+                }
+                className="text-base font-medium"
+              />
               <div className={`flex items-center justify-center gap-4 ${!canUseLiveTrading ? 'opacity-50' : ''}`}>
                 <div className={`flex items-center gap-2 ${!alpacaPaperTrading ? 'font-semibold' : 'text-muted-foreground'}`}>
                   <TrendingDown className={`h-4 w-4 ${!alpacaPaperTrading ? 'text-red-500' : ''}`} />
@@ -143,10 +158,24 @@ export default function TradingTab({
 
         {/* Trade Execution Settings */}
         <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Trade Execution Settings
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Trade Execution Settings
+            </h3>
+            <HelpButton
+              content={
+                <HelpContent
+                  description="Configure how trades are executed and managed in your account."
+                  tips={[
+                    "Auto-execution saves time but requires trust in the AI",
+                    "Risk tolerance affects position sizing",
+                    "Position size is the base amount for each trade"
+                  ]}
+                />
+              }
+            />
+          </div>
 
           {/* Auto-Execute Trade Orders */}
           <div className={`rounded-lg border bg-muted/30 p-4 `}>
@@ -161,10 +190,22 @@ export default function TradingTab({
             <div className={`space-y-3 ${!canUseAutoTrading ? 'opacity-50' : ''}`}>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="auto-execute" className="text-base font-medium cursor-pointer flex items-center gap-2">
-                    Auto-Execute Trade Orders
-                    {!canUseAutoTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
-                  </Label>
+                  <LabelWithHelp
+                    htmlFor="auto-execute"
+                    label="Auto-Execute Trade Orders"
+                    helpContent={
+                      <HelpContent
+                        description="When enabled, approved trades execute automatically. When disabled, you manually review each trade."
+                        tips={[
+                          "Requires higher subscription tier",
+                          "Start with manual, switch to auto when comfortable",
+                          "All trades still go through risk management"
+                        ]}
+                      />
+                    }
+                    className="text-base font-medium cursor-pointer"
+                  />
+                  {!canUseAutoTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
                   <p className="text-sm text-muted-foreground">
                     Automatically execute approved trade recommendations
                   </p>
@@ -192,7 +233,20 @@ export default function TradingTab({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* User Risk Level */}
             <div className="space-y-2">
-              <Label htmlFor="risk-level">Risk Tolerance Level</Label>
+              <LabelWithHelp
+                htmlFor="risk-level"
+                label="Risk Tolerance Level"
+                helpContent={
+                  <HelpContent
+                    description="Affects position sizing and trade recommendations based on your risk appetite."
+                    tips={[
+                      "Conservative: Smaller positions, preservation focus",
+                      "Moderate: Balanced risk/reward (recommended for most)",
+                      "Aggressive: Larger positions, growth focus"
+                    ]}
+                  />
+                }
+              />
               <Select value={userRiskLevel} onValueChange={setUserRiskLevel}>
                 <SelectTrigger id="risk-level">
                   <SelectValue placeholder="Select risk level" />
@@ -233,7 +287,21 @@ export default function TradingTab({
 
             {/* Default Position Size */}
             <div className="space-y-2">
-              <Label htmlFor="position-size">Default Position Size</Label>
+              <LabelWithHelp
+                htmlFor="position-size"
+                label="Default Position Size"
+                helpContent={
+                  <HelpContent
+                    description="Base dollar amount for each new position."
+                    example="$1,000 for $25,000 account (4%)"
+                    tips={[
+                      "Adjust based on account size and risk tolerance",
+                      "Can be overridden for individual trades",
+                      "Consider starting small and increasing over time"
+                    ]}
+                  />
+                }
+              />
               <div className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
                 <Input
@@ -255,10 +323,24 @@ export default function TradingTab({
 
         {/* Position Management Preferences */}
         <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            Position Management Preferences
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Position Management Preferences
+            </h3>
+            <HelpButton
+              content={
+                <HelpContent
+                  description="Set preferences for when the AI should consider taking profits or cutting losses."
+                  tips={[
+                    "These are guidelines, not hard rules",
+                    "AI evaluates market conditions alongside these targets",
+                    "Adjust based on market volatility and your strategy"
+                  ]}
+                />
+              }
+            />
+          </div>
           <p className="text-sm text-muted-foreground">
             These preferences guide (but don't dictate) trading decisions to help manage your positions effectively.
           </p>
@@ -266,9 +348,22 @@ export default function TradingTab({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Profit Target */}
             <div className="space-y-2">
-              <Label htmlFor="profit-target" className="text-sm">
-                Profit Target: {profitTarget}%
-              </Label>
+              <LabelWithHelp
+                htmlFor="profit-target"
+                label={`Profit Target: ${profitTarget}%`}
+                helpContent={
+                  <HelpContent
+                    description="AI considers selling when position gains this percentage."
+                    tips={[
+                      "Conservative: 10-15%",
+                      "Moderate: 20-30%",
+                      "Aggressive: 40%+",
+                      "Not a hard sell rule - AI evaluates market conditions"
+                    ]}
+                  />
+                }
+                className="text-sm"
+              />
               <Slider
                 id="profit-target"
                 min={5}
@@ -285,9 +380,23 @@ export default function TradingTab({
 
             {/* Stop Loss */}
             <div className="space-y-2">
-              <Label htmlFor="stop-loss" className="text-sm">
-                Stop Loss: {stopLoss}%
-              </Label>
+              <LabelWithHelp
+                htmlFor="stop-loss"
+                label={`Stop Loss: ${stopLoss}%`}
+                helpContent={
+                  <HelpContent
+                    description="AI considers exiting when position loses this percentage."
+                    tips={[
+                      "Conservative: 5-8%",
+                      "Moderate: 10-12%",
+                      "Aggressive: 15-20%",
+                      "Protects capital from large losses",
+                      "Balance with profit target for good risk/reward ratio"
+                    ]}
+                  />
+                }
+                className="text-sm"
+              />
               <Slider
                 id="stop-loss"
                 min={5}
@@ -313,10 +422,24 @@ export default function TradingTab({
 
         {/* Paper Trading Credentials */}
         <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-            Paper Trading Credentials
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+              Paper Trading Credentials
+            </h3>
+            <HelpButton
+              content={
+                <HelpContent
+                  description="Paper trading credentials for safe testing with simulated money."
+                  tips={[
+                    "Get from Alpaca dashboard → Paper Trading → API Keys",
+                    "No real money involved - safe to test strategies",
+                    "Paper keys typically start with 'PK'"
+                  ]}
+                />
+              }
+            />
+          </div>
           <div className="rounded-lg border bg-green-500/10 dark:bg-green-500/5 border-green-500/20 dark:border-green-500/10 p-4">
             <div className="flex items-center gap-2 mb-2">
               <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -330,15 +453,28 @@ export default function TradingTab({
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  Paper API Key
+                <div className="flex items-center gap-2">
+                  <LabelWithHelp
+                    label="Paper API Key"
+                    helpContent={
+                      <HelpContent
+                        description="Your paper trading API key from Alpaca."
+                        tips={[
+                          "Get from Alpaca dashboard → Paper Trading → API Keys",
+                          "Starts with 'PK' for paper keys",
+                          "Safe to test - no real money involved",
+                          "Keep secure even though it's paper trading"
+                        ]}
+                      />
+                    }
+                  />
                   {configuredProviders.alpaca_paper && (
                     <Badge variant="success" className="text-xs">
                       <Check className="h-3 w-3 mr-1" />
                       Configured
                     </Badge>
                   )}
-                </Label>
+                </div>
                 <div className="relative">
                   <Input
                     type={showKeys.alpacaPaperApiKey ? "text" : "password"}
@@ -364,7 +500,20 @@ export default function TradingTab({
               </div>
 
               <div className="space-y-2">
-                <Label>Paper Secret Key</Label>
+                <LabelWithHelp
+                  label="Paper Secret Key"
+                  helpContent={
+                    <HelpContent
+                      description="Paired with API key for authentication."
+                      tips={[
+                        "Get from same location as API key",
+                        "Required for API access",
+                        "Never share or expose in code",
+                        "Regenerate if compromised"
+                      ]}
+                    />
+                  }
+                />
                 <div className="relative">
                   <Input
                     type={showKeys.alpacaPaperSecretKey ? "text" : "password"}
@@ -394,11 +543,27 @@ export default function TradingTab({
 
         {/* Live Trading Credentials */}
         <div className="space-y-4 p-4 border rounded-lg bg-card">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
-            Live Trading Credentials
-            {!canUseLiveTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+              Live Trading Credentials
+              {!canUseLiveTrading && <Lock className="h-4 w-4 text-muted-foreground" />}
+            </h3>
+            <HelpButton
+              content={
+                <HelpContent
+                  description="Live trading credentials for real money trading."
+                  warning="These credentials enable real money transactions. Use extreme caution and ensure you understand the risks."
+                  tips={[
+                    "Requires higher subscription tier",
+                    "Get from Alpaca dashboard → Live Trading → API Keys",
+                    "Consider using separate account for automated trading",
+                    "Always test strategies in paper trading first"
+                  ]}
+                />
+              }
+            />
+          </div>
 
           {!canUseLiveTrading ? (
             <Alert>
@@ -420,15 +585,29 @@ export default function TradingTab({
             </p>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  Live API Key
+                <div className="flex items-center gap-2">
+                  <LabelWithHelp
+                    label="Live API Key"
+                    helpContent={
+                      <HelpContent
+                        description="Your live trading API key from Alpaca."
+                        warning="REAL MONEY - Use extreme caution. This key enables real trades with actual funds."
+                        tips={[
+                          "Get from Alpaca dashboard → Live Trading → API Keys",
+                          "Different from paper trading keys",
+                          "Store securely, rotate regularly",
+                          "Never share or commit to code"
+                        ]}
+                      />
+                    }
+                  />
                   {configuredProviders.alpaca_live && (
                     <Badge variant="success" className="text-xs">
                       <Check className="h-3 w-3 mr-1" />
                       Configured
                     </Badge>
                   )}
-                </Label>
+                </div>
                 <div className="relative">
                   <Input
                     type={showKeys.alpacaLiveApiKey ? "text" : "password"}
@@ -456,7 +635,21 @@ export default function TradingTab({
               </div>
 
               <div className="space-y-2">
-                <Label>Live Secret Key</Label>
+                <LabelWithHelp
+                  label="Live Secret Key"
+                  helpContent={
+                    <HelpContent
+                      description="Paired with live API key for authentication."
+                      warning="Enables real money transactions. Critical security - never share or expose."
+                      tips={[
+                        "Use environment variables in production",
+                        "Rotate regularly for security",
+                        "Never commit to version control",
+                        "Consider using separate account for automated trading"
+                      ]}
+                    />
+                  }
+                />
                 <div className="relative">
                   <Input
                     type={showKeys.alpacaLiveSecretKey ? "text" : "password"}

@@ -44,10 +44,10 @@ const Footer = () => {
                   Privacy Policy
                 </Link>
                 <Link
-                  to="/disclaimer"
+                  to="/terms-of-service"
                   className="text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
-                  Disclaimer
+                  Terms of Service
                 </Link>
               </div>
             </div>

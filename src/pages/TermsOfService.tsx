@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const Disclaimer = () => {
+const TermsOfService = () => {
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -23,7 +23,7 @@ const Disclaimer = () => {
 
       <main className="flex-1 container mx-auto px-6 py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">Disclaimer</h1>
+          <h1 className="text-3xl font-bold">Terms of Service</h1>
           <p className="text-muted-foreground mt-2">
             Last Updated: {lastUpdated}
           </p>
@@ -33,9 +33,9 @@ const Disclaimer = () => {
         <Alert className="mb-8 border-destructive/50 bg-destructive/5">
           <AlertTriangle className="h-5 w-5 text-destructive" />
           <AlertDescription className="text-sm font-medium">
-            <strong>IMPORTANT:</strong> TradingGoose is an informational platform only.
-            It does not provide investment advice, brokerage services, or execute trades.
-            Always consult with qualified financial advisors before making investment decisions.
+            <strong>IMPORTANT:</strong> By using TradingGoose, you agree to these Terms of Service.
+            TradingGoose is an informational platform that does not provide investment advice,
+            brokerage services, or execute trades. Always consult with qualified financial advisors.
           </AlertDescription>
         </Alert>
 
@@ -181,8 +181,8 @@ const Disclaimer = () => {
             <CardContent className="pt-6">
               <h2 className="text-xl font-semibold mb-4">11. Modification of Terms</h2>
               <p className="text-muted-foreground leading-relaxed">
-                TradingGoose reserves the right to modify this disclaimer at any time without prior notice. Users are
-                responsible for regularly reviewing this disclaimer. Continued use of the platform after any modifications
+                TradingGoose reserves the right to modify these Terms of Service at any time without prior notice. Users are
+                responsible for regularly reviewing these terms. Continued use of the platform after any modifications
                 constitutes acceptance of the updated terms.
               </p>
             </CardContent>
@@ -267,7 +267,7 @@ const Disclaimer = () => {
               <h2 className="text-xl font-semibold mb-4">13. Acceptance of Terms</h2>
               <p className="text-muted-foreground leading-relaxed">
                 By accessing and using TradingGoose, you acknowledge that you have read, understood, and agree to be bound
-                by this disclaimer. If you do not agree with any part of this disclaimer, you must immediately discontinue
+                by these Terms of Service. If you do not agree with any part of these terms, you must immediately discontinue
                 use of the platform.
               </p>
             </CardContent>
@@ -311,4 +311,4 @@ const Disclaimer = () => {
   );
 };
 
-export default Disclaimer;
+export default TermsOfService;

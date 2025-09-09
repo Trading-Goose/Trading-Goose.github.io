@@ -26,7 +26,7 @@ import NotFound from "./pages/NotFound";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import InvitationSetup from "./pages/InvitationSetup";
-import Disclaimer from "./pages/Disclaimer";
+import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import FAQ from "./pages/FAQ";
 import Pricing from "./pages/Pricing";
@@ -63,7 +63,7 @@ const AppRoutes = () => {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/invitation-setup" element={<InvitationSetup />} />
-      <Route path="/disclaimer" element={<Disclaimer />} />
+      <Route path="/terms-of-service" element={<TermsOfService />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/faq" element={<FAQ />} />
       <Route path="/pricing" element={<Pricing />} />

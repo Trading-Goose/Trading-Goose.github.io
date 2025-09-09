@@ -54,7 +54,7 @@ function RecentTrades() {
       // Get recent trading actions (last 48 hours) for performance
       const twoDaysAgo = new Date();
       twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      
+
       const { data, error } = await supabase
         .from('trading_actions')
         .select('*')
@@ -107,16 +107,16 @@ function RecentTrades() {
   // Track if we've already fetched for current user
   const fetchedRef = useRef<string>('');
   const lastFetchTimeRef = useRef<number>(0);
-  
+
   useEffect(() => {
     if (!user?.id || !isAuthenticated) {
       setAllTrades([]);
       setLoading(false);
       return;
     }
-    
+
     const fetchKey = user.id;
-    
+
     // Avoid duplicate fetches for the same user
     if (fetchedRef.current === fetchKey) {
       // Check if it's been more than 30 seconds since last fetch
@@ -125,15 +125,15 @@ function RecentTrades() {
         return;
       }
     }
-    
+
     fetchedRef.current = fetchKey;
     lastFetchTimeRef.current = Date.now();
-    
+
     // Add a small delay on initial mount to ensure session is settled
     const timeoutId = setTimeout(() => {
       fetchAllTrades();
     }, 500);
-    
+
     return () => clearTimeout(timeoutId);
   }, [user?.id, isAuthenticated, fetchAllTrades]); // Include isAuthenticated in dependencies
 
@@ -277,8 +277,8 @@ function RecentTrades() {
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-sm">{decision.symbol}</span>
-                <Badge 
-                  variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'} 
+                <Badge
+                  variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'}
                   className="text-xs"
                 >
                   {decision.action}
@@ -358,9 +358,7 @@ function RecentTrades() {
                   className="h-7 px-2 text-xs border-slate-700"
                   onClick={() => {
                     const isPaper = true; // Default to paper trading
-                    const baseUrl = isPaper
-                      ? 'https://paper.alpaca.markets'
-                      : 'https://app.alpaca.markets';
+                    const baseUrl = 'https://app.alpaca.markets';
                     window.open(`${baseUrl}/dashboard/order/${decision.alpacaOrderId}`, '_blank');
                   }}
                 >
@@ -457,7 +455,7 @@ function RecentTrades() {
             )}
           </div>
         </div>
-        
+
         {/* Metadata - at bottom of card */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
           {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
@@ -515,7 +513,7 @@ function RecentTrades() {
           </Button>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         {loading ? (
           <div className="flex flex-col items-center justify-center p-12 gap-4">
@@ -530,7 +528,7 @@ function RecentTrades() {
           <div className="space-y-3">
             {/* Show pending trades first */}
             {pendingTrades.map(trade => renderTradeCard(trade))}
-            
+
             {/* Then show other recent trades */}
             {otherTrades.map(trade => renderTradeCard(trade))}
           </div>

@@ -1,14 +1,27 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
+
+# Block sensitive areas
+Disallow: /admin/
+Disallow: /settings/
+Disallow: /profile/
+Disallow: /dashboard/
+Disallow: /analysis-records/
+Disallow: /rebalance-records/
+Disallow: /trade-history/
+Disallow: /invitation-setup/
+Disallow: /reset-password/
+
+# Allow important pages for SEO
+Allow: /login
+Allow: /register
+Allow: /faq
+Allow: /pricing
+Allow: /terms-of-service
+Allow: /privacy
+
+# Sitemap location
+Sitemap: https://trading-goose.github.io/sitemap.xml
+
+# Crawl delay for respectful crawling
+Crawl-delay: 1

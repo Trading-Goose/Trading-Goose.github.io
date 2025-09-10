@@ -57,10 +57,10 @@ const Index = () => {
                 </Button>
               </div>
               <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
-                AI-Powered Portfolio Management for the Modern Trader
+                LLM Multi-Agent Trading Analysis Workflow Tool
               </p>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Leverage cutting-edge AI Agents to analyze markets, manage portfolio, and execute trades with confidence.
+                Advanced analytical workflow powered by 15 specialized LLM agents for comprehensive market research, analysis synthesis, and trading intelligence.
               </p>
             </div>
 
@@ -153,7 +153,10 @@ const Index = () => {
                 <div className="lg:col-span-2">
                   <img
                     src="/Analysis-Flow-dark.png"
-                    alt="Analysis Workflow"
+                    alt="Multi-Agent Analysis Pipeline - 5 Phase Trading System"
+                    loading="lazy"
+                    width="1200"
+                    height="800"
                     className="w-full mx-auto"
                   />
                 </div>
@@ -215,7 +218,10 @@ const Index = () => {
                 <div className="lg:col-span-2">
                   <img
                     src="/Rebalance-Flow-dark.png"
-                    alt="Rebalance Workflow"
+                    alt="Intelligent Portfolio Rebalancing System - Automated Trading Workflow"
+                    loading="lazy"
+                    width="1200"
+                    height="800"
                     className="w-full mx-auto"
                   />
                 </div>

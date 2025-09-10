@@ -53,7 +53,20 @@ export default defineConfig(({ mode }) => ({
           }
           return 'assets/[name]-[hash][extname]';
         },
-        manualChunks: undefined
+        manualChunks: {
+          // Vendor chunk for stable libraries
+          vendor: ['react', 'react-dom'],
+          // UI components chunk
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs', '@radix-ui/react-select'],
+          // Chart and data visualization
+          charts: ['recharts'],
+          // Auth and data fetching
+          auth: ['@supabase/supabase-js', '@tanstack/react-query'],
+          // Router chunk
+          router: ['react-router-dom'],
+          // Utilities
+          utils: ['class-variance-authority', 'clsx', 'tailwind-merge', 'zod']
+        }
       }
     }
   },

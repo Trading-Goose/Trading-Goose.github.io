@@ -57,7 +57,7 @@ const Index = () => {
                 </Button>
               </div>
               <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
-                LLM Multi-Agent Trading Analysis Workflow Tool
+                AI Trading Analytical Workflow
               </p>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 Advanced analytical workflow powered by 15 specialized LLM agents for comprehensive market research, analysis synthesis, and trading intelligence.

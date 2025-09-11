@@ -51,7 +51,7 @@ TradingGoose is an advanced **LLM-powered analytical workflow tool** with 15 spe
 ### ✅ Enhanced Meta Tags (Corrected)
 ```html
 <title>TradingGoose - LLM Multi-Agent Trading Analysis Workflow Tool</title>
-<meta name="description" content="Advanced LLM-powered analytical workflow tool with 15 specialized AI agents for comprehensive market analysis, research synthesis, and trading decision support. Open-source trading intelligence platform.">
+<meta name="description" content="Advanced LLM-powered analytical workflow tool with 15 specialized AI agents for comprehensive market analysis, research synthesis, and trading decision support. Open-source available on GitHub.">
 <meta name="keywords" content="LLM trading analysis, AI market research, multi-agent workflow, trading intelligence, financial analysis AI, market analysis tool, trading decision support, AI research synthesis, open source trading">
 ```
 

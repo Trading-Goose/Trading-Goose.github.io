@@ -470,12 +470,10 @@ function RecentTrades() {
               <span>•</span>
             </>
           )}
-          <span>{decision.timestamp}</span>
-          {decision.executedAt && (
-            <>
-              <span>•</span>
-              <span>Executed {decision.executedAt}</span>
-            </>
+          {decision.executedAt ? (
+            <span>Executed {decision.executedAt}</span>
+          ) : (
+            <span>{decision.timestamp}</span>
           )}
           {decision.alpacaFilledPrice && decision.alpacaFilledQty && (
             <>

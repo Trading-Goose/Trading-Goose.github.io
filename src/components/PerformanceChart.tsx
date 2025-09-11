@@ -38,6 +38,7 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
   const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("1D");
   const [loading, setLoading] = useState(false);
+  const [positionsLoading, setPositionsLoading] = useState(true); // Track positions loading separately
   const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<any>(null);
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
@@ -111,6 +112,7 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
 
       setMetrics(metricsData);
       setPositions(positionsData || []);
+      setPositionsLoading(false); // Mark positions as loaded
 
       // If a stock is selected, fetch its data (uses Alpaca API)
       if (selectedStock) {
@@ -228,15 +230,19 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
       };
     }
 
-    const shares = parseFloat(position.qty);
-    const avgCost = parseFloat(position.avg_entry_price);
-    const currentPrice = parseFloat(position.current_price || 'Loading...');
-    const lastdayPrice = parseFloat(position.lastday_price || 'Loading...');
-    const marketValue = parseFloat(position.market_value);
-    const unrealizedPL = parseFloat(position.unrealized_pl);
-    const unrealizedPLPercent = parseFloat(position.unrealized_plpc) * 100;
-    const todayPL = parseFloat(position.unrealized_intraday_pl || 'Loading...');
-    const todayPLPercent = parseFloat(position.unrealized_intraday_plpc || 'Loading...') * 100;
+    // Handle both raw Alpaca format and transformed metrics format
+    const shares = position.shares !== undefined ? position.shares : (parseFloat(position.qty || '0') || 0);
+    const avgCost = position.avgCost !== undefined ? position.avgCost : (parseFloat(position.avg_entry_price || '0') || 0);
+    const currentPrice = position.currentPrice !== undefined ? position.currentPrice : (parseFloat(position.current_price || '0') || 0);
+    const lastdayPrice = position.lastdayPrice !== undefined ? position.lastdayPrice : (parseFloat(position.lastday_price || '0') || 0);
+    const marketValue = position.marketValue !== undefined ? position.marketValue : (parseFloat(position.market_value || '0') || 0);
+    const unrealizedPL = position.unrealizedPL !== undefined ? position.unrealizedPL : (parseFloat(position.unrealized_pl || '0') || 0);
+    const unrealizedPLPercent = position.unrealizedPLPct !== undefined ? position.unrealizedPLPct : ((parseFloat(position.unrealized_plpc || '0') || 0) * 100);
+    
+    // For intraday P/L, calculate from day change if not directly available
+    const dayChange = position.dayChange !== undefined ? position.dayChange : 0;
+    const todayPL = position.unrealized_intraday_pl !== undefined ? parseFloat(position.unrealized_intraday_pl || '0') : (dayChange * shares * currentPrice / 100);
+    const todayPLPercent = position.unrealized_intraday_plpc !== undefined ? (parseFloat(position.unrealized_intraday_plpc || '0') * 100) : dayChange;
 
     // Calculate stock's daily price change (not position P&L)
     const stockDailyChange = currentPrice - lastdayPrice;
@@ -420,7 +426,7 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
           {periods.map((period) => (
             <TabsContent key={period.value} value={period.value} className="space-y-4">
               <div className="h-48">
-                {loading && !portfolioData ? (
+                {loading ? (
                   <div className="h-full flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
@@ -499,7 +505,7 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-muted-foreground">
-                    {error ? error : (hasAlpacaConfig ? "No data available for this period" : "Configure Alpaca API to view performance data")}
+                    {error ? error : (hasAlpacaConfig ? "Loading chart data..." : "Configure Alpaca API to view performance data")}
                   </div>
                 )}
               </div>
@@ -608,41 +614,57 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
                   <div className="grid grid-cols-3 gap-4 pt-4 border-t">
                     <div>
                       <p className="text-xs text-muted-foreground">Position P&L Today</p>
-                      <p className={`text-sm font-medium ${getStockMetrics(selectedStock).dailyReturn >= 0 ? 'text-success' : 'text-danger'
+                      <p className={`text-sm font-medium ${positionsLoading ? '' : getStockMetrics(selectedStock).dailyReturn >= 0 ? 'text-success' : 'text-danger'
                         }`}>
-                        {getStockMetrics(selectedStock).dailyReturn >= 0 ? '+' : ''}
-                        ${getStockMetrics(selectedStock).dailyReturn.toFixed(2)}
-                        ({getStockMetrics(selectedStock).dailyReturnPercent >= 0 ? '+' : ''}
-                        {getStockMetrics(selectedStock).dailyReturnPercent.toFixed(2)}%)
+                        {positionsLoading ? 'Loading...' : (
+                          <>
+                            {getStockMetrics(selectedStock).dailyReturn >= 0 ? '+' : ''}
+                            ${getStockMetrics(selectedStock).dailyReturn.toFixed(2)}
+                            ({getStockMetrics(selectedStock).dailyReturnPercent >= 0 ? '+' : ''}
+                            {getStockMetrics(selectedStock).dailyReturnPercent.toFixed(2)}%)
+                          </>
+                        )}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Total Position P&L</p>
-                      <p className={`text-sm font-medium ${getStockMetrics(selectedStock).totalReturn >= 0 ? 'text-success' : 'text-danger'
+                      <p className={`text-sm font-medium ${positionsLoading ? '' : getStockMetrics(selectedStock).totalReturn >= 0 ? 'text-success' : 'text-danger'
                         }`}>
-                        {getStockMetrics(selectedStock).totalReturn >= 0 ? '+' : ''}
-                        ${getStockMetrics(selectedStock).totalReturn.toFixed(2)}
-                        ({getStockMetrics(selectedStock).totalReturnPercent >= 0 ? '+' : ''}
-                        {getStockMetrics(selectedStock).totalReturnPercent.toFixed(2)}%)
+                        {positionsLoading ? 'Loading...' : (
+                          <>
+                            {getStockMetrics(selectedStock).totalReturn >= 0 ? '+' : ''}
+                            ${getStockMetrics(selectedStock).totalReturn.toFixed(2)}
+                            ({getStockMetrics(selectedStock).totalReturnPercent >= 0 ? '+' : ''}
+                            {getStockMetrics(selectedStock).totalReturnPercent.toFixed(2)}%)
+                          </>
+                        )}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Shares Owned</p>
-                      <p className="text-sm font-medium">{getStockMetrics(selectedStock).shares}</p>
+                      <p className="text-sm font-medium">
+                        {positionsLoading ? 'Loading...' : getStockMetrics(selectedStock).shares}
+                      </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-4 pt-4 border-t">
                     <div>
                       <p className="text-xs text-muted-foreground">Avg Cost</p>
-                      <p className="text-sm font-medium">${getStockMetrics(selectedStock).avgCost.toFixed(2)}</p>
+                      <p className="text-sm font-medium">
+                        {positionsLoading ? 'Loading...' : `$${getStockMetrics(selectedStock).avgCost.toFixed(2)}`}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Total Position</p>
-                      <p className="text-sm font-medium">${getStockMetrics(selectedStock).positionValue.toLocaleString()}</p>
+                      <p className="text-sm font-medium">
+                        {positionsLoading ? 'Loading...' : `$${getStockMetrics(selectedStock).positionValue.toLocaleString()}`}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">% of Portfolio</p>
-                      <p className="text-sm font-medium">{getStockMetrics(selectedStock).portfolioPercent.toFixed(1)}%</p>
+                      <p className="text-sm font-medium">
+                        {positionsLoading ? 'Loading...' : `${getStockMetrics(selectedStock).portfolioPercent.toFixed(1)}%`}
+                      </p>
                     </div>
                   </div>
                 </div>

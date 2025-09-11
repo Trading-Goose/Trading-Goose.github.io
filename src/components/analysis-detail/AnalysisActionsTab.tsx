@@ -1,12 +1,16 @@
+import { useState } from "react";
 import {
   Activity,
   ArrowRight,
   Shield,
   TrendingDown,
-  TrendingUp
+  TrendingUp,
+  RefreshCw
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import TradeOrderCard from "./TradeOrderCard";
+import RebalanceDetailModal from "@/components/RebalanceDetailModal";
 
 interface AnalysisActionsTabProps {
   analysisData: any;
@@ -25,17 +29,36 @@ export default function AnalysisActionsTab({
   isExecuting = false,
   getConfidenceColor
 }: AnalysisActionsTabProps) {
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  
   // For rebalance analyses, show a message that actions are handled at rebalance level
   if (analysisData.rebalance_request_id) {
     return (
-      <div className="rounded-lg border bg-muted/20 p-6 text-center">
-        <Shield className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-        <h3 className="text-lg font-semibold mb-2">Part of Rebalance Workflow</h3>
-        <p className="text-sm text-muted-foreground">
-          This analysis is part of a portfolio rebalance. Trade orders will be generated
-          after all stock analyses complete and are managed in the Rebalance view.
-        </p>
-      </div>
+      <>
+        <div className="rounded-lg border bg-muted/20 p-6 text-center">
+          <Shield className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+          <h3 className="text-lg font-semibold mb-2">Part of Rebalance Workflow</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            This analysis is part of a portfolio rebalance. Trade orders will be generated
+            after all stock analyses complete and are managed in the Rebalance view.
+          </p>
+          <Button 
+            onClick={() => setDetailModalOpen(true)}
+            variant="outline"
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            View Rebalance Details
+          </Button>
+        </div>
+        
+        {/* Rebalance Detail Modal */}
+        <RebalanceDetailModal
+          rebalanceId={analysisData.rebalance_request_id}
+          isOpen={detailModalOpen}
+          onClose={() => setDetailModalOpen(false)}
+        />
+      </>
     );
   }
 

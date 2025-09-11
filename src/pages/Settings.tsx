@@ -77,9 +77,9 @@ export default function SettingsPage() {
   const [searchParams] = useSearchParams();
   const { user, apiSettings, updateApiSettings, isAuthenticated, isLoading, initialize } = useAuth();
   const { toast } = useToast();
-  const { 
-    hasRebalanceAccess, 
-    hasOpportunityAgentAccess, 
+  const {
+    hasRebalanceAccess,
+    hasOpportunityAgentAccess,
     hasAdditionalProviderAccess,
     canUseLiveTrading,
     canUseAutoTrading
@@ -220,7 +220,7 @@ export default function SettingsPage() {
       if (analysisOpt !== undefined) {
         setAnalysisOptimization(analysisOpt || 'speed');
       }
-      
+
       const searchSources = (apiSettings as any)?.analysis_search_sources;
       if (searchSources !== undefined) {
         setAnalysisSearchSources(searchSources || 5);
@@ -264,7 +264,7 @@ export default function SettingsPage() {
       setAutoExecuteTrades(apiSettings.auto_execute_trades ?? false);
       setUserRiskLevel(apiSettings.user_risk_level || 'moderate');
       setDefaultPositionSizeDollars(apiSettings.default_position_size_dollars || 1000);
-      
+
       // Position management preferences
       setProfitTarget(apiSettings.profit_target || 25);
       setStopLoss(apiSettings.stop_loss || 10);
@@ -881,27 +881,30 @@ export default function SettingsPage() {
   const getModelOptions = (provider: string) => {
     switch (provider) {
       case 'openai':
-        return ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'gpt-4o', 'gpt-4o-mini', 'custom'];
+        return ['	gpt-5-chat-latest', 'gpt-5-mini', 'gpt-4.1-2025-04-14', 'gpt-4.1-mini-2025-04-14', 'gpt-4o-2024-08-06', 'custom'];
       case 'anthropic':
-        return ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307', 'claude-3-5-sonnet-20241022', 'custom'];
+        return ['claude-opus-4-1-20250805', 'claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-3-7-sonnet-20250219', 'claude-3-5-haiku-20241022', 'custom'];
       case 'google':
-        return ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash-exp', 'custom'];
+        return ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'custom'];
       case 'deepseek':
-        return ['deepseek-chat', 'deepseek-coder', 'custom'];
+        return ['deepseek-chat', 'custom'];
       case 'openrouter':
         return [
-          'openai/gpt-4-turbo',
-          'openai/gpt-4o',
-          'openai/gpt-4o-mini',
-          'anthropic/claude-3.5-sonnet',
-          'anthropic/claude-3-opus',
-          'anthropic/claude-3-haiku',
-          'google/gemini-1.5-pro',
-          'google/gemini-1.5-flash',
-          'google/gemini-2.0-flash-exp:free',
-          'meta-llama/llama-3.1-70b-instruct',
-          'mistralai/mixtral-8x7b-instruct',
-          'deepseek/deepseek-chat',
+          'x-ai/grok-code-fast-1',
+          'x-ai/grok-4',
+          'openai/gpt-5-chat',
+          'openai/gpt-5',
+          'openai/gpt-5-mini',
+          'google/gemini-2.5-flash-lite',
+          'google/gemini-2.5-flash',
+          'google/gemini-2.5-pro',
+          'anthropic/claude-opus-4.1',
+          'anthropic/claude-opus-4',
+          'anthropic/claude-sonnet-4',
+          'anthropic/claude-3.7-sonnet',
+          'deepseek/deepseek-chat-v3.1',
+          'deepseek/deepseek-v3.1-base',
+          'qwen/qwen3-max',
           'custom'
         ];
       default:
@@ -1107,7 +1110,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const checkAuth = () => {
       console.log('Settings page - checking auth state...');
-      
+
       // Since auth restoration is now automatic, we just need to wait briefly for it to complete
       if (isAuthenticated) {
         console.log('Settings page - user is authenticated');
@@ -1655,7 +1658,7 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
       <Footer />
     </div>
   );

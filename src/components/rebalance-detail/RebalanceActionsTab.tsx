@@ -20,6 +20,7 @@ import {
   TrendingDown,
   Shield,
   XCircle,
+  ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -148,49 +149,67 @@ function RebalancePositionCard({ position, onApprove, onReject, isExecuted, orde
 
           {/* Action buttons and details */}
           <div className="flex flex-col gap-1">
-            {/* Alpaca Order Status Badge */}
-            {orderStatus?.alpacaOrderId && orderStatus?.alpacaStatus && (
-              <div className="flex items-center justify-center">
-                {(() => {
-                  const status = (orderStatus.alpacaStatus || '').toLowerCase();
-                  let variant: any = "outline";
-                  let icon = null;
-                  let displayText = orderStatus.alpacaStatus;
-                  let customClasses = "";
+            {/* Alpaca Order Link and Status Badge - Horizontal Layout */}
+            {orderStatus?.alpacaOrderId && (
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs border-slate-700"
+                  onClick={() => {
+                    const baseUrl = 'https://app.alpaca.markets';
+                    window.open(`${baseUrl}/dashboard/order/${orderStatus.alpacaOrderId}`, '_blank');
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Alpaca
+                </Button>
 
-                  if (status === 'filled') {
-                    variant = "success";
-                    icon = <CheckCircle className="h-3 w-3 mr-1" />;
-                    displayText = "filled";
-                  } else if (status === 'partially_filled') {
-                    variant = "default";
-                    icon = <Clock className="h-3 w-3 mr-1" />;
-                    displayText = "partial filled";
-                    customClasses = "bg-blue-500 text-white border-blue-500";
-                  } else if (['new', 'pending_new', 'accepted'].includes(status)) {
-                    variant = "warning";
-                    icon = <Clock className="h-3 w-3 mr-1" />;
-                    displayText = "placed";
-                  } else if (['canceled', 'cancelled'].includes(status)) {
-                    variant = "destructive";
-                    icon = <XCircle className="h-3 w-3 mr-1" />;
-                    displayText = "failed";
-                  } else if (status === 'rejected') {
-                    variant = "destructive";
-                    icon = <XCircle className="h-3 w-3 mr-1" />;
-                    displayText = "rejected";
-                  }
+                {/* Alpaca Order Status Badge */}
+                {orderStatus?.alpacaStatus && (
+                  <div className="flex items-center justify-center">
+                    {(() => {
+                      const status = (orderStatus.alpacaStatus || '').toLowerCase();
+                      let variant: any = "outline";
+                      let icon = null;
+                      let displayText = orderStatus.alpacaStatus;
+                      let customClasses = "";
 
-                  return (
-                    <Badge
-                      variant={variant}
-                      className={`text-xs ${customClasses}`}
-                    >
-                      {icon}
-                      {displayText}
-                    </Badge>
-                  );
-                })()}
+                      if (status === 'filled') {
+                        variant = "success";
+                        icon = <CheckCircle className="h-3 w-3 mr-1" />;
+                        displayText = "filled";
+                      } else if (status === 'partially_filled') {
+                        variant = "default";
+                        icon = <Clock className="h-3 w-3 mr-1" />;
+                        displayText = "partial filled";
+                        customClasses = "bg-blue-500 text-white border-blue-500";
+                      } else if (['new', 'pending_new', 'accepted'].includes(status)) {
+                        variant = "warning";
+                        icon = <Clock className="h-3 w-3 mr-1" />;
+                        displayText = "placed";
+                      } else if (['canceled', 'cancelled'].includes(status)) {
+                        variant = "destructive";
+                        icon = <XCircle className="h-3 w-3 mr-1" />;
+                        displayText = "failed";
+                      } else if (status === 'rejected') {
+                        variant = "destructive";
+                        icon = <XCircle className="h-3 w-3 mr-1" />;
+                        displayText = "rejected";
+                      }
+
+                      return (
+                        <Badge
+                          variant={variant}
+                          className={`text-xs ${customClasses}`}
+                        >
+                          {icon}
+                          {displayText}
+                        </Badge>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             )}
 

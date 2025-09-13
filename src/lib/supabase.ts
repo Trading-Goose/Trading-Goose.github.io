@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 // These should be in your .env file
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 // Use the new publishable key format instead of the deprecated anon key
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
 // Debug: Log the configuration (remove in production)
 if (!supabaseUrl || !supabasePublishableKey) {
@@ -69,7 +69,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
       }
       // Check if this is a token refresh request
       const isTokenRefresh = typeof url === 'string' && url.includes('/auth/v1/token?grant_type=refresh_token');
-      
+
       // If we're rate limited and this is a token refresh, skip it
       if (isTokenRefresh && rateLimitedUntil > Date.now()) {
         console.log('🔐 Skipping token refresh due to rate limit, waiting', Math.ceil((rateLimitedUntil - Date.now()) / 1000), 'seconds');
@@ -99,7 +99,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
         // If no stored session, return a network error to avoid sign out
         throw new Error('Rate limited - using cached session');
       }
-      
+
       // Check if this is an Edge Function call
       const isEdgeFunction = typeof url === 'string' && url.includes('/functions/v1/');
 
@@ -178,21 +178,21 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
           cache: 'no-cache'
         });
         clearTimeout(timeoutId);
-        
+
         // Handle 401 Unauthorized errors by triggering token refresh
         if (response.status === 401 && !isTokenRefresh) {
           console.log('🔐 API call returned 401, triggering token refresh...');
-          
+
           // Try to refresh the token using refreshSession which forces an actual refresh
           try {
             const refreshResponse = await supabase.auth.refreshSession();
             if (refreshResponse.data.session && !refreshResponse.error) {
               console.log('🔐 Token refreshed after 401, retrying original request...');
-              
+
               // Update the authorization header with the new token
               const updatedHeaders = new Headers(options.headers || {});
               updatedHeaders.set('Authorization', `Bearer ${refreshResponse.data.session.access_token}`);
-              
+
               // Retry the original request with the new token
               const retryResponse = await fetch(url, {
                 ...options,
@@ -201,7 +201,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
                 credentials: 'same-origin',
                 cache: 'no-cache'
               });
-              
+
               return retryResponse;
             } else {
               console.error('🔐 Token refresh failed:', refreshResponse.error);
@@ -210,7 +210,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
             console.error('🔐 Failed to refresh token after 401:', refreshError);
           }
         }
-        
+
         // Immediately check for 429 rate limit on token refresh BEFORE returning
         if (response.status === 429 && isTokenRefresh) {
           // Set the flag IMMEDIATELY
@@ -218,16 +218,16 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
           // Set rate limit for 30 seconds
           rateLimitedUntil = Date.now() + 30000;
           console.error('🔐 Token refresh rate limited! Backing off for 30 seconds');
-          
+
           // Set a global flag so components know we're rate limited
           (window as any).__supabaseRateLimited = true;
-          
+
           // Clear the rate limit after the timeout
           setTimeout(async () => {
             rateLimitedUntil = 0;
             (window as any).__supabaseRateLimited = false;
             console.log('🔐 Rate limit cleared, token refresh can resume');
-            
+
             // Try to restore the session if auth state was lost
             try {
               const authState = (await import('./auth')).useAuth.getState();
@@ -236,7 +236,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
                 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
                 const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
                 const storedSession = localStorage.getItem(storageKey);
-                
+
                 if (storedSession) {
                   try {
                     const sessionData = JSON.parse(storedSession);
@@ -255,7 +255,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
                           timeUntilExpiry = sessionData.expires_at - now;
                         }
                       }
-                      
+
                       // If session is still valid for more than 5 minutes, restore it
                       if (timeUntilExpiry > 300) {
                         console.log('🔐 Restoring auth state after rate limit');
@@ -275,7 +275,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
               console.error('Error restoring auth state after rate limit:', error);
             }
           }, 30000);
-          
+
           // Return a fake successful response with the current session to prevent sign out
           const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
           const storedSession = localStorage.getItem(storageKey);
@@ -299,7 +299,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
             }
           }
         }
-        
+
         return response;
       } catch (error) {
         clearTimeout(timeoutId);

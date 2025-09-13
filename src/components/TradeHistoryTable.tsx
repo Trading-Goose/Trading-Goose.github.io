@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw, Loader2, ExternalLink, FileText, BarChart3, Calendar, Package } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw, Loader2, ExternalLink, FileText, BarChart3, Calendar, Package, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getCachedSession } from "@/lib/cachedAuth";
@@ -51,17 +51,73 @@ export default function TradeHistoryTable() {
   const { apiSettings, user } = useAuth();
   const { toast } = useToast();
 
+  // Date filter states - default to today (using local date to avoid timezone issues)
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const [selectedDate, setSelectedDate] = useState<string>(todayString);
+
+  // Helper to format date display
+  const getDateDisplay = () => {
+    const today = new Date();
+    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayString = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    if (selectedDate === todayString) return "Today";
+    if (selectedDate === yesterdayString) return "Yesterday";
+
+    // Parse the date parts to avoid timezone issues
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  // Navigate date helper functions
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const currentDate = new Date(year, month - 1, day);
+    
+    if (direction === 'prev') {
+      currentDate.setDate(currentDate.getDate() - 1);
+    } else {
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    const newDateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+    setSelectedDate(newDateString);
+  };
+
+  const jumpToToday = () => {
+    const today = new Date();
+    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    setSelectedDate(todayString);
+  };
+
   // Fetch all trades from trading_actions table
   const fetchAllTrades = async () => {
     if (!user?.id) return;
 
     setLoading(true);
     try {
-      // Get all trading actions for this user
+      // Build date range for the selected date using local date parsing
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+      // Get trading actions for this user within the selected date
       const { data, error } = await supabase
         .from('trading_actions')
         .select('*')
         .eq('user_id', user.id)
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -262,7 +318,7 @@ export default function TradeHistoryTable() {
     } else {
       console.log('No Alpaca credentials found, skipping order status update');
     }
-  }, [apiSettings, user]);
+  }, [apiSettings, user, selectedDate]); // Added selectedDate dependency
 
   // Periodically update Alpaca order status
   useEffect(() => {
@@ -757,27 +813,61 @@ export default function TradeHistoryTable() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-foreground flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
-            Complete Trade History
+            Trade History
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => {
-              fetchAllTrades();
-              const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
-              if (hasCredentials) {
-                updateAlpacaOrderStatus();
-              }
-            }}
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-          </Button>
+          
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigateDate('prev')}
+              className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              className="px-3 min-w-[140px] hover:border-[#fc0] hover:bg-[#fc0]/10 hover:text-[#fc0] transition-all duration-200"
+              onClick={jumpToToday}
+            >
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              {getDateDisplay()}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigateDate('next')}
+              disabled={selectedDate === todayString}
+              className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0] disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            
+            <div className="ml-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  fetchAllTrades();
+                  const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
+                  if (hasCredentials) {
+                    updateAlpacaOrderStatus();
+                  }
+                }}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
       </CardHeader>
       

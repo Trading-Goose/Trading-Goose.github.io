@@ -14,6 +14,7 @@ export function useAnalysisState(updateWorkflowFromAnalysis: (analysis: any) => 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [runningAnalysesCount, setRunningAnalysesCount] = useState(0);
   const [isRebalanceContext, setIsRebalanceContext] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const previousRunningRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -28,6 +29,11 @@ export function useAnalysisState(updateWorkflowFromAnalysis: (analysis: any) => 
         setIsAnalyzing,
         setRunningAnalysesCount
       });
+      
+      // Mark initial loading as complete after first check
+      if (isInitialLoading) {
+        setIsInitialLoading(false);
+      }
     };
 
     handleCheckRunningAnalyses();
@@ -87,6 +93,7 @@ export function useAnalysisState(updateWorkflowFromAnalysis: (analysis: any) => 
     setIsAnalyzing,
     runningAnalysesCount,
     isRebalanceContext,
-    setIsRebalanceContext
+    setIsRebalanceContext,
+    isInitialLoading
   };
 }

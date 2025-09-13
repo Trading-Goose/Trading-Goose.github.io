@@ -68,6 +68,7 @@ interface RunningAnalysisItem {
   ticker: string;
   created_at: string;
   full_analysis?: any;  // Add to store progress data
+  agent_insights?: any;  // Add to access agent completion data
   rebalance_request_id?: string;  // To check if part of rebalance
   status?: AnalysisStatus;  // To distinguish between pending and running
 }
@@ -80,42 +81,66 @@ interface RebalanceAnalysisGroup {
 }
 
 // Calculate agent completion percentage for a single analysis
-const calculateAgentCompletion = (fullAnalysis: any, isRebalanceAnalysis: boolean = false): number => {
-  if (!fullAnalysis?.messages) return 0;
+// Similar to how GitHub Actions tracks workflow steps
+const calculateAgentCompletion = (analysisItem: any, isRebalanceAnalysis: boolean = false): number => {
+  if (!analysisItem) return 0;
 
-  // Define expected agents (including macro-analyst)
-  // For rebalance analyses, exclude portfolio-manager as it runs at rebalance level
-  const expectedAgents = [
-    'macro-analyst', 'market-analyst', 'news-analyst', 'social-media-analyst', 'fundamentals-analyst',
-    'bull-researcher', 'bear-researcher', 'research-manager',
-    'risky-analyst', 'safe-analyst', 'neutral-analyst', 'risk-manager',
-    'trader'
-  ];
+  let totalAgents = 0;
+  let completedAgents = 0;
 
-  // Only add portfolio-manager for standalone analyses (not part of rebalance)
-  if (!isRebalanceAnalysis) {
-    expectedAgents.push('portfolio-manager');
+  // Primary method: Check workflow_steps structure (similar to GitHub Actions)
+  // This is the most reliable way as it mirrors the workflow visualization
+  if (analysisItem.full_analysis?.workflow_steps) {
+    const workflowSteps = analysisItem.full_analysis.workflow_steps;
+    
+    // Iterate through all phases and count agents
+    Object.keys(workflowSteps).forEach(phase => {
+      // Skip portfolio phase for rebalance analyses
+      if (phase === 'portfolio' && isRebalanceAnalysis) {
+        return;
+      }
+      
+      const phaseData = workflowSteps[phase];
+      if (phaseData?.agents && Array.isArray(phaseData.agents)) {
+        phaseData.agents.forEach((agent: any) => {
+          totalAgents++;
+          // Check if agent is completed (similar to GitHub Actions step status)
+          if (agent.status === 'completed' || agent.status === 'complete') {
+            completedAgents++;
+          }
+        });
+      }
+    });
+    
+    // Return percentage if we found agents
+    if (totalAgents > 0) {
+      return Math.round((completedAgents / totalAgents) * 100);
+    }
   }
 
-  const messages = fullAnalysis.messages || [];
-  const completedAgents = new Set<string>();
-
-  messages.forEach((msg: any) => {
-    if (msg.agent && msg.timestamp) {
-      const normalizedAgent = msg.agent.toLowerCase().replace(/\s+/g, '-');
-      completedAgents.add(normalizedAgent);
+  // Fallback method: Count agent_insights (for when workflow_steps is not available)
+  // This counts completed agents by checking which ones have insights
+  if (analysisItem.agent_insights && typeof analysisItem.agent_insights === 'object') {
+    const insightKeys = Object.keys(analysisItem.agent_insights);
+    
+    // Count valid agent insights (non-empty values)
+    completedAgents = insightKeys.filter(key => {
+      const value = analysisItem.agent_insights[key];
+      return value !== null && value !== undefined && value !== '';
+    }).length;
+    
+    // Use a reasonable estimate for total agents
+    // Based on the workflow: 5 analysis + 3 research + 1 trader + 4 risk + 1 portfolio
+    totalAgents = isRebalanceAnalysis ? 13 : 14;
+    
+    if (completedAgents > 0) {
+      // Don't exceed 100%
+      return Math.min(Math.round((completedAgents / totalAgents) * 100), 100);
     }
-  });
+  }
 
-  // Count matches
-  let matchedAgents = 0;
-  expectedAgents.forEach(agentKey => {
-    if (completedAgents.has(agentKey)) {
-      matchedAgents++;
-    }
-  });
-
-  return expectedAgents.length > 0 ? (matchedAgents / expectedAgents.length) * 100 : 0;
+  // If no data available, return 0
+  return 0;
 };
 
 export default function UnifiedAnalysisHistory() {
@@ -232,6 +257,7 @@ export default function UnifiedAnalysisHistory() {
               ticker: item.ticker,
               created_at: item.created_at,
               full_analysis: item.full_analysis,
+              agent_insights: item.agent_insights,  // Add this!
               rebalance_request_id: item.rebalance_request_id,
               status: status
             });
@@ -851,18 +877,18 @@ export default function UnifiedAnalysisHistory() {
 
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            {item.status === ANALYSIS_STATUS.RUNNING && item.full_analysis && (
+                            {item.status === ANALYSIS_STATUS.RUNNING && (item.full_analysis || item.agent_insights) && (
                               <div className="flex items-center gap-2 mr-4">
                                 <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-yellow-500 animate-pulse transition-all"
                                     style={{
-                                      width: `${calculateAgentCompletion(item.full_analysis, !!item.rebalance_request_id)}%`
+                                      width: `${calculateAgentCompletion(item, !!item.rebalance_request_id)}%`
                                     }}
                                   />
                                 </div>
                                 <span className="text-xs text-yellow-600 dark:text-yellow-400">
-                                  {Math.round(calculateAgentCompletion(item.full_analysis, !!item.rebalance_request_id))}%
+                                  {Math.round(calculateAgentCompletion(item, !!item.rebalance_request_id))}%
                                 </span>
                               </div>
                             )}
@@ -1127,12 +1153,12 @@ export default function UnifiedAnalysisHistory() {
                                 <div
                                   className="h-full bg-yellow-500 animate-pulse transition-all"
                                   style={{
-                                    width: `${calculateAgentCompletion(item.full_analysis, !!item.rebalance_request_id)}%`
+                                    width: `${calculateAgentCompletion(item, !!item.rebalance_request_id)}%`
                                   }}
                                 />
                               </div>
                               <span className="text-xs text-yellow-600 dark:text-yellow-400">
-                                {Math.round(calculateAgentCompletion(item.full_analysis, !!item.rebalance_request_id))}%
+                                {Math.round(calculateAgentCompletion(item, !!item.rebalance_request_id))}%
                               </span>
                             </div>
                           )}

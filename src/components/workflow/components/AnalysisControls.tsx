@@ -2,7 +2,7 @@
  * Analysis controls component for starting and viewing analyses
  */
 
-import { Activity, Info, Play } from 'lucide-react';
+import { Activity, Info, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StockTickerAutocomplete from '@/components/StockTickerAutocomplete';
 
@@ -13,6 +13,7 @@ interface AnalysisControlsProps {
   setSearchTicker: (value: string) => void;
   handleStartAnalysis: () => void;
   setShowAnalysisDetail: (value: boolean) => void;
+  isInitialLoading?: boolean;
 }
 
 export function AnalysisControls({
@@ -21,11 +22,20 @@ export function AnalysisControls({
   searchTicker,
   setSearchTicker,
   handleStartAnalysis,
-  setShowAnalysisDetail
+  setShowAnalysisDetail,
+  isInitialLoading = false
 }: AnalysisControlsProps) {
   return (
     <div className="flex items-center justify-center p-2 rounded-lg mb-2 min-h-[36px]">
-      {activeAnalysisTicker && isAnalyzing ? (
+      {isInitialLoading ? (
+        // Show loading state while checking for running analyses
+        <div className="flex items-center justify-center w-full">
+          <Loader2 className="w-4 h-4 mr-2 animate-spin text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            Checking for running analyses...
+          </span>
+        </div>
+      ) : activeAnalysisTicker && isAnalyzing ? (
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center">
             <Activity className="w-4 h-4 mr-2 animate-pulse text-primary" />

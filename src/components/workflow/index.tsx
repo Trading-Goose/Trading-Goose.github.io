@@ -57,7 +57,8 @@ function HorizontalWorkflow() {
     setActiveAnalysisTicker,
     isAnalyzing,
     setIsAnalyzing,
-    runningAnalysesCount
+    runningAnalysesCount,
+    isInitialLoading
   } = useAnalysisState(updateWorkflowFromAnalysis);
 
   // Handle starting a new analysis
@@ -84,14 +85,26 @@ function HorizontalWorkflow() {
     }
 
     const ticker = searchTicker.toUpperCase();
+    
+    // Immediately show "Starting analysis" state
+    setIsAnalyzing(true);
+    setActiveAnalysisTicker(ticker);
+    setIsRebalanceContext(false);
+    
+    // Clear the search field immediately
+    setSearchTicker('');
+    
+    // Show starting toast
+    toast({
+      title: "Starting Analysis",
+      description: `Initializing AI analysis for ${ticker}...`,
+    });
+
+    // Now make the API call
     const result = await startAnalysis({ ticker, userId: user.id });
 
     if (result.success) {
-      // This is an individual analysis, not part of rebalance
-      setIsRebalanceContext(false);
-
-      // Set the active ticker and open the detail modal
-      setActiveAnalysisTicker(ticker);
+      // Open the detail modal
       setShowAnalysisDetail(true);
 
       // Set current analysis with the ID if returned
@@ -99,14 +112,16 @@ function HorizontalWorkflow() {
         setCurrentAnalysis({ id: result.analysisId, ticker });
       }
 
-      // Clear the search field
-      setSearchTicker('');
-
+      // Update toast to show success
       toast({
         title: "Analysis Started",
         description: `Running AI analysis for ${ticker} on the server`,
       });
     } else {
+      // On failure, reset the UI state
+      setIsAnalyzing(false);
+      setActiveAnalysisTicker(null);
+      
       toast({
         title: "Analysis Failed",
         description: result.error || "Failed to start analysis",
@@ -152,6 +167,7 @@ function HorizontalWorkflow() {
             setSearchTicker={setSearchTicker}
             handleStartAnalysis={handleStartAnalysis}
             setShowAnalysisDetail={setShowAnalysisDetail}
+            isInitialLoading={isInitialLoading}
           />
 
           {/* Horizontal workflow steps */}

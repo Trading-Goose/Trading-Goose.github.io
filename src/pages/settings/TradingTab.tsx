@@ -41,6 +41,7 @@ export default function TradingTab({
   defaultPositionSizeDollars,
   profitTarget,
   stopLoss,
+  nearLimitThreshold,
   configuredProviders,
   showKeys,
   saved,
@@ -55,6 +56,7 @@ export default function TradingTab({
   setDefaultPositionSizeDollars,
   setProfitTarget,
   setStopLoss,
+  setNearLimitThreshold,
   toggleShowKey,
   handleSaveTab,
   canUseLiveTrading = true,
@@ -412,10 +414,43 @@ export default function TradingTab({
             </div>
           </div>
 
+          {/* Near Limit Threshold */}
+          <div className="space-y-2">
+            <LabelWithHelp
+              htmlFor="near-limit-threshold"
+              label={`Near Limit Threshold: ${nearLimitThreshold}%`}
+              helpContent={
+                <HelpContent
+                  description="Defines when a position is considered 'near' profit target or stop loss."
+                  example="If set to 20%, a position at 80% of profit target (e.g., 20% gain with 25% target) is considered 'near target'"
+                  tips={[
+                    "Lower values (5-10%): More conservative, earlier warnings",
+                    "Medium values (15-20%): Balanced approach (recommended)",
+                    "Higher values (20-25%): Less sensitive to approaches",
+                    "Affects when AI starts considering exit strategies"
+                  ]}
+                />
+              }
+              className="text-sm"
+            />
+            <Slider
+              id="near-limit-threshold"
+              min={5}
+              max={25}
+              step={1}
+              value={[nearLimitThreshold]}
+              onValueChange={(value) => setNearLimitThreshold(value[0])}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              Position considered "near" when within {nearLimitThreshold}% of profit target or stop loss
+            </p>
+          </div>
+
           <Alert className="mt-4">
             <ShieldAlert className="h-4 w-4" />
             <AlertDescription>
-              These are preferences that influence AI recommendations, not hard rules. The AI will consider these targets along with market conditions, technical analysis, and other factors when making trading decisions.
+              These are preferences that influence AI recommendations, not hard rules. The AI will consider these targets along with market conditions, technical analysis, and other factors when making decisions.
             </AlertDescription>
           </Alert>
         </div>

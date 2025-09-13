@@ -97,6 +97,7 @@ export interface RebalanceTabProps {
   rebalanceThreshold: number;
   rebalanceMinPositionSize: number;
   rebalanceMaxPositionSize: number;
+  nearPositionThreshold: number;
   targetStockAllocation: number;
   targetCashAllocation: number;
   opportunityAgentProviderId: string;
@@ -112,6 +113,7 @@ export interface RebalanceTabProps {
   setRebalanceThreshold: (threshold: number) => void;
   setRebalanceMinPositionSize: (size: number) => void;
   setRebalanceMaxPositionSize: (size: number) => void;
+  setNearPositionThreshold: (threshold: number) => void;
   setTargetStockAllocation: (allocation: number) => void;
   setTargetCashAllocation: (allocation: number) => void;
   setOpportunityAgentProviderId: (id: string) => void;
@@ -138,6 +140,7 @@ export interface TradingTabProps {
   defaultPositionSizeDollars: number;
   profitTarget: number;
   stopLoss: number;
+  nearLimitThreshold: number;
   configuredProviders: Record<string, boolean>;
   showKeys: Record<string, boolean>;
   saved: boolean;
@@ -152,6 +155,7 @@ export interface TradingTabProps {
   setDefaultPositionSizeDollars: (amount: number) => void;
   setProfitTarget: (target: number) => void;
   setStopLoss: (loss: number) => void;
+  setNearLimitThreshold: (threshold: number) => void;
   toggleShowKey: (key: string) => void;
   handleSaveTab: (tab: string) => void;
   canUseLiveTrading?: boolean;

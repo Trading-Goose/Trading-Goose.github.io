@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Loader2, RefreshCw, Eye, Trash2, MoreVertical, StopCircle, Users, MessageSquare, AlertCircle, Package, Calendar, Clock } from "lucide-react";
+import { Brain, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Loader2, RefreshCw, Eye, Trash2, MoreVertical, StopCircle, Users, MessageSquare, AlertCircle, Package, Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -89,7 +91,7 @@ const calculateAgentCompletion = (fullAnalysis: any, isRebalanceAnalysis: boolea
     'risky-analyst', 'safe-analyst', 'neutral-analyst', 'risk-manager',
     'trader'
   ];
-  
+
   // Only add portfolio-manager for standalone analyses (not part of rebalance)
   if (!isRebalanceAnalysis) {
     expectedAgents.push('portfolio-manager');
@@ -122,7 +124,7 @@ export default function UnifiedAnalysisHistory() {
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const [runningAnalyses, setRunningAnalyses] = useState<RunningAnalysisItem[]>([]);
   const [canceledAnalyses, setCanceledAnalyses] = useState<AnalysisHistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Start with loading true
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [selectedAnalysisDate, setSelectedAnalysisDate] = useState<string | null>(null);
   const [selectedViewAnalysisId, setSelectedViewAnalysisId] = useState<string | null>(null); // For viewing specific analysis
@@ -133,26 +135,71 @@ export default function UnifiedAnalysisHistory() {
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Date filter states - default to today (using local date to avoid timezone issues)
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const [selectedDate, setSelectedDate] = useState<string>(todayString);
+
+  // Track if initial data has been loaded
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  // Filtered data
+  const [filteredHistory, setFilteredHistory] = useState<AnalysisHistoryItem[]>([]);
+  const [filteredCanceled, setFilteredCanceled] = useState<AnalysisHistoryItem[]>([]);
+
+  // No longer need client-side filtering - data comes filtered from DB
+
+  // Helper to format date display
+  const getDateDisplay = () => {
+    const today = new Date();
+    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayString = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    if (selectedDate === todayString) return "Today";
+    if (selectedDate === yesterdayString) return "Yesterday";
+
+    // Parse the date parts to avoid timezone issues
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
   const loadAllAnalyses = async () => {
     if (!user) return;
 
+    setLoading(true);
     try {
+      // Build date range for the selected date using local date parsing
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+      // Query only analyses from the selected date
       const { data, error } = await supabase
         .from('analysis_history')
         .select('*')
         .eq('user_id', user.id)
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
         .order('created_at', { ascending: false })
-        .limit(50);
 
       if (error) {
         console.error('Error loading analyses:', error);
-        
+
         // Handle 500 errors gracefully - don't throw, just return
         if (error.message?.includes('500') || error.code === '500') {
           console.log('Server error, skipping update');
           return;
         }
-        
+
         // Handle authentication errors
         if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
           console.log('JWT error detected, will attempt refresh on next poll');
@@ -162,7 +209,7 @@ export default function UnifiedAnalysisHistory() {
           });
           return;
         }
-        
+
         throw error;
       }
 
@@ -222,6 +269,10 @@ export default function UnifiedAnalysisHistory() {
       setRunningAnalyses(runningAnalyses);
       setHistory(completedAnalyses);
       setCanceledAnalyses(canceledAnalyses);
+
+      // No need for client-side filtering anymore - data is already filtered from DB
+      setFilteredHistory(completedAnalyses);
+      setFilteredCanceled(canceledAnalyses);
     } catch (error) {
       console.error('Error loading analysis history:', error);
       if (!loading) { // Only show toast if not initial load
@@ -233,6 +284,7 @@ export default function UnifiedAnalysisHistory() {
       }
     } finally {
       setLoading(false);
+      setInitialLoadComplete(true);
     }
   };
 
@@ -243,9 +295,11 @@ export default function UnifiedAnalysisHistory() {
       setHistory([]);
       setRunningAnalyses([]);
       setCanceledAnalyses([]);
+      setFilteredHistory([]);
+      setFilteredCanceled([]);
       setLoading(false);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, selectedDate]); // Reload when selectedDate changes
 
   // Poll for updates with smart retry logic
   useEffect(() => {
@@ -253,7 +307,7 @@ export default function UnifiedAnalysisHistory() {
 
     let errorCount = 0;
     const maxErrors = 3;
-    
+
     const interval = setInterval(() => {
       // Only poll if there are running analyses or we haven't loaded yet
       if (runningAnalyses.length > 0 || (history.length === 0 && !loading)) {
@@ -522,11 +576,11 @@ export default function UnifiedAnalysisHistory() {
   // Render individual analysis card
   const renderAnalysisCard = (item: AnalysisHistoryItem, isInRebalanceGroup: boolean = false) => {
     // Prioritize Portfolio Manager's decision over Risk Manager's decision
-    const displayDecision = item.agent_insights?.portfolioManager?.finalDecision?.action || 
-                           item.agent_insights?.portfolioManager?.decision?.action ||
-                           item.agent_insights?.portfolioManager?.action ||
-                           item.decision;
-    
+    const displayDecision = item.agent_insights?.portfolioManager?.finalDecision?.action ||
+      item.agent_insights?.portfolioManager?.decision?.action ||
+      item.agent_insights?.portfolioManager?.action ||
+      item.decision;
+
     return (
       <div
         key={item.id}
@@ -554,90 +608,208 @@ export default function UnifiedAnalysisHistory() {
           </span>
         </div>
 
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          {item.analysis_date ?
-            `Analysis date: ${new Date(item.analysis_date).toLocaleDateString()}` :
-            `Started: ${new Date(item.created_at).toLocaleDateString()}`
-          }
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="border border-slate-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              viewDetails(item);
-            }}
-          >
-            <Eye className="h-4 w-4 mr-1" />
-            View Details
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 border border-slate-700"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedAnalysisId(item.id);
-                  setSelectedAnalysisTicker(item.ticker);
-                  setShowDeleteDialog(true);
-                }}
-                className="text-red-500 hover:text-white hover:bg-red-600"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {item.analysis_date ?
+              `Analysis date: ${new Date(item.analysis_date).toLocaleDateString()}` :
+              `Started: ${new Date(item.created_at).toLocaleDateString()}`
+            }
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="border border-slate-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                viewDetails(item);
+              }}
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              View Details
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 border border-slate-700"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedAnalysisId(item.id);
+                    setSelectedAnalysisTicker(item.ticker);
+                    setShowDeleteDialog(true);
+                  }}
+                  className="text-red-500 hover:text-white hover:bg-red-600"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
-    </div>
     );
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>AI Analysis History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+
+  // Get display counts - always use filtered data
+  const displayHistory = filteredHistory;
+  const displayCanceled = filteredCanceled;
 
   return (
     <>
       <Card>
         <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Analysis History</h3>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const [year, month, day] = selectedDate.split('-').map(Number);
+                  const prevDate = new Date(year, month - 1, day);
+                  prevDate.setDate(prevDate.getDate() - 1);
+                  const prevYear = prevDate.getFullYear();
+                  const prevMonth = String(prevDate.getMonth() + 1).padStart(2, '0');
+                  const prevDay = String(prevDate.getDate()).padStart(2, '0');
+                  setSelectedDate(`${prevYear}-${prevMonth}-${prevDay}`);
+                }}
+                className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="px-3 min-w-[140px] hover:border-[#fc0] hover:bg-[#fc0]/10 hover:text-[#fc0] transition-all duration-200"
+                  >
+                    <CalendarIcon className="h-4 w-4 mr-2" />
+                    {getDateDisplay()}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-auto p-0 bg-background border-border"
+                  align="center"
+                >
+                  <div className="space-y-2 p-3">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
+                        onClick={() => {
+                          const yesterday = new Date();
+                          yesterday.setDate(yesterday.getDate() - 1);
+                          const year = yesterday.getFullYear();
+                          const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+                          const day = String(yesterday.getDate()).padStart(2, '0');
+                          setSelectedDate(`${year}-${month}-${day}`);
+                        }}
+                      >
+                        Yesterday
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
+                        onClick={() => {
+                          const today = new Date();
+                          const year = today.getFullYear();
+                          const month = String(today.getMonth() + 1).padStart(2, '0');
+                          const day = String(today.getDate()).padStart(2, '0');
+                          setSelectedDate(`${year}-${month}-${day}`);
+                        }}
+                      >
+                        Today
+                      </Button>
+                    </div>
+                  </div>
+                  <Calendar
+                    mode="single"
+                    selected={(() => {
+                      // Parse the date string properly to avoid timezone issues
+                      const [year, month, day] = selectedDate.split('-').map(Number);
+                      return new Date(year, month - 1, day);
+                    })()}
+                    onSelect={(date) => {
+                      if (date) {
+                        // Format the date properly without timezone issues
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        setSelectedDate(`${year}-${month}-${day}`);
+                      }
+                    }}
+                    disabled={(date) => {
+                      const today = new Date();
+                      today.setHours(23, 59, 59, 999);
+                      return date > today;
+                    }}
+                    showOutsideDays={false}
+                    initialFocus
+                    className="rounded-b-lg"
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const [year, month, day] = selectedDate.split('-').map(Number);
+                  const nextDate = new Date(year, month - 1, day);
+                  nextDate.setDate(nextDate.getDate() + 1);
+
+                  const today = new Date();
+                  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+                  const nextYear = nextDate.getFullYear();
+                  const nextMonth = String(nextDate.getMonth() + 1).padStart(2, '0');
+                  const nextDay = String(nextDate.getDate()).padStart(2, '0');
+                  const next = `${nextYear}-${nextMonth}-${nextDay}`;
+
+                  if (next <= todayString) {
+                    setSelectedDate(next);
+                  }
+                }}
+                disabled={(() => {
+                  const today = new Date();
+                  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                  return selectedDate === todayString;
+                })()}
+                className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0] disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
           <Tabs defaultValue="all" className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="all">
-                All <span className="hidden sm:inline">({history.length + runningAnalyses.length + canceledAnalyses.length})</span>
+                All <span className="hidden sm:inline">({displayHistory.length + runningAnalyses.length + displayCanceled.length})</span>
               </TabsTrigger>
               <TabsTrigger value="running">
                 Active <span className="hidden sm:inline">({runningAnalyses.length})</span>
               </TabsTrigger>
               <TabsTrigger value="completed">
-                Completed <span className="hidden sm:inline">({history.length})</span>
+                Completed <span className="hidden sm:inline">({displayHistory.length})</span>
               </TabsTrigger>
               <TabsTrigger value="canceled">
-                Canceled <span className="hidden sm:inline">({canceledAnalyses.length})</span>
+                Canceled <span className="hidden sm:inline">({displayCanceled.length})</span>
               </TabsTrigger>
             </TabsList>
 
@@ -765,12 +937,12 @@ export default function UnifiedAnalysisHistory() {
               )}
 
               {/* Completed Analyses Section */}
-              {history.length > 0 && (
+              {displayHistory.length > 0 && (
                 <div className="space-y-3">
                   {runningAnalyses.length > 0 && (
                     <h3 className="text-sm font-medium text-muted-foreground mb-3">Completed Analyses</h3>
                   )}
-                  {groupAnalysesByRebalance(history).map((item, index) => {
+                  {groupAnalysesByRebalance(displayHistory).map((item, index) => {
                     // Check if it's a rebalance group
                     if ('analyses' in item) {
                       const group = item as RebalanceAnalysisGroup;
@@ -787,7 +959,7 @@ export default function UnifiedAnalysisHistory() {
                                 </Badge>
                               </div>
                               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Calendar className="h-4 w-4" />
+                                <CalendarIcon className="h-4 w-4" />
                                 {formatFullDate(group.createdAt)}
                               </div>
                             </div>
@@ -808,16 +980,16 @@ export default function UnifiedAnalysisHistory() {
               )}
 
               {/* Canceled Analyses Section */}
-              {canceledAnalyses.length > 0 && (
+              {displayCanceled.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-muted-foreground mb-3">Canceled Analyses</h3>
-                  {canceledAnalyses.map((item) => {
+                  {displayCanceled.map((item) => {
                     // Prioritize Portfolio Manager's decision over Risk Manager's decision
-                    const displayDecision = item.agent_insights?.portfolioManager?.finalDecision?.action || 
-                                           item.agent_insights?.portfolioManager?.decision?.action ||
-                                           item.agent_insights?.portfolioManager?.action ||
-                                           item.decision;
-                    
+                    const displayDecision = item.agent_insights?.portfolioManager?.finalDecision?.action ||
+                      item.agent_insights?.portfolioManager?.decision?.action ||
+                      item.agent_insights?.portfolioManager?.action ||
+                      item.decision;
+
                     return (
                       <div
                         key={item.id}
@@ -834,64 +1006,86 @@ export default function UnifiedAnalysisHistory() {
                               </span>
                             </Badge>
                           </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                        </span>
-                      </div>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          Started: {new Date(item.created_at).toLocaleDateString()}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 border border-slate-700"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedAnalysisId(item.id);
-                                  setSelectedAnalysisTicker(item.ticker);
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            Started: {new Date(item.created_at).toLocaleDateString()}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 border border-slate-700"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedAnalysisId(item.id);
+                                    setSelectedAnalysisTicker(item.ticker);
+                                    setShowDeleteDialog(true);
+                                  }}
+                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                       </div>
-                    </div>
                     );
                   })}
                 </div>
               )}
 
               {/* Empty state */}
-              {history.length === 0 && runningAnalyses.length === 0 && canceledAnalyses.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No analysis history yet</p>
-                  <p className="text-sm mt-2">Run your first AI analysis from the watchlist or analysis tab</p>
+              {!initialLoadComplete || loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading analyses...</span>
                 </div>
+              ) : (
+                displayHistory.length === 0 && runningAnalyses.length === 0 && displayCanceled.length === 0 && (
+                  <div className="flex items-center justify-center py-8">
+                    <img
+                      src="/goose_sit.png"
+                      alt="No data"
+                      className="w-32 h-32 mr-6"
+                    />
+                    <div className="text-left text-muted-foreground">
+                      <p>No analyses on {getDateDisplay()}</p>
+                      <p className="text-sm mt-2">Try selecting a different date or run a new analysis</p>
+                    </div>
+                  </div>
+                )
               )}
             </TabsContent>
 
             {/* Running Only Tab */}
             <TabsContent value="running" className="space-y-4">
               {runningAnalyses.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No running analyses</p>
+                <div className="flex items-center justify-center py-8">
+                  <img
+                    src="/goose_sit.png"
+                    alt="No data"
+                    className="w-32 h-32 mr-6"
+                  />
+                  <div className="text-left text-muted-foreground">
+                    <p>No running analyses on {getDateDisplay()}</p>
+                    <p className="text-sm mt-2">Select a different date to view more analyses</p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1014,13 +1208,26 @@ export default function UnifiedAnalysisHistory() {
 
             {/* Completed Only Tab */}
             <TabsContent value="completed" className="space-y-4">
-              {history.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No completed analyses</p>
+              {!initialLoadComplete || loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading analyses...</span>
+                </div>
+              ) : displayHistory.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <img
+                    src="/goose_sit.png"
+                    alt="No data"
+                    className="w-32 h-32 mr-6"
+                  />
+                  <div className="text-left text-muted-foreground">
+                    <p>No completed analyses on {getDateDisplay()}</p>
+                    <p className="text-sm mt-2">Select a different date to view more analyses</p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {groupAnalysesByRebalance(history).map((item, index) => {
+                  {groupAnalysesByRebalance(displayHistory).map((item, index) => {
                     // Check if it's a rebalance group
                     if ('analyses' in item) {
                       const group = item as RebalanceAnalysisGroup;
@@ -1037,7 +1244,7 @@ export default function UnifiedAnalysisHistory() {
                                 </Badge>
                               </div>
                               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Calendar className="h-4 w-4" />
+                                <CalendarIcon className="h-4 w-4" />
                                 {formatFullDate(group.createdAt)}
                               </div>
                             </div>
@@ -1060,19 +1267,32 @@ export default function UnifiedAnalysisHistory() {
 
             {/* Canceled Only Tab */}
             <TabsContent value="canceled" className="space-y-4">
-              {canceledAnalyses.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No canceled analyses</p>
+              {!initialLoadComplete || loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading analyses...</span>
+                </div>
+              ) : displayCanceled.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <img
+                    src="/goose_sit.png"
+                    alt="No data"
+                    className="w-32 h-32 mr-6"
+                  />
+                  <div className="text-left text-muted-foreground">
+                    <p>No canceled analyses on {getDateDisplay()}</p>
+                    <p className="text-sm mt-2">Select a different date to view more analyses</p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {canceledAnalyses.map((item) => {
+                  {displayCanceled.map((item) => {
                     // Prioritize Portfolio Manager's decision over Risk Manager's decision
-                    const displayDecision = item.agent_insights?.portfolioManager?.finalDecision?.action || 
-                                           item.agent_insights?.portfolioManager?.decision?.action ||
-                                           item.agent_insights?.portfolioManager?.action ||
-                                           item.decision;
-                    
+                    const displayDecision = item.agent_insights?.portfolioManager?.finalDecision?.action ||
+                      item.agent_insights?.portfolioManager?.decision?.action ||
+                      item.agent_insights?.portfolioManager?.action ||
+                      item.decision;
+
                     return (
                       <div
                         key={item.id}
@@ -1089,45 +1309,45 @@ export default function UnifiedAnalysisHistory() {
                               </span>
                             </Badge>
                           </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                        </span>
-                      </div>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          Started: {new Date(item.created_at).toLocaleDateString()}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 border border-slate-700"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedAnalysisId(item.id);
-                                  setSelectedAnalysisTicker(item.ticker);
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            Started: {new Date(item.created_at).toLocaleDateString()}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 border border-slate-700"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedAnalysisId(item.id);
+                                    setSelectedAnalysisTicker(item.ticker);
+                                    setShowDeleteDialog(true);
+                                  }}
+                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                       </div>
-                    </div>
                     );
                   })}
                 </div>

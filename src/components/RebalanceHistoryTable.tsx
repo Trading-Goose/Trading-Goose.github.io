@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +38,10 @@ import {
   MoreVertical,
   StopCircle,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import RebalanceDetailModal from './RebalanceDetailModal';
 import {
@@ -87,9 +92,46 @@ export default function RebalanceHistoryTable() {
   const [deleting, setDeleting] = useState(false);
   const [analysisData, setAnalysisData] = useState<{ [key: string]: any[] }>({});
 
+  // Date filter states - default to today (using local date to avoid timezone issues)
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const [selectedDate, setSelectedDate] = useState<string>(todayString);
+
+  // Track if initial data has been loaded
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  // Helper to format date display
+  const getDateDisplay = () => {
+    const today = new Date();
+    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayString = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    if (selectedDate === todayString) return "Today";
+    if (selectedDate === yesterdayString) return "Yesterday";
+
+    // Parse the date parts to avoid timezone issues
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
   useEffect(() => {
     if (user) {
       fetchRebalanceRequests();
+    }
+  }, [user, selectedDate]); // Reload when selectedDate changes
+
+  // Separate useEffect for polling and subscriptions
+  useEffect(() => {
+    if (user && runningRebalances.length > 0) {
       // Set up real-time subscription for instant updates
       const subscription = supabase
         .channel('rebalance_updates')
@@ -139,10 +181,18 @@ export default function RebalanceHistoryTable() {
     if (!user) return;
 
     try {
+      // Build date range for the selected date using local date parsing
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+      // Query only rebalances from the selected date
       const { data, error } = await supabase
         .from('rebalance_requests')
         .select('*')
         .eq('user_id', user.id)
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -197,6 +247,7 @@ export default function RebalanceHistoryTable() {
       }
     } finally {
       setLoading(false);
+      setInitialLoadComplete(true);
     }
   };
 
@@ -351,7 +402,7 @@ export default function RebalanceHistoryTable() {
         return 'outline';
     }
   };
-  
+
   const getStatusClassName = (status: string): string => {
     // Convert legacy status to new format for consistent variant display
     const normalizedStatus = convertLegacyRebalanceStatus(status);
@@ -526,6 +577,134 @@ export default function RebalanceHistoryTable() {
     <>
       <Card>
         <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Rebalance History</h3>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const [year, month, day] = selectedDate.split('-').map(Number);
+                  const prevDate = new Date(year, month - 1, day);
+                  prevDate.setDate(prevDate.getDate() - 1);
+                  const prevYear = prevDate.getFullYear();
+                  const prevMonth = String(prevDate.getMonth() + 1).padStart(2, '0');
+                  const prevDay = String(prevDate.getDate()).padStart(2, '0');
+                  setSelectedDate(`${prevYear}-${prevMonth}-${prevDay}`);
+                }}
+                className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="px-3 min-w-[140px] hover:border-[#fc0] hover:bg-[#fc0]/10 hover:text-[#fc0] transition-all duration-200"
+                  >
+                    <CalendarIcon className="h-4 w-4 mr-2" />
+                    {getDateDisplay()}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-auto p-0 bg-background border-border"
+                  align="center"
+                >
+                  <div className="space-y-2 p-3">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
+                        onClick={() => {
+                          const yesterday = new Date();
+                          yesterday.setDate(yesterday.getDate() - 1);
+                          const year = yesterday.getFullYear();
+                          const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+                          const day = String(yesterday.getDate()).padStart(2, '0');
+                          setSelectedDate(`${year}-${month}-${day}`);
+                        }}
+                      >
+                        Yesterday
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
+                        onClick={() => {
+                          const today = new Date();
+                          const year = today.getFullYear();
+                          const month = String(today.getMonth() + 1).padStart(2, '0');
+                          const day = String(today.getDate()).padStart(2, '0');
+                          setSelectedDate(`${year}-${month}-${day}`);
+                        }}
+                      >
+                        Today
+                      </Button>
+                    </div>
+                  </div>
+                  <Calendar
+                    mode="single"
+                    selected={(() => {
+                      // Parse the date string properly to avoid timezone issues
+                      const [year, month, day] = selectedDate.split('-').map(Number);
+                      return new Date(year, month - 1, day);
+                    })()}
+                    onSelect={(date) => {
+                      if (date) {
+                        // Format the date properly without timezone issues
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        setSelectedDate(`${year}-${month}-${day}`);
+                      }
+                    }}
+                    disabled={(date) => {
+                      const today = new Date();
+                      today.setHours(23, 59, 59, 999);
+                      return date > today;
+                    }}
+                    showOutsideDays={false}
+                    initialFocus
+                    className="rounded-b-lg"
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const [year, month, day] = selectedDate.split('-').map(Number);
+                  const nextDate = new Date(year, month - 1, day);
+                  nextDate.setDate(nextDate.getDate() + 1);
+
+                  const today = new Date();
+                  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+                  const nextYear = nextDate.getFullYear();
+                  const nextMonth = String(nextDate.getMonth() + 1).padStart(2, '0');
+                  const nextDay = String(nextDate.getDate()).padStart(2, '0');
+                  const next = `${nextYear}-${nextMonth}-${nextDay}`;
+
+                  if (next <= todayString) {
+                    setSelectedDate(next);
+                  }
+                }}
+                disabled={(() => {
+                  const today = new Date();
+                  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                  return selectedDate === todayString;
+                })()}
+                className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0] disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
           <Tabs defaultValue="all" className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="all">
@@ -800,17 +979,45 @@ export default function RebalanceHistoryTable() {
                 </div>
               )}
 
-              {totalCount === 0 && (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No rebalance records found</p>
+              {!initialLoadComplete || loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading rebalances...</span>
                 </div>
+              ) : (
+                totalCount === 0 && (
+                  <div className="flex items-center justify-center py-8">
+                    <img
+                      src="/goose_sit.png"
+                      alt="No data"
+                      className="w-32 h-32 mr-6"
+                    />
+                    <div className="text-left text-muted-foreground">
+                      <p>No rebalances on {getDateDisplay()}</p>
+                      <p className="text-sm mt-2">Try selecting a different date or start a new rebalance</p>
+                    </div>
+                  </div>
+                )
               )}
             </TabsContent>
 
             <TabsContent value="running" className="space-y-4">
-              {runningRebalances.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No running rebalances</p>
+              {!initialLoadComplete || loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading rebalances...</span>
+                </div>
+              ) : runningRebalances.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <img
+                    src="/goose_sit.png"
+                    alt="No data"
+                    className="w-32 h-32 mr-6"
+                  />
+                  <div className="text-left text-muted-foreground">
+                    <p>No running rebalances on {getDateDisplay()}</p>
+                    <p className="text-sm mt-2">Select a different date to view more rebalances</p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -912,9 +1119,22 @@ export default function RebalanceHistoryTable() {
             </TabsContent>
 
             <TabsContent value="completed" className="space-y-4">
-              {completedRebalances.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No completed rebalances</p>
+              {!initialLoadComplete || loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading rebalances...</span>
+                </div>
+              ) : completedRebalances.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <img
+                    src="/goose_sit.png"
+                    alt="No data"
+                    className="w-32 h-32 mr-6"
+                  />
+                  <div className="text-left text-muted-foreground">
+                    <p>No completed rebalances on {getDateDisplay()}</p>
+                    <p className="text-sm mt-2">Select a different date to view more rebalances</p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -993,9 +1213,22 @@ export default function RebalanceHistoryTable() {
             </TabsContent>
 
             <TabsContent value="cancelled" className="space-y-4">
-              {cancelledRebalances.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No cancelled rebalances</p>
+              {!initialLoadComplete || loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading rebalances...</span>
+                </div>
+              ) : cancelledRebalances.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <img
+                    src="/goose_sit.png"
+                    alt="No data"
+                    className="w-32 h-32 mr-6"
+                  />
+                  <div className="text-left text-muted-foreground">
+                    <p>No cancelled rebalances on {getDateDisplay()}</p>
+                    <p className="text-sm mt-2">Select a different date to view more rebalances</p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">

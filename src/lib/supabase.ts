@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 
 // These should be in your .env file
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Use the new publishable key format instead of the deprecated anon key
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Debug: Log the configuration (remove in production)
 if (!supabaseUrl || !supabasePublishableKey) {

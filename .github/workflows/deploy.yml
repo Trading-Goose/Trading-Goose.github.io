@@ -37,6 +37,9 @@ jobs:
         env:
           # Public environment variables (safe to expose)
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          # Use the new publishable key format (recommended by Supabase)
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # Legacy anon key (fallback for compatibility)
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           # PostHog analytics
           VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}

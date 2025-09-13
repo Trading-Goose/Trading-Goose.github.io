@@ -136,6 +136,7 @@ export default function SettingsPage() {
   const [rebalanceThreshold, setRebalanceThreshold] = useState(apiSettings?.rebalance_threshold || apiSettings?.default_rebalance_threshold || 10);
   const [rebalanceMinPositionSize, setRebalanceMinPositionSize] = useState(apiSettings?.rebalance_min_position_size || 2); // Default 2%
   const [rebalanceMaxPositionSize, setRebalanceMaxPositionSize] = useState(apiSettings?.rebalance_max_position_size || 25); // Default 25%
+  const [nearPositionThreshold, setNearPositionThreshold] = useState(apiSettings?.near_position_threshold || 20); // Default 20%
   const [targetStockAllocation, setTargetStockAllocation] = useState(apiSettings?.target_stock_allocation || 80);
   const [targetCashAllocation, setTargetCashAllocation] = useState(apiSettings?.target_cash_allocation || 20);
 
@@ -163,6 +164,7 @@ export default function SettingsPage() {
   const [defaultPositionSizeDollars, setDefaultPositionSizeDollars] = useState(apiSettings?.default_position_size_dollars || 1000);
   const [profitTarget, setProfitTarget] = useState(apiSettings?.profit_target || 25);
   const [stopLoss, setStopLoss] = useState(apiSettings?.stop_loss || 10);
+  const [nearLimitThreshold, setNearLimitThreshold] = useState(apiSettings?.near_limit_threshold || 20);
 
   // Track if initial load is complete to prevent re-loading
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -268,6 +270,8 @@ export default function SettingsPage() {
       // Position management preferences
       setProfitTarget(apiSettings.profit_target || 25);
       setStopLoss(apiSettings.stop_loss || 10);
+      setNearLimitThreshold(apiSettings.near_limit_threshold || 20);
+      setNearPositionThreshold(apiSettings.near_position_threshold || 20);
 
       // Team-specific settings
       setResearchDebateRounds(apiSettings.research_debate_rounds || 2);
@@ -697,7 +701,8 @@ export default function SettingsPage() {
           user_risk_level: userRiskLevel,
           default_position_size_dollars: defaultPositionSizeDollars,
           profit_target: profitTarget,
-          stop_loss: stopLoss
+          stop_loss: stopLoss,
+          near_limit_threshold: nearLimitThreshold
         };
 
         // Use settings-proxy to save with credential masking
@@ -798,6 +803,7 @@ export default function SettingsPage() {
           rebalance_threshold: rebalanceThreshold,
           rebalance_min_position_size: rebalanceMinPositionSize,
           rebalance_max_position_size: rebalanceMaxPositionSize,
+          near_position_threshold: nearPositionThreshold,
           target_stock_allocation: targetStockAllocation,
           target_cash_allocation: targetCashAllocation,
           opportunity_market_range: opportunityMarketRange,
@@ -1574,6 +1580,7 @@ export default function SettingsPage() {
               rebalanceThreshold={rebalanceThreshold}
               rebalanceMinPositionSize={rebalanceMinPositionSize}
               rebalanceMaxPositionSize={rebalanceMaxPositionSize}
+              nearPositionThreshold={nearPositionThreshold}
               targetStockAllocation={targetStockAllocation}
               targetCashAllocation={targetCashAllocation}
               opportunityAgentProviderId={opportunityAgentProviderId}
@@ -1589,6 +1596,7 @@ export default function SettingsPage() {
               setRebalanceThreshold={setRebalanceThreshold}
               setRebalanceMinPositionSize={setRebalanceMinPositionSize}
               setRebalanceMaxPositionSize={setRebalanceMaxPositionSize}
+              setNearPositionThreshold={setNearPositionThreshold}
               setTargetStockAllocation={setTargetStockAllocation}
               setTargetCashAllocation={setTargetCashAllocation}
               setOpportunityAgentProviderId={setOpportunityAgentProviderId}
@@ -1617,6 +1625,7 @@ export default function SettingsPage() {
               defaultPositionSizeDollars={defaultPositionSizeDollars}
               profitTarget={profitTarget}
               stopLoss={stopLoss}
+              nearLimitThreshold={nearLimitThreshold}
               configuredProviders={configuredProviders}
               showKeys={showKeys}
               saved={saved}
@@ -1631,6 +1640,7 @@ export default function SettingsPage() {
               setDefaultPositionSizeDollars={setDefaultPositionSizeDollars}
               setProfitTarget={setProfitTarget}
               setStopLoss={setStopLoss}
+              setNearLimitThreshold={setNearLimitThreshold}
               toggleShowKey={toggleShowKey}
               handleSaveTab={handleSaveTab}
               canUseLiveTrading={canUseLiveTrading()}

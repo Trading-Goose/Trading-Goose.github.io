@@ -2,35 +2,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from './supabase';
+import type { ApiSettings, Profile } from './supabase';
 import { getCachedSession, clearSessionCache, updateCachedSession } from './cachedAuth';
 import type { User, Session } from '@supabase/supabase-js';
-
-// Types
-export interface Profile {
-  id: string;
-  email: string;
-  name?: string;
-  full_name?: string;
-  avatar_url?: string;
-  created_at: string;
-  updated_at?: string;
-}
-
-export interface ApiSettings {
-  id?: string;
-  user_id: string;
-  ai_provider: string;
-  ai_api_key: string;
-  ai_model: string;
-  polygon_api_key?: string;
-  alpaca_paper_api_key?: string;
-  alpaca_paper_secret_key?: string;
-  alpaca_live_api_key?: string;
-  alpaca_live_secret_key?: string;
-  alpaca_paper_trading?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
 
 interface AuthState {
   // Core state

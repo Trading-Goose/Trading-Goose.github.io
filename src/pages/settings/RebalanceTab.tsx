@@ -27,6 +27,7 @@ export default function RebalanceTab({
   rebalanceThreshold,
   rebalanceMinPositionSize,
   rebalanceMaxPositionSize,
+  nearPositionThreshold,
   targetStockAllocation,
   targetCashAllocation,
   opportunityAgentProviderId,
@@ -42,6 +43,7 @@ export default function RebalanceTab({
   setRebalanceThreshold,
   setRebalanceMinPositionSize,
   setRebalanceMaxPositionSize,
+  setNearPositionThreshold,
   setTargetStockAllocation,
   setTargetCashAllocation,
   setOpportunityAgentProviderId,
@@ -164,6 +166,26 @@ export default function RebalanceTab({
             </div>
             <p className="text-xs text-muted-foreground">
               Position sizes must be between {rebalanceMinPositionSize}% and {rebalanceMaxPositionSize}% of portfolio
+            </p>
+          </div>
+
+          {/* Near Position Threshold */}
+          <div className="space-y-2">
+            <LabelWithHelp
+              label={`Near Position Threshold: ${nearPositionThreshold}%`}
+              helpContent="Defines when a position is considered 'near' the minimum or maximum size limits. For example, if set to 20% with a max size of 25%, positions at 20% or above (80% of max) are considered 'near maximum'. This helps the AI make more nuanced decisions about position sizing."
+            />
+            <Slider
+              value={[nearPositionThreshold]}
+              onValueChange={(value) => setNearPositionThreshold(value[0])}
+              min={5}
+              max={25}
+              step={1}
+              className="w-full"
+              disabled={!hasRebalanceAccess}
+            />
+            <p className="text-xs text-muted-foreground">
+              Positions within {nearPositionThreshold}% of limits trigger warnings
             </p>
           </div>
 

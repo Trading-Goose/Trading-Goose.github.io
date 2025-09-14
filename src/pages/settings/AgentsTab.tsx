@@ -135,8 +135,8 @@ export default function AgentsTab({
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="AI Provider" 
+              <LabelWithHelp
+                label="AI Provider"
                 helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
               />
               <Select value={analysisTeamProviderId} onValueChange={setAnalysisTeamProviderId} disabled={!hasAgentConfigAccess}>
@@ -153,8 +153,8 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="Model" 
+              <LabelWithHelp
+                label="Model"
                 helpContent="Choose the AI model for analysis tasks"
               />
               {analysisTeamProviderId === defaultProviderId ? (
@@ -208,9 +208,9 @@ export default function AgentsTab({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="Analysis Optimization" 
-                helpContent="Speed: Faster but may skip some sources | Balanced: Thorough analysis with all data"
+              <LabelWithHelp
+                label="Analysis Optimization"
+                helpContent="More optimization mode comming soon..."
               />
               <Select
                 value={analysisOptimization}
@@ -229,17 +229,10 @@ export default function AgentsTab({
                   )}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                {availableOptimizationModes.includes('speed') && availableOptimizationModes.includes('balanced') 
-                  ? 'Speed: Faster analysis | Balanced: More thorough coverage'
-                  : availableOptimizationModes.includes('balanced')
-                  ? 'Balanced: Thorough analysis coverage'
-                  : 'Speed: Standard analysis coverage'}
-              </p>
             </div>
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="Historical Data Range" 
+              <LabelWithHelp
+                label="Historical Data Range"
                 helpContent="How far back to analyze. 1M for day trading, 3M for swing, 6M+ for investing"
               />
               <Select
@@ -263,8 +256,8 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <LabelWithHelp 
-              label="Number of Search Sources" 
+            <LabelWithHelp
+              label="Number of Search Sources"
               helpContent="More sources = better coverage but higher cost. Recommended: 15-25"
             />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
@@ -284,8 +277,8 @@ export default function AgentsTab({
             </p>
           </div>
           <div className="space-y-2">
-            <LabelWithHelp 
-              label="Max Tokens" 
+            <LabelWithHelp
+              label="Max Tokens"
               helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
             />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
@@ -315,8 +308,8 @@ export default function AgentsTab({
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="AI Provider" 
+              <LabelWithHelp
+                label="AI Provider"
                 helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
               />
               <Select value={researchTeamProviderId} onValueChange={setResearchTeamProviderId} disabled={!hasAgentConfigAccess}>
@@ -333,8 +326,8 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="Model" 
+              <LabelWithHelp
+                label="Model"
                 helpContent="Choose the AI model for research tasks"
               />
               {researchTeamProviderId === defaultProviderId ? (
@@ -387,8 +380,8 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <LabelWithHelp 
-              label="Number of Debate Rounds" 
+            <LabelWithHelp
+              label="Number of Debate Rounds"
               helpContent="More rounds = deeper analysis. Each round refines arguments. Recommended: 2-3"
             />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
@@ -408,8 +401,8 @@ export default function AgentsTab({
             </p>
           </div>
           <div className="space-y-2">
-            <LabelWithHelp 
-              label="Max Tokens" 
+            <LabelWithHelp
+              label="Max Tokens"
               helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
             />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
@@ -439,8 +432,8 @@ export default function AgentsTab({
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="AI Provider" 
+              <LabelWithHelp
+                label="AI Provider"
                 helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
               />
               <Select value={tradingTeamProviderId} onValueChange={setTradingTeamProviderId} disabled={!hasAgentConfigAccess}>
@@ -457,8 +450,8 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="Model" 
+              <LabelWithHelp
+                label="Model"
                 helpContent="Choose the AI model for trading decision tasks"
               />
               {tradingTeamProviderId === defaultProviderId ? (
@@ -511,8 +504,8 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <LabelWithHelp 
-              label="Max Tokens" 
+            <LabelWithHelp
+              label="Max Tokens"
               helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
             />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
@@ -542,8 +535,8 @@ export default function AgentsTab({
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="AI Provider" 
+              <LabelWithHelp
+                label="AI Provider"
                 helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
               />
               <Select value={riskTeamProviderId} onValueChange={setRiskTeamProviderId} disabled={!hasAgentConfigAccess}>
@@ -560,8 +553,8 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="Model" 
+              <LabelWithHelp
+                label="Model"
                 helpContent="Choose the AI model for risk management tasks"
               />
               {riskTeamProviderId === defaultProviderId ? (
@@ -614,8 +607,8 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <LabelWithHelp 
-              label="Max Tokens" 
+            <LabelWithHelp
+              label="Max Tokens"
               helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
             />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">
@@ -648,8 +641,8 @@ export default function AgentsTab({
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="AI Provider" 
+              <LabelWithHelp
+                label="AI Provider"
                 helpContent="Select which API key configuration to use. Uses Default AI provider if not changed"
               />
               <Select value={portfolioManagerProviderId} onValueChange={setPortfolioManagerProviderId} disabled={!hasAgentConfigAccess}>
@@ -666,8 +659,8 @@ export default function AgentsTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <LabelWithHelp 
-                label="Model" 
+              <LabelWithHelp
+                label="Model"
                 helpContent="Choose the AI model for portfolio management tasks"
               />
               {portfolioManagerProviderId === defaultProviderId ? (
@@ -720,8 +713,8 @@ export default function AgentsTab({
             </div>
           </div>
           <div className="space-y-2">
-            <LabelWithHelp 
-              label="Max Tokens" 
+            <LabelWithHelp
+              label="Max Tokens"
               helpContent="Response length limit. Higher = more detailed. Recommended: 2000-4000"
             />
             <div className="flex items-center space-x-4 py-3 min-h-[40px]">

@@ -91,7 +91,7 @@ const Footer = () => {
           <div className="border-t border-border py-6">
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
-                © {currentYear} TradingGoose. All rights reserved.   -    Pioneering Trading Intelligence with AI Precision
+                © {currentYear} TradingGoose. All rights reserved.   -    Pioneering Trading Intelligence with AI Analysis - HONK!
               </p>
             </div>
           </div>

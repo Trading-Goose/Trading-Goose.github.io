@@ -27,15 +27,7 @@ export function AnalysisControls({
 }: AnalysisControlsProps) {
   return (
     <div className="flex items-center justify-center p-2 rounded-lg mb-2 min-h-[36px]">
-      {isInitialLoading ? (
-        // Show loading state while checking for running analyses
-        <div className="flex items-center justify-center w-full">
-          <Loader2 className="w-4 h-4 mr-2 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            Checking for running analyses...
-          </span>
-        </div>
-      ) : activeAnalysisTicker && isAnalyzing ? (
+      {activeAnalysisTicker && isAnalyzing ? (
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center">
             <Activity className="w-4 h-4 mr-2 animate-pulse text-primary" />
@@ -64,15 +56,25 @@ export function AnalysisControls({
               value={searchTicker}
               onChange={setSearchTicker}
               placeholder="Enter ticker to analyze"
+              disabled={isInitialLoading}
             />
           </div>
           <Button
             type="submit"
-            disabled={!searchTicker || isAnalyzing}
+            disabled={!searchTicker || isAnalyzing || isInitialLoading}
             size="sm"
           >
-            <Play className="h-4 w-4 mr-1" />
-            Analyze
+            {isInitialLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Checking...
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4 mr-1" />
+                Analyze
+              </>
+            )}
           </Button>
         </form>
       )}

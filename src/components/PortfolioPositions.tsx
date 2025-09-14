@@ -65,6 +65,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   const [runningAnalysesCount, setRunningAnalysesCount] = useState(0);
   const [showAnalysisAlert, setShowAnalysisAlert] = useState(false);
   const [showRebalanceAccessAlert, setShowRebalanceAccessAlert] = useState(false);
+  const [checkingRebalance, setCheckingRebalance] = useState(true); // Loading state for initial rebalance check
 
   // Use ref to track previous running rebalance
   const previousRunningRef = useRef<string | null>(null);
@@ -336,12 +337,14 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
     
     const checkRunningRebalance = async () => {
       if (!user || !isAuthenticated) {
+        setCheckingRebalance(false);
         return;
       }
       
       // Double-check session validity inside the async function
       if (!isSessionValid()) {
         console.log('PortfolioPositions: Skipping rebalance check - session invalid or not authenticated');
+        setCheckingRebalance(false);
         return;
       }
 
@@ -394,6 +397,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         if (data && data.length > 0) {
           const activeRebalance = data[0];
           setRunningRebalance(activeRebalance.id);
+          setCheckingRebalance(false); // Set loading to false when rebalance is found
 
           // Check if rebalance just started (wasn't running before)
           if (!previousRunningRef.current && activeRebalance.id) {
@@ -435,8 +439,12 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
           setRunningRebalance(null);
           previousRunningRef.current = null;
         }
+        
+        // Set loading to false after first check completes
+        setCheckingRebalance(false);
       } catch (error) {
         console.error('Error checking running rebalance:', error);
+        setCheckingRebalance(false);
       }
     };
 
@@ -452,7 +460,8 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         }
       };
     } else {
-      // If not authenticated, clean up any existing interval
+      // If not authenticated, set loading to false and clean up any existing interval
+      setCheckingRebalance(false);
       return () => {
         if (intervalRef) {
           clearInterval(intervalRef);
@@ -477,7 +486,17 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
             </div>
             <div className="flex items-center gap-2">
 
-              {runningRebalance ? (
+              {checkingRebalance ? (
+                // Show loading state while checking for running rebalance
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                >
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Checking...
+                </Button>
+              ) : runningRebalance ? (
                 <Button
                   variant="outline"
                   size="sm"

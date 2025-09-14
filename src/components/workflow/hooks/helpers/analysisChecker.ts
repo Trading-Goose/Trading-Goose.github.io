@@ -35,20 +35,20 @@ export async function checkRunningAnalyses({
   // Check database for running analyses if user is authenticated
   if (user) {
     try {
-      // Only fetch analyses from the last 24 hours (for checking running analyses)
-      const twentyFourHoursAgo = new Date();
-      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+      // Fetch ALL analyses from today in a single query
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       
-      const { data, error } = await supabase
+      const { data: todayAnalyses, error } = await supabase
         .from('analysis_history')
-        .select('ticker, analysis_status, full_analysis, created_at, id, decision, agent_insights, rebalance_request_id, is_canceled')
+        .select('*')
         .eq('user_id', user.id)
-        .gte('created_at', twentyFourHoursAgo.toISOString()) // Only last 24 hours
+        .gte('created_at', today.toISOString()) // All of today's analyses
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        // Filter to only actually running analyses using centralized logic
-        const runningData = data.filter(item => {
+      if (!error && todayAnalyses) {
+        // Filter for running analyses in memory (no additional query)
+        const runningData = todayAnalyses.filter(item => {
           // Convert legacy numeric status if needed
           const currentStatus = typeof item.analysis_status === 'number'
             ? convertLegacyAnalysisStatus(item.analysis_status)
@@ -64,6 +64,17 @@ export async function checkRunningAnalyses({
           return isRunning;
         });
 
+        // Filter for completed analyses in memory (no additional query)
+        const completedData = todayAnalyses.filter(item => {
+          const currentStatus = typeof item.analysis_status === 'number'
+            ? convertLegacyAnalysisStatus(item.analysis_status)
+            : item.analysis_status;
+          
+          return !item.is_canceled && 
+                 currentStatus !== ANALYSIS_STATUS.CANCELLED &&
+                 !isAnalysisActive(currentStatus);
+        });
+
         // Only log if there are actually running analyses
         if (runningData.length > 0) {
           console.log('Running analyses from DB:', runningData.map(d => ({
@@ -71,6 +82,7 @@ export async function checkRunningAnalyses({
             status: d.analysis_status
           })));
         }
+        
         for (const item of runningData) {
           running.add(item.ticker);
         }
@@ -80,9 +92,7 @@ export async function checkRunningAnalyses({
 
         // Use the most recent running analysis for display
         if (runningData.length > 0) {
-          const mostRecent = runningData.sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          )[0];
+          const mostRecent = runningData[0]; // Already sorted by created_at desc
           console.log('Most recent running analysis:', {
             ticker: mostRecent.ticker,
             rebalance_request_id: mostRecent.rebalance_request_id,
@@ -92,77 +102,44 @@ export async function checkRunningAnalyses({
           setActiveAnalysisTicker(mostRecent.ticker);
           const stillRunning = updateWorkflowFromAnalysis(mostRecent);
           setIsAnalyzing(stillRunning);
+        } else if (completedData.length > 0 && !activeAnalysisTicker) {
+          // No running analyses, show most recent completed one
+          const mostRecentCompleted = completedData[0];
+          setCurrentAnalysis(mostRecentCompleted);
+          setActiveAnalysisTicker(mostRecentCompleted.ticker);
+          const stillRunning = updateWorkflowFromAnalysis(mostRecentCompleted);
+          setIsAnalyzing(stillRunning);
+        }
+
+        // Check if any analyses just completed (were running before but not now)
+        const justCompleted = Array.from(previousRunningRef.current).filter(ticker => !running.has(ticker));
+        if (justCompleted.length > 0) {
+          console.log('Analyses completed, reloading for:', justCompleted);
+          
+          // Find the completed analysis from our already-fetched data (no additional query!)
+          const completedAnalysis = completedData.find(item => justCompleted.includes(item.ticker));
+          
+          if (completedAnalysis) {
+            setCurrentAnalysis(completedAnalysis);
+            setActiveAnalysisTicker(completedAnalysis.ticker);
+            const stillRunning = updateWorkflowFromAnalysis(completedAnalysis);
+            setIsAnalyzing(stillRunning);
+          }
         }
       }
     } catch (error) {
       console.error('Error checking running analyses:', error);
     }
-  }
-
-  // Check if any analyses just completed (were running before but not now)
-  const justCompleted = Array.from(previousRunningRef.current).filter(ticker => !running.has(ticker));
-  if (justCompleted.length > 0) {
-    console.log('Analyses completed, reloading for:', justCompleted);
-
-    // Fetch the completed analysis data (should be recent)
-    try {
-      // Only look for analyses completed in the last hour
-      const oneHourAgo = new Date();
-      oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-      
-      const { data, error } = await supabase
-        .from('analysis_history')
-        .select('*')
-        .eq('user_id', user!.id)
-        .eq('is_canceled', false)
-        .in('ticker', justCompleted)
-        .neq('analysis_status', ANALYSIS_STATUS.CANCELLED)
-        .gte('created_at', oneHourAgo.toISOString()) // Only recent completions
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!error && data) {
-        setCurrentAnalysis(data);
-        setActiveAnalysisTicker(data.ticker);
-        const stillRunning = updateWorkflowFromAnalysis(data);
-        setIsAnalyzing(stillRunning);
-      }
-    } catch (error) {
-      console.error('Error fetching completed analysis:', error);
-    }
+  } else {
+    // User not authenticated
+    setRunningAnalysesCount(0);
+    setIsAnalyzing(false);
   }
 
   // If no running analyses and we were analyzing, keep showing the last one
   if (running.size === 0 && previousRunningRef.current.size > 0) {
     setIsAnalyzing(false);
     // Keep the current analysis display, don't reset
-  } else if (running.size === 0 && !activeAnalysisTicker && user) {
-    // No analyses at all - check for recent completed ones
-    try {
-      const thirtyMinutesAgo = new Date();
-      thirtyMinutesAgo.setMinutes(thirtyMinutesAgo.getMinutes() - 30);
-
-      const { data, error } = await supabase
-        .from('analysis_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_canceled', false)
-        .neq('analysis_status', ANALYSIS_STATUS.CANCELLED)
-        .gte('created_at', thirtyMinutesAgo.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!error && data) {
-        setCurrentAnalysis(data);
-        setActiveAnalysisTicker(data.ticker);
-        const stillRunning = updateWorkflowFromAnalysis(data);
-        setIsAnalyzing(stillRunning);
-      }
-    } catch (error) {
-      console.error('Error fetching recent analysis:', error);
-    }
   }
 
   // Only log if there are running analyses or if status changed

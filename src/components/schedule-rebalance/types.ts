@@ -18,13 +18,7 @@ export interface ScheduleRebalanceModalProps {
     timezone: string;
     selected_tickers: string[];
     include_watchlist: boolean;
-    include_all_positions: boolean;
-    use_default_settings?: boolean;
-    max_position_size?: number;
-    min_position_size?: number;
     rebalance_threshold?: number;
-    target_stock_allocation?: number;
-    target_cash_allocation?: number;
     skip_threshold_check?: boolean;
     skip_opportunity_agent?: boolean;
   } | null;
@@ -62,13 +56,7 @@ export interface ExistingSchedule {
   timezone?: string;
   selected_tickers?: string[];
   include_watchlist?: boolean;
-  include_all_positions?: boolean;
-  use_default_settings?: boolean;
-  max_position_size?: number;
-  min_position_size?: number;
   rebalance_threshold?: number;
-  target_stock_allocation?: number;
-  target_cash_allocation?: number;
   skip_threshold_check?: boolean;
   skip_opportunity_agent?: boolean;
 }

@@ -25,9 +25,8 @@ export function useRebalanceData(isOpen: boolean) {
 
   // Configuration state - if no opportunity agent access, skip it by default
   const [config, setConfig] = useState<RebalanceConfig>({
-    useDefaultSettings: true,
-    maxPosition: 10000,
-    minPosition: 100,
+    maxPosition: 25,  // Default 25% max position size
+    minPosition: 5,   // Default 5% min position size
     rebalanceThreshold: 10,
     targetStockAllocation: 80,
     targetCashAllocation: 20,
@@ -70,17 +69,22 @@ export function useRebalanceData(isOpen: boolean) {
     setCashAllocation(0);
 
     try {
-      // Update config from apiSettings
-      setConfig(prev => ({
-        ...prev,
-        maxPosition: apiSettings?.rebalance_max_position_size || 10000,
-        minPosition: apiSettings?.rebalance_min_position_size || 100,
-        rebalanceThreshold: apiSettings?.rebalance_threshold || 10,
-        targetStockAllocation: 80,
-        targetCashAllocation: 20,
-        // Ensure skipOpportunityAgent is true if user doesn't have access
-        skipOpportunityAgent: !hasOppAccess ? true : prev.skipOpportunityAgent
-      }));
+      // These values come from the user's saved settings in the database
+      setConfig(prev => {
+        if (apiSettings) {
+          return {
+            ...prev,
+            maxPosition: apiSettings.rebalance_max_position_size ?? prev.maxPosition,  // Use user's saved percentage
+            minPosition: apiSettings.rebalance_min_position_size ?? prev.minPosition,  // Use user's saved percentage
+            rebalanceThreshold: apiSettings.rebalance_threshold ?? prev.rebalanceThreshold,
+            targetStockAllocation: apiSettings.target_stock_allocation ?? prev.targetStockAllocation,
+            targetCashAllocation: apiSettings.target_cash_allocation ?? prev.targetCashAllocation,
+            // Ensure skipOpportunityAgent is true if user doesn't have access
+            skipOpportunityAgent: !hasOppAccess ? true : prev.skipOpportunityAgent
+          };
+        }
+        return prev;
+      });
 
       // Load Alpaca account and positions
       console.log('Fetching Alpaca account and positions...');
@@ -101,7 +105,7 @@ export function useRebalanceData(isOpen: boolean) {
       const cashBalance = parseFloat(accountData.cash || '0');
 
       console.log(`Account summary: Equity=$${totalEquity}, Cash=$${cashBalance}`);
-      
+
       // Check for account/position mismatch
       if (cashBalance < 0 && (!positionsData || positionsData.length === 0)) {
         console.warn('⚠️ Account has negative cash (margin) but no positions!');
@@ -112,7 +116,7 @@ export function useRebalanceData(isOpen: boolean) {
       if (totalEquity === 0) {
         throw new Error('Account has no equity');
       }
-      
+
       // Store portfolio values
       setPortfolioTotalValue(totalEquity);
       setPortfolioCashBalance(cashBalance);
@@ -132,7 +136,7 @@ export function useRebalanceData(isOpen: boolean) {
         processedPositions.sort((a, b) => b.currentAllocation - a.currentAllocation);
 
         setPositions(processedPositions);
-        
+
         // Auto-select positions (will be limited by maxStocks in parent)
         setSelectedPositions(new Set(processedPositions.map(p => p.ticker)));
       } else {

@@ -9,7 +9,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Clock, Calendar, Settings, List, Loader2, AlertCircle } from "lucide-react";
@@ -28,6 +39,7 @@ import type { ScheduleRebalanceModalProps } from "./types";
 export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit }: ScheduleRebalanceModalProps) {
   const { user, apiSettings } = useAuth();
   const [activeTab, setActiveTab] = useState("schedule");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   // Check for required credentials
   const hasApiKeys = hasRequiredApiKeys(apiSettings);
@@ -40,7 +52,6 @@ export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit
     setConfig,
     rebalanceConfig,
     setRebalanceConfig,
-    handleStockAllocationChange,
   } = useScheduleConfig();
 
   // Use data management hook
@@ -93,6 +104,9 @@ export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit
     setSaving(true);
     const success = await deleteSchedule();
     setSaving(false);
+    if (success) {
+      setShowDeleteConfirm(false);
+    }
   };
 
   // Calculate watchlist selected count
@@ -127,6 +141,18 @@ export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit
                 Settings
               </TabsTrigger>
             </TabsList>
+            
+            {/* Stock Selection Limit Display */}
+            {maxStocks > 0 && (
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Stock selection limit: {selectedPositions.size} / {maxStocks} stocks selected
+                </span>
+                {selectedPositions.size >= maxStocks && (
+                  <Badge variant="destructive" className="text-xs">Limit Reached</Badge>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Schedule Settings Tab */}
@@ -155,7 +181,6 @@ export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit
           <SettingsTab
             rebalanceConfig={rebalanceConfig}
             setRebalanceConfig={setRebalanceConfig}
-            handleStockAllocationChange={handleStockAllocationChange}
             selectedPositionsCount={selectedPositions.size}
             includeWatchlist={includeWatchlist}
             watchlistSelectedCount={watchlistSelectedCount}
@@ -193,7 +218,7 @@ export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit
               {existingSchedule && (
                 <Button
                   variant="outline"
-                  onClick={handleDelete}
+                  onClick={() => setShowDeleteConfirm(true)}
                   disabled={saving}
                   className="border-red-500/30 bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-700 dark:hover:text-red-300"
                 >
@@ -226,6 +251,27 @@ export default function ScheduleRebalanceModal({ isOpen, onClose, scheduleToEdit
           </div>
         </div>
       </DialogContent>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Schedule?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The schedule will be permanently removed and will no longer execute.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

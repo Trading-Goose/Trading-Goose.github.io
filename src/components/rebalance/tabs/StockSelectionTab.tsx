@@ -3,12 +3,11 @@
 
 import { TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { LabelWithHelp } from "@/components/ui/help-button";
-import { AlertCircle, Loader2, Eye, Lock } from "lucide-react";
+import { Loader2, Eye, Lock, AlertCircle } from "lucide-react";
 import { PortfolioComposition } from "../components/PortfolioComposition";
 import { StockPositionCard } from "../components/StockPositionCard";
 import type { RebalancePosition, RebalanceConfig } from "../types";
@@ -46,26 +45,6 @@ export function StockSelectionTab({
 }: StockSelectionTabProps) {
   return (
     <TabsContent value="stocks" className="flex-1 overflow-y-auto px-6 pb-4 mt-4 data-[state=inactive]:hidden">
-      {/* Stock Selection Limit Alert */}
-      {maxStocks > 0 && (
-        <Alert className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            <div className="flex items-center justify-between">
-              <span>Stock selection limit: {selectedPositions.size} / {maxStocks} stocks selected</span>
-              {selectedPositions.size >= maxStocks && (
-                <Badge variant="destructive" className="ml-2">Limit Reached</Badge>
-              )}
-            </div>
-            {selectedPositions.size >= maxStocks && (
-              <p className="text-xs mt-1 text-muted-foreground">
-                Deselect some stocks to choose others. Your subscription allows up to {maxStocks} stocks for rebalancing.
-              </p>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-      
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12 gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />

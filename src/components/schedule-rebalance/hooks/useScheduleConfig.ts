@@ -21,31 +21,22 @@ export function useScheduleConfig() {
   });
 
   // Rebalance configuration - auto-skip opportunity agent if no access
+  // Note: min/max position and target allocations are not configurable in scheduled UI
+  // These will use user's api_settings values at runtime
   const [rebalanceConfig, setRebalanceConfig] = useState<RebalanceConfig>({
-    useDefaultSettings: true,
-    maxPosition: 10000,
-    minPosition: 100,
+    maxPosition: 25,   // Default placeholder (percentage), not used
+    minPosition: 5,    // Default placeholder (percentage), not used
     rebalanceThreshold: 10,
-    targetStockAllocation: 80,
-    targetCashAllocation: 20,
+    targetStockAllocation: 80,  // Default placeholder, not used
+    targetCashAllocation: 20,   // Default placeholder, not used
     skipThresholdCheck: false,
     skipOpportunityAgent: !hasOppAccess // Auto-skip if no access
   });
-
-  // Validate that stock + cash allocation equals 100%
-  const handleStockAllocationChange = (value: number[]) => {
-    setRebalanceConfig(prev => ({
-      ...prev,
-      targetStockAllocation: value[0],
-      targetCashAllocation: 100 - value[0]
-    }));
-  };
 
   return {
     config,
     setConfig,
     rebalanceConfig,
     setRebalanceConfig,
-    handleStockAllocationChange,
   };
 }

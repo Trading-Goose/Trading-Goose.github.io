@@ -81,39 +81,16 @@ export default function RebalanceTab({
           </Alert>
         )}
 
-        {/* Rebalance Settings */}
+        {/* Portfolio Limits - New separate section */}
         <div className={`space-y-4 p-4 border rounded-lg bg-card ${!hasRebalanceAccess ? 'opacity-50' : ''}`}>
           <h3 className="text-lg font-semibold flex items-center gap-2">
-            Rebalance Settings
+            Portfolio Limits
             <HelpButton 
-              content="Controls when and how your portfolio gets rebalanced. Rebalancing helps maintain your target asset allocation and manages risk."
+              content="Define position size constraints and target allocations for your portfolio"
               iconSize={16}
             />
             {!hasRebalanceAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
           </h3>
-
-          {/* Rebalance Threshold */}
-          <div className="space-y-2">
-            <LabelWithHelp
-              label="Rebalance Threshold (%)"
-              helpContent="Triggers rebalance when portfolio drifts by this percentage. Lower values (1-5%) result in frequent rebalancing, higher values (10-20%) result in less frequent rebalancing. Recommended: 5-10%"
-            />
-            <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-              <Slider
-                value={[rebalanceThreshold]}
-                onValueChange={(value) => setRebalanceThreshold(value[0])}
-                min={1}
-                max={20}
-                step={1}
-                className="flex-1"
-                disabled={!hasRebalanceAccess}
-              />
-              <span className="w-12 text-center font-medium">{rebalanceThreshold}%</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Trigger rebalance when portfolio drift exceeds this percentage
-            </p>
-          </div>
 
           {/* Position Size Limits */}
           <div className="space-y-2">

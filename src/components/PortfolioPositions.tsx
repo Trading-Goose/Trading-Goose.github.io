@@ -651,9 +651,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
             // The constraints object below includes targetCashAllocation
             // which tells the Portfolio Manager the stock/cash split
 
-            // Build constraints object
-            // Note: When useDefaultSettings is true, config already has the values from apiSettings
-            // (loaded in RebalanceModal's loadData function)
+            // Build constraints object with user-configured values
             const constraints = {
               maxPositionSize: config.maxPosition,
               minPositionSize: config.minPosition,
@@ -701,8 +699,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                 constraints,
                 portfolioData,
                 skipOpportunityAgent: config.skipOpportunityAgent,
-                rebalanceThreshold: config.rebalanceThreshold,
-                useDefaultSettings: config.useDefaultSettings
+                rebalanceThreshold: config.rebalanceThreshold
               }
             });
 

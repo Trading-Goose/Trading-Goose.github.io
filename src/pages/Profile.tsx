@@ -4,6 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -71,6 +81,7 @@ export default function ProfilePage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [discordIdentity, setDiscordIdentity] = useState<any>(null);
   const [hasDiscordConnection, setHasDiscordConnection] = useState(false);
+  const [showDiscordDisconnectConfirm, setShowDiscordDisconnectConfirm] = useState(false);
 
   const handleSendResetEmail = async () => {
     if (!user?.email) return;
@@ -1112,7 +1123,7 @@ export default function ProfilePage() {
                         variant="outline"
                         size="sm"
                         className="flex-1 bg-red-500/5 border-red-500/30 text-red-600 dark:bg-red-500/5 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50"
-                        onClick={handleUnlinkDiscord}
+                        onClick={() => setShowDiscordDisconnectConfirm(true)}
                       >
                         Disconnect
                       </Button>
@@ -1238,6 +1249,30 @@ export default function ProfilePage() {
         isOpen={showChangePasswordModal}
         onClose={() => setShowChangePasswordModal(false)}
       />
+
+      {/* Discord Disconnect Confirmation Dialog */}
+      <AlertDialog open={showDiscordDisconnectConfirm} onOpenChange={setShowDiscordDisconnectConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect Discord?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove your role in the Discord server. You'll need to reconnect to regain access to member channels.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                handleUnlinkDiscord();
+                setShowDiscordDisconnectConfirm(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Footer />
     </div>

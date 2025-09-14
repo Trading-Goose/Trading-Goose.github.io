@@ -42,25 +42,101 @@ interface RoleData {
 
 export default function Pricing() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { hasSubscription, subscriptionStatus, variantName } = useSubscription();
-  const { hasRole, getPrimaryRole, userRoles, roleDetails } = useRBAC();
+  const { hasRole, getPrimaryRole, userRoles, roleDetails, isLoading: rbacLoading } = useRBAC();
   const { toast } = useToast();
-
-  // Debug logging - only log if authenticated
-  const primaryRole = isAuthenticated ? getPrimaryRole() : null;
-  if (isAuthenticated) {
-    console.log('[Pricing] Primary role:', primaryRole);
-    console.log('[Pricing] userRoles:', userRoles);
-    console.log('[Pricing] roleDetails:', roleDetails);
-  }
 
   const [roles, setRoles] = useState<RoleData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [roleExpiration, setRoleExpiration] = useState<{ expires_at?: string; current_period_end?: string } | null>(null);
+  const [roleExpirationLoaded, setRoleExpirationLoaded] = useState(false);
+  const [primaryRole, setPrimaryRole] = useState<any>(null);
+  const [primaryRoleLoaded, setPrimaryRoleLoaded] = useState(false);
+  
+  // Single source of truth for loading state
+  const isDataLoading = authLoading || rbacLoading || (isAuthenticated && !roleExpirationLoaded) || (isAuthenticated && !primaryRoleLoaded);
+  
+  // Set primary role when auth and RBAC data is ready
+  useEffect(() => {
+    if (!authLoading && !rbacLoading) {
+      if (isAuthenticated && userRoles.length > 0) {
+        const role = getPrimaryRole();
+        setPrimaryRole(role);
+        setPrimaryRoleLoaded(true);
+        console.log('[Pricing] Primary role set:', role);
+      } else if (isAuthenticated && userRoles.length === 0) {
+        // User is authenticated but has no roles yet
+        setPrimaryRole(null);
+        setPrimaryRoleLoaded(true);
+      } else if (!isAuthenticated) {
+        setPrimaryRole(null);
+        setPrimaryRoleLoaded(true);
+      }
+    }
+  }, [authLoading, rbacLoading, isAuthenticated, userRoles]);
 
+
+  // Fetch role expiration if authenticated
+  useEffect(() => {
+    const fetchRoleExpiration = async () => {
+      // Only fetch after auth is determined
+      if (authLoading) return;
+      
+      // If not authenticated, mark as complete immediately
+      if (!isAuthenticated) {
+        setRoleExpirationLoaded(true);
+        return;
+      }
+      
+      if (!user?.id) {
+        // No user data yet
+        return;
+      }
+      
+      try {
+        // Get the user's primary role with expiration info
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select(`
+            expires_at,
+            current_period_end,
+            roles!inner(
+              priority,
+              name
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('is_active', true);
+
+        console.log('[Pricing] Role expiration data:', data);
+        
+        if (!error && data && data.length > 0) {
+          // Sort by priority (highest first) to get the primary role
+          const sortedRoles = data.sort((a, b) => (b.roles?.priority || 0) - (a.roles?.priority || 0));
+          const highestPriorityRole = sortedRoles[0];
+          
+          setRoleExpiration({
+            expires_at: highestPriorityRole?.expires_at,
+            current_period_end: highestPriorityRole?.current_period_end
+          });
+        } else {
+          // Set empty object to indicate we checked but found no expiration
+          setRoleExpiration({});
+        }
+      } catch (error) {
+        console.error('[Pricing] Error fetching role expiration:', error);
+        setRoleExpiration({});
+      } finally {
+        setRoleExpirationLoaded(true);
+      }
+    };
+
+    fetchRoleExpiration();
+  }, [user, isAuthenticated, authLoading]);
 
   // Fetch all roles except admin
   useEffect(() => {
@@ -118,6 +194,39 @@ export default function Pricing() {
     return Math.round(((yearlyFromMonthly - yearly) / yearlyFromMonthly) * 100);
   };
 
+  // Check if a plan is available for selection
+  const isPlanAvailable = (role: RoleData): boolean => {
+    // Don't make any decisions while loading
+    if (isDataLoading) return false;
+    
+    // If user is not authenticated, all plans are available
+    if (!isAuthenticated) return true;
+    
+    // If it's the user's current plan, it's always available
+    if (primaryRole?.name === role.name) return true;
+    
+    // For permanent roles: expires_at should be checked (not current_period_end which is subscription-related)
+    // A permanent role has no expires_at or an invalid expires_at
+    const expirationDate = roleExpiration?.expires_at;
+    let hasValidExpiration = false;
+    
+    if (expirationDate) {
+      // Check if it's a valid date
+      const date = new Date(expirationDate);
+      // Check if date is valid and not some placeholder like --/--/-- or invalid date
+      hasValidExpiration = !isNaN(date.getTime()) && date.getTime() > 0;
+    }
+    
+    // If user has a permanent role (no valid expires_at) and it's not the default role
+    // then other plans are unavailable
+    if (!hasValidExpiration && primaryRole && primaryRole.name !== 'default') {
+      return false;
+    }
+    
+    // Otherwise, plan is available
+    return true;
+  };
+
   // Handle subscription selection
   const handleSelectPlan = async (role: RoleData) => {
     // If user is not authenticated, redirect to login page
@@ -126,7 +235,17 @@ export default function Pricing() {
       return;
     }
 
-    const primaryRole = getPrimaryRole();
+    // Check if plan is available
+    if (!isPlanAvailable(role)) {
+      toast({
+        title: "Plan Unavailable",
+        description: "This plan is not available for your account type. Please contact support if you need assistance.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Use the state variable primaryRole instead of calling getPrimaryRole()
 
     // If user has an active subscription and wants to switch to a different plan
     if (hasSubscription && primaryRole?.name !== role.name) {
@@ -333,6 +452,9 @@ export default function Pricing() {
 
   // Get button text based on current subscription
   const getButtonText = (role: RoleData) => {
+    // Don't calculate anything while loading
+    if (isDataLoading) return "";
+    
     if (isProcessing === role.id) return "Processing...";
 
     // If user is not authenticated, always show "Get Started"
@@ -340,13 +462,16 @@ export default function Pricing() {
       return "Get Started";
     }
 
-    const primaryRole = getPrimaryRole();
-
     // Only show "Current Plan" for the user's primary (highest priority) role
     const isCurrentPlan = primaryRole?.name === role.name;
 
     if (isCurrentPlan) {
       return "Current Plan";
+    }
+
+    // Check if plan is available
+    if (!isPlanAvailable(role)) {
+      return "Unavailable";
     }
 
     // If user has a subscription, show "Switch to [Role Display Name]"
@@ -410,8 +535,9 @@ export default function Pricing() {
                   'md:grid-cols-2 lg:grid-cols-4'
               }`}>
               {roles.map((role) => {
-                // Only show "Current Plan" badge for authenticated users with the primary role
-                const isCurrentPlan = isAuthenticated && primaryRole?.name === role.name;
+                // Don't calculate anything while loading
+                const isCurrentPlan = !isDataLoading && isAuthenticated && primaryRole?.name === role.name;
+                const isAvailable = !isDataLoading ? isPlanAvailable(role) : false;
                 const savings = calculateSavings(role.price_monthly, role.price_yearly);
 
                 // Create custom styles based on role color
@@ -511,9 +637,37 @@ export default function Pricing() {
                     </CardContent>
 
                     <CardFooter className="mt-auto">
-                      {isCurrentPlan ? (
+                      {isDataLoading ? (
+                        <Button
+                          className="w-full"
+                          variant="outline"
+                          style={role.color ? {
+                            borderColor: role.color,
+                            color: role.color,
+                            backgroundColor: `${role.color}08`
+                          } : {}}
+                          disabled={true}
+                        >
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Checking Availability...
+                        </Button>
+                      ) : isCurrentPlan ? (
                         <div className="w-full text-center py-2">
-                          <span className="text-[#fc0] font-semibold text-lg">Current Plan</span>
+                          <span className="text-[#fc0] font-semibold text-lg">
+                            Current Plan
+                          </span>
+                        </div>
+                      ) : !isAvailable ? (
+                        <div className="w-full text-center py-2">
+                          <span 
+                            className="font-semibold text-lg"
+                            style={{ 
+                              color: role.color || '#6b7280',
+                              opacity: 0.5
+                            }}
+                          >
+                            Unavailable
+                          </span>
                         </div>
                       ) : (
                         <Button

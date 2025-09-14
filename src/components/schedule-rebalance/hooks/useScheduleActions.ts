@@ -64,17 +64,14 @@ export function useScheduleActions({
         time_of_day: `${hour24.toString().padStart(2, '0')}:${minuteStr}:00`,
         timezone: config.timezone,
         selected_tickers: Array.from(selectedPositions),
-        include_watchlist: includeWatchlist,
-        include_all_positions: false, // Deprecated - always use selected tickers
-        // Rebalance configuration
-        use_default_settings: rebalanceConfig.useDefaultSettings,
-        max_position_size: rebalanceConfig.useDefaultSettings ? null : rebalanceConfig.maxPosition,
-        min_position_size: rebalanceConfig.useDefaultSettings ? null : rebalanceConfig.minPosition,
-        rebalance_threshold: rebalanceConfig.useDefaultSettings ? null : rebalanceConfig.rebalanceThreshold,
-        target_stock_allocation: rebalanceConfig.useDefaultSettings ? null : rebalanceConfig.targetStockAllocation,
-        target_cash_allocation: rebalanceConfig.useDefaultSettings ? null : rebalanceConfig.targetCashAllocation,
+        include_watchlist: includeWatchlist,  // UI flag for editing
+        // Note: include_all_positions removed - deprecated
+        // Rebalance configuration - only save what's configurable in UI
+        rebalance_threshold: rebalanceConfig.rebalanceThreshold,
         skip_threshold_check: rebalanceConfig.skipThresholdCheck,
         skip_opportunity_agent: rebalanceConfig.skipOpportunityAgent,
+        // Note: min/max position size and target allocations are not configurable in scheduled UI
+        // They will use the user's api_settings values
       };
 
       if (existingSchedule) {

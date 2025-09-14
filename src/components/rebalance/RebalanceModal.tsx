@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, Settings, List, AlertCircle } from "lucide-react";
@@ -156,6 +157,18 @@ export default function RebalanceModal({ isOpen, onClose, onApprove }: Rebalance
                 Stock Selection
               </TabsTrigger>
             </TabsList>
+            
+            {/* Stock Selection Limit Display */}
+            {maxStocks > 0 && (
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Stock selection limit: {selectedPositions.size} / {maxStocks} stocks selected
+                </span>
+                {selectedPositions.size >= maxStocks && (
+                  <Badge variant="destructive" className="text-xs">Limit Reached</Badge>
+                )}
+              </div>
+            )}
           </div>
 
           <ConfigurationTab

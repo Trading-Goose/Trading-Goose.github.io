@@ -6,6 +6,7 @@ import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, 
 import { alpacaAPI } from "@/lib/alpaca";
 import { useAuth, isSessionValid } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { getCachedSession } from "@/lib/cachedAuth";
 import { useToast } from "@/hooks/use-toast";
 import AnalysisDetailModal from "@/components/AnalysisDetailModal";
 import RebalanceDetailModal from "@/components/RebalanceDetailModal";
@@ -104,6 +105,153 @@ function RecentTrades() {
     }
   }, [user?.id, isAuthenticated, toast]); // isSessionValid is a pure function, doesn't need to be in deps
 
+  // Function to update Alpaca order status for approved orders using batch API
+  const updateAlpacaOrderStatus = async () => {
+    if (!user?.id || !apiSettings) return;
+
+    try {
+      // Get recent trading actions (last 48 hours) - same timeframe as displayed trades
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+      // Get approved and executed orders with Alpaca IDs in metadata from last 48 hours
+      // Include executed orders in case they need status updates (partial fills, etc.)
+      const { data: approvedOrders, error } = await supabase
+        .from('trading_actions')
+        .select('id, metadata, status, created_at')
+        .eq('user_id', user.id)
+        .in('status', ['approved', 'executed'])
+        .gte('created_at', twoDaysAgo.toISOString());
+
+      if (error || !approvedOrders || approvedOrders.length === 0) {
+        console.log('No approved orders found to update');
+        return;
+      }
+
+      // Filter orders that have Alpaca order IDs
+      const ordersWithAlpacaIds = approvedOrders.filter(o => o.metadata?.alpaca_order?.id);
+      if (ordersWithAlpacaIds.length === 0) {
+        console.log('No orders with Alpaca IDs found');
+        return;
+      }
+
+      // Extract all Alpaca order IDs
+      const alpacaOrderIds = ordersWithAlpacaIds.map(o => o.metadata.alpaca_order.id);
+      console.log(`Fetching status for ${alpacaOrderIds.length} Alpaca orders:`, alpacaOrderIds);
+      
+      // Fetch all orders from Alpaca using batch API
+      const session = await getCachedSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/alpaca-batch`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderIds: alpacaOrderIds,
+          includeOrders: true
+        })
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch orders from Alpaca batch API');
+        return;
+      }
+
+      const responseData = await response.json();
+      console.log('Full response from alpaca-batch:', responseData);
+      const alpacaOrders = responseData?.data?.orders || [];
+      console.log(`Received ${alpacaOrders.length} orders from Alpaca:`, alpacaOrders);
+
+      // Update status for each order
+      let hasUpdates = false;
+      for (const order of ordersWithAlpacaIds) {
+        const alpacaOrderId = order.metadata.alpaca_order.id;
+        const alpacaOrder = alpacaOrders.find((o: any) => o.id === alpacaOrderId);
+
+        if (alpacaOrder) {
+          console.log(`Found Alpaca order ${alpacaOrderId} with status: ${alpacaOrder.status}`);
+          
+          // Check if status has changed or if there's new fill information
+          const currentAlpacaStatus = order.metadata?.alpaca_order?.status;
+          const currentFilledQty = order.metadata?.alpaca_order?.filled_qty;
+          const hasStatusChanged = currentAlpacaStatus !== alpacaOrder.status;
+          const hasNewFillData = alpacaOrder.filled_qty && alpacaOrder.filled_qty !== currentFilledQty;
+          
+          // Always update if we don't have a status yet, or if something changed
+          if (!currentAlpacaStatus || hasStatusChanged || hasNewFillData) {
+            console.log(`Order ${alpacaOrderId} updating: current status "${currentAlpacaStatus}" -> new status "${alpacaOrder.status}"`);
+            hasUpdates = true;
+            
+            // Build the alpaca_order object, only including defined values
+            const alpacaOrderUpdate: any = {
+              ...(order.metadata?.alpaca_order || {}),
+              status: alpacaOrder.status,
+              updated_at: new Date().toISOString()
+            };
+            
+            // Only add filled_qty and filled_avg_price if they exist
+            if (alpacaOrder.filled_qty) {
+              alpacaOrderUpdate.filled_qty = parseFloat(alpacaOrder.filled_qty);
+            }
+            if (alpacaOrder.filled_avg_price) {
+              alpacaOrderUpdate.filled_avg_price = parseFloat(alpacaOrder.filled_avg_price);
+            }
+            
+            // Update metadata with latest Alpaca order info
+            const updatedMetadata = {
+              ...(order.metadata || {}),
+              alpaca_order: alpacaOrderUpdate
+            };
+
+            const updates: any = {
+              metadata: updatedMetadata
+            };
+
+            // If order is filled, update execution timestamp in metadata
+            if (alpacaOrder.status === 'filled') {
+              // Store execution details in metadata, not in main status field
+              updates.executed_at = alpacaOrder.filled_at || new Date().toISOString();
+              console.log(`Order ${alpacaOrderId} is filled, updating execution timestamp`);
+            } else if (['canceled', 'cancelled', 'rejected', 'expired'].includes(alpacaOrder.status) && order.status === 'approved') {
+              // Only update to rejected if it was approved before
+              updates.status = 'rejected';
+              console.log(`Marking order ${alpacaOrderId} as rejected due to Alpaca status: ${alpacaOrder.status}`);
+            }
+
+            console.log(`Updating order ${order.id} with:`, updates);
+            const { data: updateData, error: updateError } = await supabase
+              .from('trading_actions')
+              .update(updates)
+              .eq('id', order.id)
+              .select();
+              
+            if (updateError) {
+              console.error(`Failed to update order ${order.id}:`, updateError);
+              console.error('Update payload was:', updates);
+            } else {
+              console.log(`Successfully updated order ${order.id}`, updateData);
+            }
+          } else {
+            console.log(`Order ${alpacaOrderId} unchanged at status: ${currentAlpacaStatus}`);
+          }
+        } else {
+          console.log(`No matching Alpaca order found for ${alpacaOrderId}`);
+        }
+      }
+
+      // Refresh the trades after a short delay if we made updates
+      if (hasUpdates) {
+        console.log('Updates were made, refreshing trades...');
+        setTimeout(() => {
+          fetchAllTrades();
+        }, 500);
+      }
+    } catch (err) {
+      console.error('Error updating Alpaca order status:', err);
+    }
+  };
+
   // Track if we've already fetched for current user
   const fetchedRef = useRef<string>('');
   const lastFetchTimeRef = useRef<number>(0);
@@ -132,10 +280,31 @@ function RecentTrades() {
     // Add a small delay on initial mount to ensure session is settled
     const timeoutId = setTimeout(() => {
       fetchAllTrades();
+      
+      // Also update Alpaca order status if credentials exist
+      const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
+      if (hasCredentials) {
+        console.log('Alpaca credentials detected, updating order status...');
+        updateAlpacaOrderStatus();
+      }
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [user?.id, isAuthenticated, fetchAllTrades]); // Include isAuthenticated in dependencies
+  }, [user?.id, isAuthenticated, fetchAllTrades, apiSettings]); // Include isAuthenticated and apiSettings in dependencies
+
+  // Periodically update Alpaca order status
+  useEffect(() => {
+    const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
+
+    if (!hasCredentials) return;
+
+    const interval = setInterval(() => {
+      console.log('Periodic order status update...');
+      updateAlpacaOrderStatus();
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [apiSettings, user]);
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -232,7 +401,7 @@ function RecentTrades() {
 
   const renderTradeCard = (decision: TradeDecision) => {
     const isPending = decision.status === 'pending';
-    const isExecuted = decision.status === 'executed';
+    const isExecuted = decision.alpacaOrderStatus === 'filled' || decision.alpacaOrderStatus === 'partially_filled';
     const isApproved = decision.status === 'approved';
     const isRejected = decision.status === 'rejected';
 
@@ -373,30 +542,25 @@ function RecentTrades() {
                       const status = decision.alpacaOrderStatus.toLowerCase();
                       let variant: any = "outline";
                       let icon = null;
-                      let displayText = decision.alpacaOrderStatus;
                       let customClasses = "";
 
+                      // Display the actual Alpaca status directly
                       if (status === 'filled') {
                         variant = "success";
                         icon = <CheckCircle className="h-3 w-3 mr-1" />;
-                        displayText = "filled";
                       } else if (status === 'partially_filled') {
                         variant = "default";
                         icon = <Clock className="h-3 w-3 mr-1" />;
-                        displayText = "partial filled";
                         customClasses = "bg-blue-500 text-white border-blue-500";
-                      } else if (['new', 'pending_new', 'accepted'].includes(status)) {
+                      } else if (['new', 'pending_new', 'accepted', 'pending_replace', 'pending_cancel'].includes(status)) {
                         variant = "warning";
                         icon = <Clock className="h-3 w-3 mr-1" />;
-                        displayText = "placed";
-                      } else if (['canceled', 'cancelled'].includes(status)) {
+                      } else if (['canceled', 'cancelled', 'expired', 'replaced'].includes(status)) {
                         variant = "destructive";
                         icon = <XCircle className="h-3 w-3 mr-1" />;
-                        displayText = "failed";
                       } else if (status === 'rejected') {
                         variant = "destructive";
                         icon = <XCircle className="h-3 w-3 mr-1" />;
-                        displayText = "rejected";
                       }
 
                       return (
@@ -405,10 +569,10 @@ function RecentTrades() {
                           className={`text-xs ${customClasses}`}
                         >
                           {icon}
-                          {displayText}
-                          {decision.alpacaFilledQty && status === 'partially_filled' ? (
+                          {decision.alpacaOrderStatus}
+                          {decision.alpacaFilledQty > 0 && status === 'partially_filled' && (
                             <span className="ml-1">({decision.alpacaFilledQty}/{decision.quantity})</span>
-                          ) : null}
+                          )}
                         </Badge>
                       );
                     })()}
@@ -500,7 +664,13 @@ function RecentTrades() {
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => fetchAllTrades()}
+            onClick={() => {
+              fetchAllTrades();
+              const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
+              if (hasCredentials) {
+                updateAlpacaOrderStatus();
+              }
+            }}
             disabled={loading}
           >
             {loading ? (

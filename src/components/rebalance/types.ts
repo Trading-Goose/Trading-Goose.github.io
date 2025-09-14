@@ -10,7 +10,6 @@ export interface RebalancePosition {
 }
 
 export interface RebalanceConfig {
-  useDefaultSettings: boolean;
   maxPosition: number;
   minPosition: number;
   rebalanceThreshold: number;

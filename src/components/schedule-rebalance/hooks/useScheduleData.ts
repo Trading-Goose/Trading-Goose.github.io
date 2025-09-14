@@ -144,12 +144,13 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
         });
 
         setRebalanceConfig({
-          useDefaultSettings: scheduleData.use_default_settings ?? true,
-          maxPosition: scheduleData.max_position_size || apiSettings?.rebalance_max_position_size || 10000,
-          minPosition: scheduleData.min_position_size || apiSettings?.rebalance_min_position_size || 100,
+          // Position size and allocations not configurable in scheduled UI
+          // Will use user's api_settings values at runtime
+          maxPosition: 25,  // Default placeholder, not used
+          minPosition: 5,   // Default placeholder, not used
           rebalanceThreshold: scheduleData.rebalance_threshold || apiSettings?.rebalance_threshold || 10,
-          targetStockAllocation: scheduleData.target_stock_allocation || 80,
-          targetCashAllocation: scheduleData.target_cash_allocation || 20,
+          targetStockAllocation: 80, // Default placeholder, not used
+          targetCashAllocation: 20,  // Default placeholder, not used
           skipThresholdCheck: scheduleData.skip_threshold_check || false,
           // Force skip if no opportunity agent access
           skipOpportunityAgent: !hasOppAccess ? true : (scheduleData.skip_opportunity_agent || false)
@@ -163,12 +164,13 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
       } else {
         if (apiSettings) {
           setRebalanceConfig(prev => ({
-            useDefaultSettings: true,
-            maxPosition: apiSettings.rebalance_max_position_size || 10000,
-            minPosition: apiSettings.rebalance_min_position_size || 100,
+            // Position size and allocations not configurable in scheduled UI
+            // Will use user's api_settings values at runtime
+            maxPosition: 25,  // Default placeholder, not used
+            minPosition: 5,   // Default placeholder, not used
             rebalanceThreshold: apiSettings.rebalance_threshold || 10,
-            targetStockAllocation: 80,
-            targetCashAllocation: 20,
+            targetStockAllocation: 80, // Default placeholder, not used
+            targetCashAllocation: 20,  // Default placeholder, not used
             skipThresholdCheck: false,
             // Force skip if no opportunity agent access
             skipOpportunityAgent: !hasOppAccess

@@ -32,43 +32,102 @@ export interface StockData {
   };
 }
 
-// Helper to format timestamps based on period
-const formatTimestamp = (timestamp: number, period: string): string => {
-  const date = new Date(timestamp * 1000);
+// Period configuration centralized
+interface PeriodConfig {
+  apiPeriod?: '1D' | '1W' | '1M' | '3M' | '1A' | 'all';
+  timeframe: string;
+  downsampleTarget: number;
+  dateFormat: Intl.DateTimeFormatOptions;
+}
 
-  switch (period) {
-    case '1D':
-      // Use 24-hour format for clarity, display in user's local timezone
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-    case '1W':
-      return date.toLocaleDateString('en-US', { weekday: 'short' });
-    case '1M':
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    case '3M':
-    case 'YTD':
-    case '1Y':
-      return date.toLocaleDateString('en-US', { month: 'short' });
-    case '5Y':
-    case 'All':
-      return date.toLocaleDateString('en-US', { year: 'numeric' });
-    default:
-      return date.toLocaleDateString();
+const PERIOD_CONFIGS: Record<string, PeriodConfig> = {
+  '1D': {
+    apiPeriod: '1D',
+    timeframe: '5Min',
+    downsampleTarget: 30,
+    dateFormat: { hour: '2-digit', minute: '2-digit', hour12: false }
+  },
+  '1W': {
+    apiPeriod: '1W',
+    timeframe: '2Hour',
+    downsampleTarget: 30,
+    dateFormat: { weekday: 'short' }
+  },
+  '1M': {
+    apiPeriod: '1M',
+    timeframe: '6Hour',
+    downsampleTarget: 0, // No downsampling for 1M
+    dateFormat: { month: 'short', day: 'numeric' }
+  },
+  '3M': {
+    apiPeriod: '3M',
+    timeframe: '1Day',
+    downsampleTarget: 30,
+    dateFormat: { month: 'short', day: 'numeric' }
+  },
+  'YTD': {
+    apiPeriod: '1A',
+    timeframe: '1Day',
+    downsampleTarget: 40,
+    dateFormat: { month: 'short', day: 'numeric' }
+  },
+  '1Y': {
+    apiPeriod: '1A',
+    timeframe: '1Day',
+    downsampleTarget: 40,
+    dateFormat: { month: 'short', day: 'numeric' }
+  },
+  '5Y': {
+    apiPeriod: 'all',
+    timeframe: '1Week',
+    downsampleTarget: 50,
+    dateFormat: { month: 'short', year: 'numeric' }
+  },
+  'All': {
+    apiPeriod: 'all',
+    timeframe: '1Day',
+    downsampleTarget: 50,
+    dateFormat: { month: 'short', year: 'numeric' }
   }
+};
+
+// Unified date formatting helper
+const formatDate = (date: Date, period: string): string => {
+  const config = PERIOD_CONFIGS[period];
+  if (!config) return date.toLocaleDateString();
+  
+  // For time-based formatting (1D), use toLocaleTimeString
+  if (period === '1D') {
+    return date.toLocaleTimeString('en-US', config.dateFormat);
+  }
+  
+  return date.toLocaleDateString('en-US', config.dateFormat);
+};
+
+// Helper to format timestamps (for portfolio history with Unix timestamps)
+const formatTimestamp = (timestamp: number, period: string): string => {
+  return formatDate(new Date(timestamp * 1000), period);
+};
+
+// Get target points for downsampling based on period
+const getDownsampleTarget = (period: string): number => {
+  return PERIOD_CONFIGS[period]?.downsampleTarget || 30;
 };
 
 // Downsamples data points to a manageable number for display
 const downsampleData = (
   data: PortfolioDataPoint[],
-  targetPoints: number = 80
+  period: string
 ): PortfolioDataPoint[] => {
   if (!data || data.length === 0) {
     console.log('Downsample: No data to downsample');
     return [];
   }
+
+  const targetPoints = getDownsampleTarget(period);
+  
+  // No downsampling if target is 0 (e.g., for 1M period)
+  if (targetPoints === 0) return data;
 
   // If we already have fewer points than target, return as is
   if (data.length <= targetPoints) {
@@ -78,14 +137,13 @@ const downsampleData = (
 
   console.log(`Downsample: Reducing ${data.length} points to ${targetPoints}`);
 
-  // Calculate the step size for sampling - use data.length / 80 as requested
   const step = data.length / targetPoints;
   const downsampled: PortfolioDataPoint[] = [];
 
   // Always include the first point (oldest)
   downsampled.push(data[0]);
 
-  // Sample points at regular intervals using the calculated step
+  // Sample points at regular intervals
   for (let i = 1; i < targetPoints - 1; i++) {
     const index = Math.floor(i * step);
     if (index < data.length) {
@@ -100,8 +158,22 @@ const downsampleData = (
   }
 
   console.log(`Downsample: Final result has ${downsampled.length} points (step size was ${step.toFixed(2)})`);
-
   return downsampled;
+};
+
+// Find market open index for 1D data
+const findMarketOpenIndex = (timestamps: number[]): number => {
+  for (let i = 0; i < timestamps.length; i++) {
+    const date = new Date(timestamps[i] * 1000);
+    const etTime = date.toLocaleTimeString('en-US', {
+      timeZone: 'America/New_York',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    if (etTime >= '09:30') return i;
+  }
+  return 0;
 };
 
 // Convert Alpaca portfolio history to our format
@@ -113,33 +185,10 @@ const convertAlpacaHistory = (
     return [];
   }
 
-  // For 1D period, we want to use the value at market open (9:30 AM ET) as reference
-  // not the base_value which might be from previous close
+  // For 1D period, use market open value as reference
   let baseValue = history.base_value || history.equity[0];
-
   if (period === '1D' && history.timestamp.length > 0) {
-    // Find the first timestamp that's at or after 9:30 AM ET (market open)
-    // Alpaca timestamps are in seconds since epoch
-    let marketOpenIndex = 0;
-
-    for (let i = 0; i < history.timestamp.length; i++) {
-      const date = new Date(history.timestamp[i] * 1000);
-      // Get the time in ET
-      const etTime = date.toLocaleTimeString('en-US', {
-        timeZone: 'America/New_York',
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      // Check if this is at or after 09:30
-      if (etTime >= '09:30') {
-        marketOpenIndex = i;
-        break;
-      }
-    }
-
-    // Use the value at market open as the base
+    const marketOpenIndex = findMarketOpenIndex(history.timestamp);
     baseValue = history.equity[marketOpenIndex];
     console.log(`Portfolio 1D: Using market open value as base: ${baseValue} (index: ${marketOpenIndex})`);
   }
@@ -151,91 +200,48 @@ const convertAlpacaHistory = (
 
     return {
       time: formatTimestamp(timestamp, period),
-      value: value,
-      pnl: pnl,
-      pnlPercent: pnlPercent
+      value,
+      pnl,
+      pnlPercent
     };
   });
+};
+
+// Get API period and timeframe for portfolio history
+const getPortfolioApiConfig = (period: string): { apiPeriod: string; timeframe: string } => {
+  const config = PERIOD_CONFIGS[period];
+  
+  // Special handling for portfolio API which uses different timeframes
+  const portfolioTimeframes: Record<string, string> = {
+    '1D': '5Min',
+    '1W': '1H',
+    '1M': '1D', // 1D because intraday timeframes only allowed for periods < 30 days
+    '3M': '1D',
+    'YTD': '1D',
+    '1Y': '1D',
+    '5Y': '1D',
+    'All': '1D'
+  };
+  
+  return {
+    apiPeriod: config?.apiPeriod || '1M',
+    timeframe: portfolioTimeframes[period] || '1D'
+  };
 };
 
 // Fetch portfolio data for a specific period
 export const fetchPortfolioDataForPeriod = async (period: string): Promise<PortfolioDataPoint[]> => {
   try {
-    let apiPeriod: '1D' | '1W' | '1M' | '3M' | '1A' | 'all';
-    let timeframe: '1Min' | '5Min' | '15Min' | '1H' | '1D';
-
-    switch (period) {
-      case '1D':
-        apiPeriod = '1D';
-        timeframe = '5Min';
-        break;
-      case '1W':
-        apiPeriod = '1W';
-        timeframe = '1H';
-        break;
-      case '1M':
-        apiPeriod = '1M';
-        // Use 1D timeframe for 1M because intraday timeframes are only allowed for periods < 30 days
-        // and 1M is exactly 30 days, which hits the limit
-        timeframe = '1D';
-        break;
-      case '3M':
-        apiPeriod = '3M';
-        timeframe = '1D';
-        break;
-      case 'YTD':
-        // For YTD, use 1A (one year) period and filter to current year later
-        // This ensures we get all data from January 1st to now
-        apiPeriod = '1A';
-        timeframe = '1D';
-        break;
-      case '1Y':
-        apiPeriod = '1A';
-        timeframe = '1D';
-        break;
-      case '5Y':
-        apiPeriod = 'all';
-        timeframe = '1D';
-        break;
-      case 'All':
-        apiPeriod = 'all';
-        timeframe = '1D';
-        break;
-      default:
-        apiPeriod = '1M';
-        timeframe = '1D';
-    }
-
-    const data = await alpacaAPI.getPortfolioHistory(apiPeriod, timeframe);
+    const { apiPeriod, timeframe } = getPortfolioApiConfig(period);
+    const data = await alpacaAPI.getPortfolioHistory(apiPeriod as any, timeframe as any);
     let convertedData = convertAlpacaHistory(data, period);
 
-    // For YTD, filter to only include data from current year
-    if (period === 'YTD' && data.timestamp && data.timestamp.length > 0) {
-      const currentYear = new Date().getFullYear();
-      const yearStart = new Date(currentYear, 0, 1).getTime() / 1000; // Convert to seconds
-
-      // Find the index where current year starts
-      let startIndex = 0;
-      for (let i = 0; i < data.timestamp.length; i++) {
-        if (data.timestamp[i] >= yearStart) {
-          startIndex = i;
-          break;
-        }
-      }
-
-      // Filter the converted data to only include current year
-      if (startIndex > 0) {
-        const filteredHistory = {
-          ...data,
-          timestamp: data.timestamp.slice(startIndex),
-          equity: data.equity.slice(startIndex),
-          base_value: data.equity[startIndex] // Use first value of the year as base
-        };
-        convertedData = convertAlpacaHistory(filteredHistory, period);
-      }
+    // For YTD, filter to current year only
+    if (period === 'YTD') {
+      convertedData = filterToCurrentYear(convertedData, data);
     }
 
-    return downsampleData(convertedData, 80); // Always use 80 points
+    return downsampleData(convertedData, period);
   } catch (error) {
     console.error(`Error fetching portfolio data for period ${period}:`, error);
     throw error;
@@ -270,14 +276,14 @@ export const fetchPortfolioData = async (): Promise<PortfolioData> => {
     const allData = await alpacaAPI.getPortfolioHistory('all', '1D');
 
     return {
-      '1D': downsampleData(convertAlpacaHistory(dayData, '1D'), 80),
-      '1W': downsampleData(convertAlpacaHistory(weekData, '1W'), 80),
-      '1M': downsampleData(convertAlpacaHistory(monthData, '1M'), 80),
-      '3M': downsampleData(convertAlpacaHistory(threeMonthData, '3M'), 80),
-      'YTD': downsampleData(convertAlpacaHistory(ytdData, 'YTD'), 80),
-      '1Y': downsampleData(convertAlpacaHistory(yearData, '1Y'), 80),
-      '5Y': downsampleData(convertAlpacaHistory(allData, '5Y'), 80),
-      'All': downsampleData(convertAlpacaHistory(allData, 'All'), 80)
+      '1D': downsampleData(convertAlpacaHistory(dayData, '1D'), '1D'),
+      '1W': downsampleData(convertAlpacaHistory(weekData, '1W'), '1W'),
+      '1M': downsampleData(convertAlpacaHistory(monthData, '1M'), '1M'),
+      '3M': downsampleData(convertAlpacaHistory(threeMonthData, '3M'), '3M'),
+      'YTD': downsampleData(convertAlpacaHistory(ytdData, 'YTD'), 'YTD'),
+      '1Y': downsampleData(convertAlpacaHistory(yearData, '1Y'), '1Y'),
+      '5Y': downsampleData(convertAlpacaHistory(allData, '5Y'), '5Y'),
+      'All': downsampleData(convertAlpacaHistory(allData, 'All'), 'All')
     };
   } catch (error) {
     console.error('Error fetching portfolio data:', error);
@@ -298,7 +304,6 @@ const convertBarsToDataPoints = (
   console.log(`Converting ${bars.length} bars for period ${period}. Sample bar:`, bars[0]);
 
   const firstBar = bars[0];
-  // Alpaca v2 API uses 'c' for close, 't' for timestamp
   const firstPrice = firstBar.c !== undefined ? firstBar.c : firstBar.close;
 
   if (firstPrice === undefined || firstPrice === null) {
@@ -306,13 +311,10 @@ const convertBarsToDataPoints = (
     return [];
   }
 
-  // For 1D period, use the first bar's price (market open) as reference
-  // This shows today's change from open, not from previous close
   const referencePrice = firstPrice;
 
   return bars.map((bar: any) => {
     const price = bar.c !== undefined ? bar.c : bar.close;
-
     if (price === undefined || price === null) {
       console.warn(`Skipping bar with invalid price:`, bar);
       return null;
@@ -320,137 +322,133 @@ const convertBarsToDataPoints = (
 
     const pnl = price - referencePrice;
     const pnlPercent = referencePrice !== 0 ? ((price - referencePrice) / referencePrice) * 100 : 0;
-
-    // Format time based on period
-    // Alpaca returns ISO strings for timestamps in 't' field
     const date = new Date(bar.t || bar.timestamp);
-    let timeLabel: string;
-
-    switch (period) {
-      case '1D':
-        // Display in user's local timezone - the date object already has the correct time
-        // from Alpaca's RFC3339 timestamps which include timezone info
-        timeLabel = date.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-          // Don't specify timeZone - let it use the user's local timezone
-        });
-        break;
-      case '1W':
-        timeLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
-        break;
-      case '1M':
-        timeLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        break;
-      case '3M':
-      case 'YTD':
-      case '1Y':
-        timeLabel = date.toLocaleDateString('en-US', { month: 'short' });
-        break;
-      case '5Y':
-      case 'All':
-        timeLabel = date.toLocaleDateString('en-US', { year: 'numeric' });
-        break;
-      default:
-        timeLabel = date.toLocaleDateString();
-    }
 
     return {
-      time: timeLabel,
+      time: formatDate(date, period),
       value: price,
-      pnl: pnl,
-      pnlPercent: pnlPercent
+      pnl,
+      pnlPercent
     };
-  }).filter(point => point !== null) as PortfolioDataPoint[]; // Filter out any null values
+  }).filter(point => point !== null) as PortfolioDataPoint[];
+};
+
+// Filter data to current year (for YTD period)
+const filterToCurrentYear = (convertedData: PortfolioDataPoint[], rawData: any): PortfolioDataPoint[] => {
+  if (!rawData?.timestamp || rawData.timestamp.length === 0) return convertedData;
+  
+  const currentYear = new Date().getFullYear();
+  const yearStart = new Date(currentYear, 0, 1).getTime() / 1000;
+  
+  const startIndex = rawData.timestamp.findIndex((ts: number) => ts >= yearStart);
+  if (startIndex <= 0) return convertedData;
+  
+  const filteredHistory = {
+    ...rawData,
+    timestamp: rawData.timestamp.slice(startIndex),
+    equity: rawData.equity.slice(startIndex),
+    base_value: rawData.equity[startIndex]
+  };
+  
+  return convertAlpacaHistory(filteredHistory, 'YTD');
+};
+
+// Filter bars to most recent trading day
+const filterToMostRecentTradingDay = (bars: any[]): any[] => {
+  if (bars.length === 0) return bars;
+  
+  const sortedBars = [...bars].sort((a, b) => {
+    const timeA = new Date(a.t || a.timestamp).getTime();
+    const timeB = new Date(b.t || b.timestamp).getTime();
+    return timeA - timeB;
+  });
+  
+  const mostRecentBar = sortedBars[sortedBars.length - 1];
+  const mostRecentBarTime = new Date(mostRecentBar.t || mostRecentBar.timestamp);
+  const marketDateStr = mostRecentBarTime.toLocaleDateString('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  return sortedBars.filter((bar: any) => {
+    const barTime = new Date(bar.t || bar.timestamp);
+    const barMarketDate = barTime.toLocaleDateString('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return barMarketDate === marketDateStr;
+  });
 };
 
 // Get date range for different periods (for Alpaca API)
 const getDateRange = (period: string): { start: string; end: string; timeframe: string } => {
-  // Use actual current date
   const now = new Date();
-  // Alpaca API expects RFC3339 format timestamps
   const end = now.toISOString();
   let start: Date;
-  let timeframe: string;
+  
+  const config = PERIOD_CONFIGS[period];
+  const timeframe = config?.timeframe || '1Day';
 
   switch (period) {
     case '1D':
-      // Get intraday data for today and potentially yesterday
-      // Go back 3 days to ensure we capture the most recent trading day
       start = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-      timeframe = '5Min';
-      console.log(`1D data range: ${start.toISOString()} to ${end} (intraday)`);
       break;
     case '1W':
-      // 1 week with 2-hour bars for better balance
       start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      timeframe = '2Hour';
       break;
     case '1M':
-      // 1 month with 6-hour bars for better granularity
       start = new Date(now);
       start.setMonth(now.getMonth() - 1);
-      timeframe = '6Hour';
       break;
     case '3M':
-      // 3 months with daily bars (12Hour not supported)
       start = new Date(now);
       start.setMonth(now.getMonth() - 3);
-      timeframe = '1Day';
       break;
     case 'YTD':
-      // Year to date with daily data
       start = new Date(now.getFullYear(), 0, 1);
-      timeframe = '1Day';
       break;
     case '1Y':
-      // 1 year with daily data
       start = new Date(now);
       start.setFullYear(now.getFullYear() - 1);
-      timeframe = '1Day';
       break;
     case '5Y':
-      // 5 years of weekly data
       start = new Date(now);
       start.setFullYear(now.getFullYear() - 5);
-      timeframe = '1Week';
       break;
     case 'All':
-      // All available data - use maximum history with daily bars
-      start = new Date('2015-01-01'); // Request from far back to get all available
-      timeframe = '1Day';
+      start = new Date('2015-01-01');
       break;
     default:
-      // Default to 1 month of daily data
       start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      timeframe = '1Day';
   }
 
-  return {
-    start: start.toISOString(),
-    end,
-    timeframe
-  };
+  return { start: start.toISOString(), end, timeframe };
+};
+
+// Check Alpaca credentials
+const checkAlpacaCredentials = (): void => {
+  const authState = useAuth.getState();
+  const apiSettings = authState.apiSettings;
+  const isPaperTrading = apiSettings?.alpaca_paper_trading ?? true;
+  const hasCredentials = isPaperTrading
+    ? (apiSettings?.alpaca_paper_api_key && apiSettings?.alpaca_paper_secret_key)
+    : (apiSettings?.alpaca_live_api_key && apiSettings?.alpaca_live_secret_key);
+
+  if (!hasCredentials) {
+    console.error('Alpaca API credentials not configured');
+    throw new Error('Alpaca API credentials not configured. Please add them in Settings.');
+  }
 };
 
 // Fetch stock data for a specific period
 export const fetchStockDataForPeriod = async (ticker: string, period: string): Promise<PortfolioDataPoint[]> => {
   try {
     console.log(`Fetching ${period} data for ${ticker} from Alpaca...`);
-
-    // Check if Alpaca is configured
-    const authState = useAuth.getState();
-    const apiSettings = authState.apiSettings;
-    const isPaperTrading = apiSettings?.alpaca_paper_trading ?? true;
-    const hasCredentials = isPaperTrading
-      ? (apiSettings?.alpaca_paper_api_key && apiSettings?.alpaca_paper_secret_key)
-      : (apiSettings?.alpaca_live_api_key && apiSettings?.alpaca_live_secret_key);
-
-    if (!hasCredentials) {
-      console.error('Alpaca API credentials not configured');
-      throw new Error('Alpaca API credentials not configured. Please add them in Settings.');
-    }
+    checkAlpacaCredentials();
 
     const { start, end, timeframe } = getDateRange(period);
 
@@ -481,68 +479,30 @@ export const fetchStockDataForPeriod = async (ticker: string, period: string): P
     }
 
     // For 1D, filter to most recent trading day
-    let filteredBars = bars;
+    let filteredBars = period === '1D' && bars.length > 0 
+      ? filterToMostRecentTradingDay(bars)
+      : bars;
 
-    if (period === '1D' && bars.length > 0) {
-      // Sort bars by time to ensure chronological order
-      const sortedBars = [...bars].sort((a: any, b: any) => {
-        const timeA = new Date(a.t || a.timestamp).getTime();
-        const timeB = new Date(b.t || b.timestamp).getTime();
-        return timeA - timeB;
-      });
-
-      // Find the most recent trading day
-      const mostRecentBar = sortedBars[sortedBars.length - 1];
-      const mostRecentBarTime = new Date(mostRecentBar.t || mostRecentBar.timestamp);
-
-      // Get the market date (ET) for the most recent bar
-      const marketDateStr = mostRecentBarTime.toLocaleDateString('en-US', {
-        timeZone: 'America/New_York',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      });
-
-      // Filter to only include bars from the most recent trading day
-      filteredBars = sortedBars.filter((bar: any) => {
-        const barTime = new Date(bar.t || bar.timestamp);
-        const barMarketDate = barTime.toLocaleDateString('en-US', {
-          timeZone: 'America/New_York',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        });
-        return barMarketDate === marketDateStr;
-      });
-
-      console.log(`1D data filtered to most recent trading day:`, {
-        originalBars: sortedBars.length,
-        filteredBars: filteredBars.length,
-        marketDate: marketDateStr
-      });
+    if (period === '1D' && filteredBars.length !== bars.length) {
+      console.log(`1D data filtered: ${bars.length} -> ${filteredBars.length} bars`);
     }
 
     // Convert and downsample the data for display
     let fullData = convertBarsToDataPoints(filteredBars, period);
 
-    // For YTD, filter to only include data from current year
-    if (period === 'YTD' && fullData.length > 0) {
+    // For YTD, filter to current year
+    if (period === 'YTD' && filteredBars.length > 0) {
       const currentYear = new Date().getFullYear();
-
-      // Filter data points to only include current year
-      // Since the time labels are formatted strings, we need to parse the original bars
       const yearStartTime = new Date(currentYear, 0, 1).getTime();
-      const filteredYTDBars = filteredBars.filter((bar: any) => {
-        const barTime = new Date(bar.t || bar.timestamp).getTime();
-        return barTime >= yearStartTime;
-      });
-
-      if (filteredYTDBars.length > 0) {
-        fullData = convertBarsToDataPoints(filteredYTDBars, period);
+      const ytdBars = filteredBars.filter((bar: any) => 
+        new Date(bar.t || bar.timestamp).getTime() >= yearStartTime
+      );
+      if (ytdBars.length > 0) {
+        fullData = convertBarsToDataPoints(ytdBars, period);
       }
     }
 
-    return downsampleData(fullData, 80); // Always use 80 points
+    return downsampleData(fullData, period);
   } catch (error) {
     console.error(`Error fetching ${period} data for ${ticker}:`, error);
     return [];
@@ -554,168 +514,16 @@ export const fetchStockDataForPeriod = async (ticker: string, period: string): P
 export const fetchStockData = async (ticker: string): Promise<StockData[string]> => {
   try {
     console.log(`Fetching historical data for ${ticker} from Alpaca...`);
+    checkAlpacaCredentials();
 
-    // Check if Alpaca is configured
-    const authState = useAuth.getState();
-    const apiSettings = authState.apiSettings;
-    const isPaperTrading = apiSettings?.alpaca_paper_trading ?? true;
-    const hasCredentials = isPaperTrading
-      ? (apiSettings?.alpaca_paper_api_key && apiSettings?.alpaca_paper_secret_key)
-      : (apiSettings?.alpaca_live_api_key && apiSettings?.alpaca_live_secret_key);
-
-    if (!hasCredentials) {
-      console.error('Alpaca API credentials not configured');
-      throw new Error('Alpaca API credentials not configured. Please add them in Settings.');
-    }
-
-    // Define periods and their configurations (removed 'live' as it's problematic)
+    // Define periods
     const periods = ['1D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'All'];
     const stockData: any = {};
 
-    // Fetch data for each period
+    // Fetch data for each period using the refactored single-period function
     const fetchPromises = periods.map(async (period) => {
       try {
-        const { start, end, timeframe } = getDateRange(period);
-
-        // Apply different downsampling based on period
-        let targetPoints = 100; // Default for good chart resolution
-        switch (period) {
-          case '1D':
-            targetPoints = 96; // Every 15 minutes for a day
-            break;
-          case '1W':
-            targetPoints = 168; // Hourly for a week
-            break;
-          case '1M':
-            targetPoints = 30; // Daily points for a month
-            break;
-          case '3M':
-            targetPoints = 90; // Daily for 3 months
-            break;
-          case 'YTD':
-            targetPoints = 52; // Weekly for YTD
-            break;
-          case '1Y':
-            targetPoints = 52; // Weekly for a year (1 point per week)
-            break;
-          case '5Y':
-            targetPoints = 60; // Monthly for 5 years (12 points per year)
-            break;
-          case 'All':
-            targetPoints = 130; // Bi-weekly data (26 weeks * 5 years = 130 points for 5 years, more for longer)
-            break;
-        }
-
-        // Log the request details for debugging
-        console.log(`Fetching ${period} data for ${ticker}:`, {
-          timeframe,
-          start,
-          end,
-          targetPoints
-        });
-
-        // Use the Alpaca getStockBars method
-        let bars = await alpacaAPI.getStockBars(
-          ticker,
-          timeframe,
-          start,
-          end
-        );
-
-        console.log(`Response for ${ticker} ${period}:`, {
-          barsReceived: bars?.length || 0,
-          firstBar: bars?.[0] ? { time: bars[0].t, close: bars[0].c } : null,
-          lastBar: bars?.[bars.length - 1] ? { time: bars[bars.length - 1].t, close: bars[bars.length - 1].c } : null
-        });
-
-        if (!bars || bars.length === 0) {
-          console.warn(`No ${period} data available for ${ticker}. This could be due to market hours or no trading activity.`);
-          stockData[period] = [];
-          return;
-        }
-
-        // For 1D, we need to get previous day's close to calculate proper daily change
-        let previousClose: number | null = null;
-        let filteredBars = bars;
-
-        if (period === '1D' && bars.length > 0) {
-          // Sort bars by time to ensure chronological order
-          const sortedBars = [...bars].sort((a: any, b: any) => {
-            const timeA = new Date(a.t || a.timestamp).getTime();
-            const timeB = new Date(b.t || b.timestamp).getTime();
-            return timeA - timeB;
-          });
-
-          // Find the most recent trading day
-          // Compare dates in market timezone (ET) to avoid timezone issues
-          const mostRecentBar = sortedBars[sortedBars.length - 1];
-          const mostRecentBarTime = new Date(mostRecentBar.t || mostRecentBar.timestamp);
-
-          // Get the market date (ET) for the most recent bar
-          const marketDateStr = mostRecentBarTime.toLocaleDateString('en-US', {
-            timeZone: 'America/New_York',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-          });
-
-          // Filter to only include bars from the most recent trading day
-          // Compare dates in ET timezone to ensure correct filtering
-          filteredBars = sortedBars.filter((bar: any) => {
-            const barTime = new Date(bar.t || bar.timestamp);
-            const barMarketDate = barTime.toLocaleDateString('en-US', {
-              timeZone: 'America/New_York',
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit'
-            });
-            return barMarketDate === marketDateStr;
-          });
-
-          // For logging purposes, show the gap from previous close
-          // But we'll use today's open as reference for the chart
-          try {
-            const batchData = await alpacaAPI.getBatchData([ticker], {
-              includeQuotes: true,
-              includeBars: true
-            });
-
-            if (batchData[ticker]?.previousBar && filteredBars.length > 0) {
-              const prevClose = batchData[ticker].previousBar.c;
-              const todayOpen = filteredBars[0].c || filteredBars[0].close;
-              const gapFromPrevClose = todayOpen - prevClose;
-              const gapPercent = prevClose > 0 ? (gapFromPrevClose / prevClose) * 100 : 0;
-              console.log(`${ticker} - Previous close: ${prevClose}, Today's open: ${todayOpen}, Gap: ${gapFromPrevClose.toFixed(2)} (${gapPercent.toFixed(2)}%)`);
-            }
-          } catch (err) {
-            console.warn(`Could not fetch previous close for logging:`, err);
-          }
-
-          console.log(`1D data filtered to most recent trading day:`, {
-            originalBars: sortedBars.length,
-            filteredBars: filteredBars.length,
-            marketDate: marketDateStr,
-            previousClose,
-            firstBar: filteredBars[0] ? new Date(filteredBars[0].t || filteredBars[0].timestamp).toLocaleString() : 'none',
-            lastBar: filteredBars[filteredBars.length - 1] ? new Date(filteredBars[filteredBars.length - 1].t || filteredBars[filteredBars.length - 1].timestamp).toLocaleString() : 'none'
-          });
-        }
-
-        // Convert and downsample the data for display
-        // For 1D, we use open price as reference (already handled in convertBarsToDataPoints)
-        const fullData = convertBarsToDataPoints(filteredBars, period);
-
-        // Log the actual time labels for 1D data
-        if (period === '1D' && fullData.length > 0) {
-          console.log('1D data time labels:', {
-            first3: fullData.slice(0, 3).map(d => d.time),
-            last3: fullData.slice(-3).map(d => d.time),
-            total: fullData.length
-          });
-        }
-
-        stockData[period] = downsampleData(fullData, 80); // Always use 80 points
-        console.log(`Converted ${period} data for ${ticker}: ${fullData.length} points downsampled to ${stockData[period].length}`);
+        stockData[period] = await fetchStockDataForPeriod(ticker, period);
       } catch (err) {
         console.error(`Error fetching ${period} data for ${ticker}:`, err);
         stockData[period] = [];

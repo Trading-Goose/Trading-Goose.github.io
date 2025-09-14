@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { LabelWithHelp } from "@/components/ui/help-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import { Progress } from "@/components/ui/progress";
 import { TabsContent } from "@/components/ui/tabs";
 // Reuse components from RebalanceModal
 import { ConfigurationSummary } from "@/components/rebalance/components/ConfigurationSummary";
@@ -16,7 +15,6 @@ import type { RebalanceConfig } from "../types";
 interface SettingsTabProps {
   rebalanceConfig: RebalanceConfig;
   setRebalanceConfig: (config: RebalanceConfig) => void;
-  handleStockAllocationChange: (value: number[]) => void;
   selectedPositionsCount: number;
   includeWatchlist: boolean;
   watchlistSelectedCount: number;
@@ -25,7 +23,6 @@ interface SettingsTabProps {
 export function SettingsTab({
   rebalanceConfig,
   setRebalanceConfig,
-  handleStockAllocationChange,
   selectedPositionsCount,
   includeWatchlist,
   watchlistSelectedCount
@@ -38,92 +35,9 @@ export function SettingsTab({
       <div className="space-y-6">
         <Card className="p-6">
           <div className="space-y-6">
-            {/* Use Default Settings */}
-            <div className="flex items-center space-x-3">
-              <Checkbox
-                id="useDefault"
-                checked={rebalanceConfig.useDefaultSettings}
-                onCheckedChange={(checked) =>
-                  setRebalanceConfig({ ...rebalanceConfig, useDefaultSettings: checked as boolean })
-                }
-              />
-              <LabelWithHelp
-                htmlFor="useDefault"
-                label="Use default rebalance configuration from user settings"
-                helpContent="Automatically uses settings from Settings > Rebalance tab. When checked, all fields below become read-only"
-                className="text-sm font-medium cursor-pointer"
-              />
-            </div>
-
             {/* Configuration Fields */}
-            <div className={`space-y-6 ${rebalanceConfig.useDefaultSettings ? 'opacity-50 pointer-events-none' : ''}`}>
-              {/* Position Size Limits */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <LabelWithHelp
-                    label="Min Position Size"
-                    helpContent="Minimum position size as percentage of portfolio. Prevents too many small positions. Lower values allow more positions but may increase trading costs."
-                  />
-                  <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                    <span className="w-8 text-sm text-muted-foreground">5%</span>
-                    <Slider
-                      value={[rebalanceConfig.minPosition]}
-                      onValueChange={(value) => {
-                        const newMin = value[0];
-                        setRebalanceConfig({
-                          ...rebalanceConfig,
-                          minPosition: newMin,
-                          // Ensure max is always greater than min
-                          maxPosition: rebalanceConfig.maxPosition <= newMin ? Math.min(newMin + 5, 50) : rebalanceConfig.maxPosition
-                        });
-                      }}
-                      min={5}
-                      max={25}
-                      step={5}
-                      className="flex-1"
-                      disabled={rebalanceConfig.useDefaultSettings}
-                    />
-                    <span className="w-12 text-sm text-muted-foreground">25%</span>
-                    <span className="w-12 text-center font-medium">{rebalanceConfig.minPosition}%</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Minimum percentage of portfolio per position (currently {rebalanceConfig.minPosition}%)
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <LabelWithHelp
-                    label="Max Position Size"
-                    helpContent="Maximum position size as percentage of portfolio. Ensures diversification by limiting exposure to any single stock. Recommended: 20-30% for balanced diversification."
-                  />
-                  <div className="flex items-center space-x-4 py-3 min-h-[40px]">
-                    <span className="w-12 text-sm text-muted-foreground">{rebalanceConfig.minPosition}%</span>
-                    <Slider
-                      value={[rebalanceConfig.maxPosition]}
-                      onValueChange={(value) => {
-                        const newMax = value[0];
-                        setRebalanceConfig({
-                          ...rebalanceConfig,
-                          maxPosition: newMax
-                          // Max is always at least min position size
-                        });
-                      }}
-                      min={rebalanceConfig.minPosition}
-                      max={50}
-                      step={5}
-                      className="flex-1"
-                      disabled={rebalanceConfig.useDefaultSettings}
-                    />
-                    <span className="w-12 text-sm text-muted-foreground">50%</span>
-                    <span className="w-12 text-center font-medium">{rebalanceConfig.maxPosition}%</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Maximum percentage of portfolio per position (currently {rebalanceConfig.maxPosition}%)
-                  </p>
-                </div>
-              </div>
-
-              {/* Rebalance Threshold */}
+            <div className="space-y-6">
+              {/* Rebalance Threshold - Now at the top like RebalanceTab */}
               <div className="space-y-2">
                 <LabelWithHelp
                   htmlFor="threshold"
@@ -140,7 +54,7 @@ export function SettingsTab({
                     ...rebalanceConfig,
                     rebalanceThreshold: value[0]
                   })}
-                  disabled={rebalanceConfig.useDefaultSettings || rebalanceConfig.skipThresholdCheck}
+                  disabled={rebalanceConfig.skipThresholdCheck}
                   className="w-full"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -160,7 +74,6 @@ export function SettingsTab({
                         skipOpportunityAgent: checked ? true : rebalanceConfig.skipOpportunityAgent
                       });
                     }}
-                    disabled={rebalanceConfig.useDefaultSettings}
                   />
                   <LabelWithHelp
                     htmlFor="skipThreshold"
@@ -174,6 +87,7 @@ export function SettingsTab({
                 </p>
               </div>
 
+
               {/* Opportunity Agent Option */}
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
@@ -183,7 +97,7 @@ export function SettingsTab({
                     onCheckedChange={(checked) =>
                       setRebalanceConfig({ ...rebalanceConfig, skipOpportunityAgent: checked as boolean })
                     }
-                    disabled={rebalanceConfig.useDefaultSettings || rebalanceConfig.skipThresholdCheck || !hasOppAccess}
+                    disabled={rebalanceConfig.skipThresholdCheck || !hasOppAccess}
                   />
                   <LabelWithHelp
                     htmlFor="skipOpportunity"
@@ -202,44 +116,6 @@ export function SettingsTab({
                 </p>
               </div>
 
-              {/* Portfolio Allocation */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <LabelWithHelp
-                    label="Portfolio Allocation"
-                    helpContent="Target allocation between stocks and cash"
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <LabelWithHelp
-                        label={`Stock Allocation: ${rebalanceConfig.targetStockAllocation}%`}
-                        helpContent="Percentage to invest in stocks. Higher = more growth potential, more risk. Age-based rule: 100 minus your age = stock percentage"
-                        className="text-sm"
-                      />
-                      <Slider
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={[rebalanceConfig.targetStockAllocation]}
-                        onValueChange={handleStockAllocationChange}
-                        disabled={rebalanceConfig.useDefaultSettings}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <LabelWithHelp
-                        label={`Cash Allocation: ${rebalanceConfig.targetCashAllocation}%`}
-                        helpContent="Percentage to keep in cash for opportunities and stability. Higher cash = more defensive, lower returns"
-                        className="text-sm"
-                      />
-                      <Progress value={rebalanceConfig.targetCashAllocation} className="h-2 mt-6" />
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Target allocation between stocks and cash in your portfolio
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Reuse WorkflowExplanation from RebalanceModal */}

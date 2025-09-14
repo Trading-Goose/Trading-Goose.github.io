@@ -56,11 +56,15 @@ export default function Header() {
       }
 
       try {
-        // Check running analyses
+        // Check running analyses - only fetch from last 24 hours
+        const twentyFourHoursAgo = new Date();
+        twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+        
         const { data: analysisData } = await supabase
           .from('analysis_history')
           .select('id, analysis_status, is_canceled')
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .gte('created_at', twentyFourHoursAgo.toISOString());
 
         if (analysisData) {
           const runningCount = analysisData.filter(item => {

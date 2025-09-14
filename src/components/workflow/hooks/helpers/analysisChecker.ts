@@ -35,10 +35,15 @@ export async function checkRunningAnalyses({
   // Check database for running analyses if user is authenticated
   if (user) {
     try {
+      // Only fetch analyses from the last 24 hours (for checking running analyses)
+      const twentyFourHoursAgo = new Date();
+      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+      
       const { data, error } = await supabase
         .from('analysis_history')
         .select('ticker, analysis_status, full_analysis, created_at, id, decision, agent_insights, rebalance_request_id, is_canceled')
         .eq('user_id', user.id)
+        .gte('created_at', twentyFourHoursAgo.toISOString()) // Only last 24 hours
         .order('created_at', { ascending: false });
 
       if (!error && data) {
@@ -99,8 +104,12 @@ export async function checkRunningAnalyses({
   if (justCompleted.length > 0) {
     console.log('Analyses completed, reloading for:', justCompleted);
 
-    // Fetch the completed analysis data
+    // Fetch the completed analysis data (should be recent)
     try {
+      // Only look for analyses completed in the last hour
+      const oneHourAgo = new Date();
+      oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+      
       const { data, error } = await supabase
         .from('analysis_history')
         .select('*')
@@ -108,6 +117,7 @@ export async function checkRunningAnalyses({
         .eq('is_canceled', false)
         .in('ticker', justCompleted)
         .neq('analysis_status', ANALYSIS_STATUS.CANCELLED)
+        .gte('created_at', oneHourAgo.toISOString()) // Only recent completions
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();

@@ -302,11 +302,15 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       // Check database for running analyses if user is authenticated
       if (user && isAuthenticated) {
         try {
-          // Get all analyses
+          // Get analyses from last 7 days (enough to show recent activity for watchlist)
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          
           const { data, error } = await supabase
             .from('analysis_history')
             .select('ticker, analysis_status, full_analysis, is_canceled, created_at')
             .eq('user_id', user.id)
+            .gte('created_at', sevenDaysAgo.toISOString())
             .order('created_at', { ascending: false });
 
           if (!error && data) {

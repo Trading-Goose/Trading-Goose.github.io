@@ -57,7 +57,6 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showRebalanceModal, setShowRebalanceModal] = useState(false);
   const [showRebalanceDetailModal, setShowRebalanceDetailModal] = useState(false);
   const [showScheduleListModal, setShowScheduleListModal] = useState(false);
@@ -201,7 +200,6 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       });
 
       setPositions(formattedPositions);
-      setLastRefresh(new Date());
     } catch (err) {
       console.error('Error fetching positions:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch positions';
@@ -262,12 +260,31 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       }
 
       try {
+        // Only fetch analyses from the last 24 hours for checking running status
+        const twentyFourHoursAgo = new Date();
+        twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+        
         const { data, error } = await supabase
           .from('analysis_history')
           .select('id, analysis_status, is_canceled')
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .gte('created_at', twentyFourHoursAgo.toISOString())
+          .abortSignal(new AbortController().signal); // Add fresh signal to avoid conflicts
 
-        if (!error && data) {
+        if (error) {
+          // Handle 500 errors gracefully
+          if (error.message?.includes('500') || error.code === '500') {
+            console.warn('Server error fetching analysis history, will retry later');
+            return;
+          }
+          // Log other unexpected errors
+          if (!error.message?.includes('abort')) {
+            console.error('Error checking running analyses:', error);
+          }
+          return;
+        }
+        
+        if (data) {
           const runningCount = data.filter(item => {
             // Convert legacy numeric status if needed
             const currentStatus = typeof item.analysis_status === 'number' 
@@ -329,18 +346,32 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       }
 
       try {
+        // Only fetch rebalances from today (for checking active status)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
         // Check for active rebalance requests using centralized status logic
         const { data: allRebalances, error } = await supabase
           .from('rebalance_requests')
           .select('id, status, created_at, completed_at, rebalance_plan')
           .eq('user_id', user.id)
+          .gte('created_at', today.toISOString()) // Only today's rebalances
           .order('created_at', { ascending: false })
           .limit(10); // Get recent rebalances to check their status
 
         if (error) {
-          // Don't log permission errors when not authenticated
-          if (error.code !== '42501' && error.message !== 'permission denied for table rebalance_requests') {
-            console.warn('Error checking rebalance requests:', error);
+          // Don't log permission errors, abort errors, or auth errors
+          const isPermissionError = error.code === '42501' || error.message?.includes('permission denied');
+          const isAbortError = error.message?.includes('AbortError') || error.message?.includes('signal is aborted');
+          const isAuthError = error.message?.includes('JWT') || error.message?.includes('token') || error.code === 'PGRST301';
+          
+          if (!isPermissionError && !isAbortError && !isAuthError) {
+            // Only log unexpected errors with details
+            console.warn('Error checking rebalance requests:', {
+              code: error.code,
+              message: error.message,
+              hint: error.hint
+            });
           }
           return;
         }
@@ -499,11 +530,6 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
 
             </div>
           </div>
-          {lastRefresh && (
-            <p className="text-xs text-muted-foreground">
-              Last updated: {lastRefresh.toLocaleTimeString()}
-            </p>
-          )}
           {error && (
             <p className="text-xs text-red-500 mt-1">{error}</p>
           )}

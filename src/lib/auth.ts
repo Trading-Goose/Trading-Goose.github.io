@@ -797,7 +797,7 @@ export const initializeAuth = () => {
   useAuth.getState().initialize();
   
   // Set up a periodic check to restore auth if lost (every 5 seconds)
-  const authCheckInterval = setInterval(() => {
+  const authCheckInterval = setInterval(async () => {
     const state = useAuth.getState();
     
     // Check if current JWT token is about to expire and warn user
@@ -820,8 +820,15 @@ export const initializeAuth = () => {
       }
       
       // Proactively refresh token when it has less than 10 minutes remaining
-      if (timeUntilExpiry > 0 && timeUntilExpiry < 600 && !(window as any).__tokenRefreshTriggered) {
+      // But add a cooldown to prevent multiple refresh attempts
+      const lastRefreshAttempt = (window as any).__lastTokenRefreshAttempt || 0;
+      const refreshCooldown = 60000; // 1 minute cooldown between refresh attempts
+      
+      if (timeUntilExpiry > 0 && timeUntilExpiry < 600 && 
+          !(window as any).__tokenRefreshTriggered &&
+          (Date.now() - lastRefreshAttempt) > refreshCooldown) {
         (window as any).__tokenRefreshTriggered = true;
+        (window as any).__lastTokenRefreshAttempt = Date.now();
         console.log('🔐 Token expiring in', Math.floor(timeUntilExpiry / 60), 'minutes - triggering refresh');
         
         // Trigger token refresh

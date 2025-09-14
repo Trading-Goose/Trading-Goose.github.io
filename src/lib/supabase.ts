@@ -13,8 +13,14 @@ if (!supabaseUrl || !supabasePublishableKey) {
   });
 }
 
-// Track rate limit status
+// Track rate limit status with exponential backoff
 let rateLimitedUntil: number = 0;
+let rateLimitBackoff: number = 30000; // Start with 30 seconds
+let consecutiveRateLimits: number = 0;
+
+// Cache for session to avoid excessive getSession calls
+let cachedSessionToken: string | null = null;
+let cachedSessionExpiry: number = 0;
 
 // Export function to check rate limit status
 export const isRateLimited = () => rateLimitedUntil > Date.now();
@@ -24,6 +30,9 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    // Reduce refresh frequency - only refresh when token has 1 minute left (instead of default 60 seconds)
+    // This helps prevent conflicts with our manual refresh logic
+    autoRefreshTickDuration: 60,
     // Use the default storage key that matches the project
     // This should be 'sb-lnvjsqyvhczgxvygbqer-auth-token'
     // Let Supabase handle the key automatically
@@ -55,16 +64,62 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
       // For all Supabase API calls, ensure we're using the latest session
       if (typeof url === 'string' && (url.includes('/rest/v1/') || url.includes('/functions/v1/'))) {
         try {
-          // Get the current session from auth state
-          const currentSession = await supabase.auth.getSession();
-          if (currentSession.data.session?.access_token) {
-            // Ensure the Authorization header is set with the current token
+          let accessToken = null;
+          
+          // First check our in-memory cache (valid for 5 seconds to batch rapid API calls)
+          const now = Date.now();
+          if (cachedSessionToken && cachedSessionExpiry > now) {
+            accessToken = cachedSessionToken;
+          } else {
+            // Cache expired, check localStorage next
+            const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
+            const storedSession = localStorage.getItem(storageKey);
+            
+            if (storedSession) {
+              try {
+                const sessionData = JSON.parse(storedSession);
+                if (sessionData?.access_token) {
+                  // Check if token is not too expired (allow up to 2 hours expired for recovery)
+                  const payload = JSON.parse(atob(sessionData.access_token.split('.')[1]));
+                  const tokenExp = payload.exp;
+                  const nowSeconds = Math.floor(now / 1000);
+                  const timeUntilExpiry = tokenExp - nowSeconds;
+                  
+                  if (timeUntilExpiry > -7200) { // Within 2 hours of expiry
+                    accessToken = sessionData.access_token;
+                    // Cache it for 5 seconds to avoid repeated parsing
+                    cachedSessionToken = accessToken;
+                    cachedSessionExpiry = now + 5000;
+                  }
+                }
+              } catch (e) {
+                // Ignore parsing errors
+              }
+            }
+            
+            // Only call getSession if we absolutely need to (no cached or stored token)
+            // AND we're not rate limited
+            if (!accessToken && !isRateLimited()) {
+              const currentSession = await supabase.auth.getSession();
+              if (currentSession.data.session?.access_token) {
+                accessToken = currentSession.data.session.access_token;
+                // Cache it for 5 seconds
+                cachedSessionToken = accessToken;
+                cachedSessionExpiry = now + 5000;
+              }
+            }
+          }
+          
+          // Set the Authorization header if we have a token
+          if (accessToken) {
             const headers = new Headers(options.headers || {});
-            headers.set('Authorization', `Bearer ${currentSession.data.session.access_token}`);
+            headers.set('Authorization', `Bearer ${accessToken}`);
+            headers.set('apikey', supabasePublishableKey); // Also ensure API key is set
             options = { ...options, headers };
           }
         } catch (e) {
           // If getting session fails, proceed with original options
+          console.warn('Failed to add auth headers:', e);
         }
       }
       // Check if this is a token refresh request
@@ -160,13 +215,21 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
         // Check if the existing signal is already aborted
         if (options.signal.aborted) {
           clearTimeout(timeoutId);
-          console.log('Skipping fetch - existing signal already aborted');
+          // Don't log for routine aborts (component unmounts, etc)
+          if (!(window as any).__suppressAbortLogs) {
+            console.log('Skipping fetch - existing signal already aborted');
+          }
           throw new DOMException('The user aborted a request.', 'AbortError');
         }
         // Create a combined signal that aborts if either signal aborts
         const combinedController = new AbortController();
-        options.signal.addEventListener('abort', () => combinedController.abort());
-        controller.signal.addEventListener('abort', () => combinedController.abort());
+        const abortHandler = () => {
+          if (!combinedController.signal.aborted) {
+            combinedController.abort();
+          }
+        };
+        options.signal.addEventListener('abort', abortHandler, { once: true });
+        controller.signal.addEventListener('abort', abortHandler, { once: true });
         signal = combinedController.signal;
       }
 
@@ -213,11 +276,15 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
 
         // Immediately check for 429 rate limit on token refresh BEFORE returning
         if (response.status === 429 && isTokenRefresh) {
+          // Increment consecutive rate limits and apply exponential backoff
+          consecutiveRateLimits++;
+          rateLimitBackoff = Math.min(300000, 30000 * Math.pow(2, consecutiveRateLimits - 1)); // Max 5 minutes
+          
           // Set the flag IMMEDIATELY
           (window as any).__supabaseRateLimited = true;
-          // Set rate limit for 30 seconds
-          rateLimitedUntil = Date.now() + 30000;
-          console.error('🔐 Token refresh rate limited! Backing off for 30 seconds');
+          // Set rate limit with exponential backoff
+          rateLimitedUntil = Date.now() + rateLimitBackoff;
+          console.error(`🔐 Token refresh rate limited! Backing off for ${rateLimitBackoff / 1000} seconds (attempt ${consecutiveRateLimits})`);
 
           // Set a global flag so components know we're rate limited
           (window as any).__supabaseRateLimited = true;
@@ -226,6 +293,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
           setTimeout(async () => {
             rateLimitedUntil = 0;
             (window as any).__supabaseRateLimited = false;
+            consecutiveRateLimits = Math.max(0, consecutiveRateLimits - 1); // Gradually reduce backoff
             console.log('🔐 Rate limit cleared, token refresh can resume');
 
             // Try to restore the session if auth state was lost
@@ -300,6 +368,15 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
           }
         }
 
+        // Reset rate limit counter on successful token refresh
+        if (response.ok && isTokenRefresh) {
+          consecutiveRateLimits = 0;
+          rateLimitBackoff = 30000; // Reset to initial backoff
+          // Clear the cache so next request gets fresh token
+          cachedSessionToken = null;
+          cachedSessionExpiry = 0;
+        }
+        
         return response;
       } catch (error) {
         clearTimeout(timeoutId);
@@ -454,6 +531,37 @@ export const supabaseFunctions = {
 
     if (error) throw error;
     return data;
+  }
+};
+
+// Helper function to manually recover session after rate limit
+export const recoverSession = async () => {
+  try {
+    // Check if we're still rate limited
+    if (rateLimitedUntil > Date.now()) {
+      console.log('🔐 Still rate limited, waiting...');
+      return false;
+    }
+    
+    // Clear rate limit flag
+    rateLimitedUntil = 0;
+    delete (window as any).__supabaseRateLimited;
+    
+    // Try to refresh the session
+    const { data, error } = await supabase.auth.refreshSession();
+    
+    if (!error && data.session) {
+      console.log('🔐 Session recovered successfully');
+      consecutiveRateLimits = 0; // Reset counter on success
+      rateLimitBackoff = 30000; // Reset backoff
+      return true;
+    } else {
+      console.error('🔐 Failed to recover session:', error);
+      return false;
+    }
+  } catch (error) {
+    console.error('🔐 Error recovering session:', error);
+    return false;
   }
 };
 

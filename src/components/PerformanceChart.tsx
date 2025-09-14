@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { alpacaAPI } from "@/lib/alpaca";
 import { useAuth, isSessionValid } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { fetchPortfolioData, fetchStockData, type PortfolioData, type StockData } from "@/lib/portfolio-data";
+import { fetchPortfolioDataForPeriod, fetchStockDataForPeriod, type PortfolioData, type StockData, type PortfolioDataPoint } from "@/lib/portfolio-data";
 import { useNavigate } from "react-router-dom";
 
 interface PerformanceChartProps {
@@ -41,8 +41,8 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
   const [positionsLoading, setPositionsLoading] = useState(true); // Track positions loading separately
   const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<any>(null);
-  const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
-  const [stockData, setStockData] = useState<StockData>({});
+  const [portfolioData, setPortfolioData] = useState<{ [period: string]: PortfolioDataPoint[] }>({});
+  const [stockData, setStockData] = useState<{ [ticker: string]: { [period: string]: PortfolioDataPoint[] } }>({});
   const [positions, setPositions] = useState<any[]>([]);
   const [hasAlpacaConfig, setHasAlpacaConfig] = useState(true); // Assume configured initially
   const { apiSettings, isAuthenticated } = useAuth();
@@ -51,8 +51,9 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
   // Track if we've already fetched for current apiSettings and selectedStock
   const fetchedRef = useRef<string>('');
   const lastFetchTimeRef = useRef<number>(0);
+  const metricsLoaded = useRef(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (period: string) => {
     // Debounce fetches - don't fetch if we just fetched less than 2 seconds ago
     const now = Date.now();
     if (now - lastFetchTimeRef.current < 2000) {
@@ -64,13 +65,33 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
     setError(null);
 
     try {
-      // First try to fetch portfolio data (doesn't require Alpaca API)
-      const portfolioHistoryData = await fetchPortfolioData();
-      setPortfolioData(portfolioHistoryData);
+      // Fetch data for the specific period
+      if (selectedStock) {
+        // Check if we already have this data
+        if (!stockData[selectedStock]?.[period]) {
+          const stockHistoryData = await fetchStockDataForPeriod(selectedStock, period);
+          setStockData(prev => ({
+            ...prev,
+            [selectedStock]: {
+              ...prev[selectedStock],
+              [period]: stockHistoryData
+            }
+          }));
+        }
+      } else {
+        // Fetch portfolio data for this period if not cached
+        if (!portfolioData[period]) {
+          const portfolioHistoryData = await fetchPortfolioDataForPeriod(period);
+          setPortfolioData(prev => ({
+            ...prev,
+            [period]: portfolioHistoryData
+          }));
+        }
+      }
 
-      // Try to fetch metrics (which now uses batch internally)
-      // The edge functions will handle checking if Alpaca is configured
-      const metricsData = await alpacaAPI.calculateMetrics().catch(err => {
+      // Try to fetch metrics only once (not period-specific)
+      if (!metricsLoaded.current) {
+        const metricsData = await alpacaAPI.calculateMetrics().catch(err => {
         console.warn("Failed to calculate metrics:", err);
         // Check if it's a configuration error
         if (err.message?.includes('API settings not found') ||
@@ -107,56 +128,33 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
         return null;
       });
 
-      // Positions are now included in metrics data
-      const positionsData = metricsData?.positions || [];
+        // Positions are now included in metrics data
+        const positionsData = metricsData?.positions || [];
 
-      setMetrics(metricsData);
-      setPositions(positionsData || []);
-      setPositionsLoading(false); // Mark positions as loaded
+        setMetrics(metricsData);
+        setPositions(positionsData || []);
+        setPositionsLoading(false); // Mark positions as loaded
+        metricsLoaded.current = true;
+      }
 
-      // If a stock is selected, fetch its data (uses Alpaca API)
-      if (selectedStock) {
+      // Fetch daily change for selected stock if needed
+      if (selectedStock && period === '1D') {
         try {
-          // console.log(`Fetching stock data for ${selectedStock}...`);
-          const stockHistoryData = await fetchStockData(selectedStock);
-          // Debug logging removed to prevent console spam
-          setStockData(prev => {
-            const newState = { ...prev, [selectedStock]: stockHistoryData };
-            // console.log(`Updated stockData state for ${selectedStock}`);
-            return newState;
+          const batchData = await alpacaAPI.getBatchData([selectedStock], {
+            includeQuotes: true,
+            includeBars: true
           });
 
-          // Fetch daily change using batch method
-          try {
-            const batchData = await alpacaAPI.getBatchData([selectedStock], {
-              includeQuotes: true,
-              includeBars: true
-            });
-
-            const data = batchData[selectedStock];
-            if (data?.quote && data?.previousBar) {
-              const currentPrice = data.quote.ap || data.quote.bp || 0;
-              const previousClose = data.previousBar.c;
-              const dayChange = currentPrice - previousClose;
-              const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;
-
-              // console.log(`Daily change for ${selectedStock}: $${dayChange.toFixed(2)} (${dayChangePercent.toFixed(2)}%`);
-            }
-          } catch (err) {
-            console.warn(`Could not fetch daily change for ${selectedStock}:`, err);
+          const data = batchData[selectedStock];
+          if (data?.quote && data?.previousBar) {
+            const currentPrice = data.quote.ap || data.quote.bp || 0;
+            const previousClose = data.previousBar.c;
+            const dayChange = currentPrice - previousClose;
+            // const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;
+            console.log(`Daily change for ${selectedStock}: $${dayChange.toFixed(2)}`);
           }
         } catch (err) {
-          console.error(`Error fetching data for ${selectedStock}:`, err);
-          // Check if it's an API configuration error for stock data
-          if (err instanceof Error &&
-            (err.message.includes('API settings not found') ||
-              err.message.includes('not configured') ||
-              err.message.includes('Edge Function returned a non-2xx status code'))) {
-            setHasAlpacaConfig(false);
-            setError(null); // Don't show error for missing API config
-          } else {
-            setError(`Failed to fetch data for ${selectedStock}: ${err instanceof Error ? err.message : 'Unknown error'}`);
-          }
+          console.warn(`Could not fetch daily change for ${selectedStock}:`, err);
         }
       }
     } catch (err) {
@@ -181,9 +179,9 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
     } finally {
       setLoading(false);
     }
-  }, [apiSettings, selectedStock, toast]);
+  }, [selectedStock, portfolioData, stockData, toast]);
 
-  // Fetch data on component mount and when selectedStock changes
+  // Fetch data when period or stock changes
   useEffect(() => {
     // Don't fetch if not authenticated or session is invalid
     if (!isAuthenticated || !isSessionValid()) {
@@ -191,7 +189,7 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
       return;
     }
     
-    const fetchKey = `${apiSettings?.apiKey || 'none'}-${selectedStock || 'portfolio'}`;
+    const fetchKey = `${selectedStock || 'portfolio'}-${selectedPeriod}`;
     
     // Avoid duplicate fetches for the same configuration
     if (fetchedRef.current === fetchKey) {
@@ -202,11 +200,11 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
     
     // Add a small delay on initial mount to ensure session is settled
     const timeoutId = setTimeout(() => {
-      fetchData();
+      fetchData(selectedPeriod);
     }, 500);
     
     return () => clearTimeout(timeoutId);
-  }, [selectedStock, fetchData, isAuthenticated]); // Include fetchData and isAuthenticated in dependencies
+  }, [selectedStock, selectedPeriod, fetchData, isAuthenticated]); // Include fetchData and isAuthenticated in dependencies
 
   // Get real stock metrics from positions
   const getStockMetrics = useCallback((symbol: string) => {
@@ -271,40 +269,42 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
 
   // Get appropriate data based on selection
   const getCurrentData = useCallback(() => {
-    // Debug logging removed to prevent console spam
-
-    // Check for real stock data first (even if no portfolio data)
-    if (selectedStock && stockData[selectedStock]) {
+    // Check for real stock data first
+    if (selectedStock && stockData[selectedStock]?.[selectedPeriod]) {
       const periodData = stockData[selectedStock][selectedPeriod];
-      // Debug logging removed to prevent console spam
-
       if (periodData && Array.isArray(periodData) && periodData.length > 0) {
-        // console.log(`Returning ${periodData.length} real data points for ${selectedStock} ${selectedPeriod}`);
         return periodData;
-      } else {
-        // console.warn(`No valid data for ${selectedStock} ${selectedPeriod} - periodData:`, periodData);
       }
     }
 
     // Check for portfolio data
-    if (!selectedStock && portfolioData && portfolioData[selectedPeriod]) {
+    if (!selectedStock && portfolioData[selectedPeriod]) {
       const data = portfolioData[selectedPeriod];
-      // console.log(`Returning ${data.length} portfolio data points for ${selectedPeriod}`);
       return data;
     }
 
     // No data available
-    // Debug logging removed to prevent console spam
     return [];
   }, [selectedStock, stockData, selectedPeriod, portfolioData]);
 
   const currentData = useMemo(() => getCurrentData(), [getCurrentData]);
   
+  // Custom tick formatter for X-axis based on period
+  const formatXAxisTick = useCallback((value: string) => {
+    // For 1M period, show abbreviated format
+    if (selectedPeriod === '1M' || selectedPeriod === '3M' || selectedPeriod === 'YTD' || selectedPeriod === '1Y') {
+      // If the value already looks like "Sep 12", keep it
+      // Otherwise try to format it consistently
+      return value;
+    }
+    return value;
+  }, [selectedPeriod]);
+  
   const latestValue = currentData[currentData.length - 1] || { value: 0, pnl: 0 };
   const firstValue = currentData[0] || { value: 0, pnl: 0 };
   const totalReturn = latestValue.pnl || (latestValue.value - firstValue.value);
-  const totalReturnPercent = latestValue.pnlPercent ?
-    parseFloat(latestValue.pnlPercent).toFixed(2) :
+  const totalReturnPercent = 'pnlPercent' in latestValue && latestValue.pnlPercent ?
+    parseFloat(String(latestValue.pnlPercent)).toFixed(2) :
     (firstValue.value > 0 ? ((totalReturn / firstValue.value) * 100).toFixed(2) : '0.00');
   const isPositive = totalReturn >= 0;
 
@@ -394,6 +394,20 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
               </div>
             )}
           </div>
+          <div className="text-xs text-muted-foreground">
+            Data may be incomplete or delayed.{' '}
+            <a
+              href={selectedStock 
+                ? `https://app.alpaca.markets/trade/${selectedStock}`
+                : 'https://app.alpaca.markets/dashboard/overview'
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              View on Alpaca →
+            </a>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -439,6 +453,9 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
                         tick={{ fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
+                        interval="preserveStartEnd"
+                        minTickGap={50}
+                        tickFormatter={formatXAxisTick}
                       />
                       <YAxis
                         domain={yAxisDomain}

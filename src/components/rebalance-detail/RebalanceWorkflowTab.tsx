@@ -317,20 +317,6 @@ function RebalanceWorkflowSteps({
               {step.id === 'analysis' && step.stockAnalyses && (
                 <div className="space-y-4 pl-14">
                   {step.stockAnalyses.map((stockAnalysis: any) => {
-                    // Define workflow steps and determine their status based on agent completion
-                    const getWorkflowStepStatus = (agentKeys: string[]) => {
-                      const agentStatuses = agentKeys.map(key => stockAnalysis.agents?.[key] || 'pending');
-                      const hasError = agentStatuses.some(s => s === 'error' || s === 'failed');
-                      const hasCompleted = agentStatuses.some(s => s === 'completed');
-                      const hasRunning = agentStatuses.some(s => s === 'running');
-                      const allCompleted = agentStatuses.every(s => s === 'completed');
-
-                      if (hasError) return 'error';
-                      if (allCompleted && agentStatuses.length > 0) return 'completed';
-                      if (hasCompleted || hasRunning) return 'running';
-                      return 'pending';
-                    };
-
                     // Get research and other steps from full_analysis workflow steps
                     const fullAnalysis = stockAnalysis.fullAnalysis || {};
                     const fullWorkflowSteps = fullAnalysis.workflowSteps || [];
@@ -341,10 +327,33 @@ function RebalanceWorkflowSteps({
 
                       // Check if all agents in this step are completed
                       const agents = step.agents || [];
+                      
+                      // Debug logging for research phase
+                      if (stepId === 'research' && agents.length > 0) {
+                        console.log(`Research phase full step data:`, step);
+                        console.log(`Research phase agents:`, agents.map((a: any) => ({
+                          name: a.name,
+                          status: a.status,
+                          error: a.error,
+                          errorAt: a.errorAt
+                        })));
+                      }
+                      
                       const anyError = agents.some((a: any) => a.status === 'error' || a.status === 'failed');
                       const allCompleted = agents.length > 0 && agents.every((a: any) => a.status === 'completed');
                       const anyRunning = agents.some((a: any) => a.status === 'running');
                       const anyCompleted = agents.some((a: any) => a.status === 'completed');
+                      
+                      // Check if analysis is complete (by checking if later phases have completed agents)
+                      const analysisComplete = fullWorkflowSteps.some((s: any) => 
+                        (s.id === 'risk' || s.id === 'portfolio') && 
+                        s.agents?.some((a: any) => a.status === 'completed')
+                      );
+
+                      // If analysis is complete but this phase has agents still "running", they actually failed
+                      if (analysisComplete && anyRunning) {
+                        return 'error';  // Agents got stuck/failed
+                      }
 
                       if (anyError) return 'error';
                       if (allCompleted) return 'completed';
@@ -357,7 +366,7 @@ function RebalanceWorkflowSteps({
                         name: 'Data Analysis',
                         key: 'dataAnalysis',
                         icon: ChartBar,
-                        status: getWorkflowStepStatus(['marketAnalyst', 'newsAnalyst', 'socialMediaAnalyst', 'fundamentalsAnalyst'])
+                        status: getStepStatusFromWorkflow('analysis')  // Use consistent method like other phases
                       },
                       {
                         name: 'Research',

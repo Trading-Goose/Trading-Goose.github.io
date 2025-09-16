@@ -275,6 +275,7 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
       setSelectedPositions(new Set());
       setIncludeWatchlist(false);
       setWatchlistStocks([]);
+      setExistingSchedule(null); // Clear existing schedule when modal closes
     }
   }, [isOpen]);
 

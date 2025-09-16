@@ -294,7 +294,8 @@ export const fetchPortfolioData = async (): Promise<PortfolioData> => {
 // Helper to convert Alpaca bar data to our format
 const convertBarsToDataPoints = (
   bars: any[],
-  period: string
+  period: string,
+  previousClose?: number
 ): PortfolioDataPoint[] => {
   if (!bars || bars.length === 0) {
     console.log(`No bars to convert for period ${period}`);
@@ -311,7 +312,13 @@ const convertBarsToDataPoints = (
     return [];
   }
 
-  const referencePrice = firstPrice;
+  // For 1D period with previous close available, use it as reference
+  // Otherwise use the first bar's close price
+  const referencePrice = (period === '1D' && previousClose !== undefined) ? previousClose : firstPrice;
+  
+  if (period === '1D') {
+    console.log(`[convertBarsToDataPoints] ${period}: firstPrice=${firstPrice}, previousClose=${previousClose}, using referencePrice=${referencePrice}`);
+  }
 
   return bars.map((bar: any) => {
     const price = bar.c !== undefined ? bar.c : bar.close;
@@ -487,8 +494,44 @@ export const fetchStockDataForPeriod = async (ticker: string, period: string): P
       console.log(`1D data filtered: ${bars.length} -> ${filteredBars.length} bars`);
     }
 
+    // For 1D period, fetch previous close and current quote for accurate daily change calculation
+    let previousClose: number | undefined;
+    let currentQuotePrice: number | undefined;
+    if (period === '1D') {
+      try {
+        // Get batch data with previous bar and current quote for daily change calculation
+        const batchData = await alpacaAPI.getBatchData([ticker], {
+          includeQuotes: true,
+          includeBars: true
+        });
+        
+        if (batchData[ticker]?.previousBar) {
+          previousClose = batchData[ticker].previousBar.c;
+          console.log(`Using previous close for ${ticker}: $${previousClose}`);
+        }
+        
+        // Prefer latest trade price over quote for accuracy
+        if (batchData[ticker]?.latestTrade?.p) {
+          currentQuotePrice = batchData[ticker].latestTrade.p;
+          console.log(`Current trade price for ${ticker}: $${currentQuotePrice}`);
+        } else if (batchData[ticker]?.quote) {
+          // Use mid-point of bid/ask for better accuracy
+          const bid = batchData[ticker].quote.bp || 0;
+          const ask = batchData[ticker].quote.ap || 0;
+          if (bid > 0 && ask > 0) {
+            currentQuotePrice = (bid + ask) / 2;
+          } else {
+            currentQuotePrice = bid || ask || undefined;
+          }
+          console.log(`Current quote for ${ticker}: $${currentQuotePrice} (bid=${bid}, ask=${ask})`);
+        }
+      } catch (err) {
+        console.warn(`Could not fetch previous close/quote for ${ticker}:`, err);
+      }
+    }
+
     // Convert and downsample the data for display
-    let fullData = convertBarsToDataPoints(filteredBars, period);
+    let fullData = convertBarsToDataPoints(filteredBars, period, previousClose);
 
     // For YTD, filter to current year
     if (period === 'YTD' && filteredBars.length > 0) {
@@ -498,8 +541,44 @@ export const fetchStockDataForPeriod = async (ticker: string, period: string): P
         new Date(bar.t || bar.timestamp).getTime() >= yearStartTime
       );
       if (ytdBars.length > 0) {
-        fullData = convertBarsToDataPoints(ytdBars, period);
+        fullData = convertBarsToDataPoints(ytdBars, period, undefined);
       }
+    }
+
+    // For 1D period with current quote, add/update the last data point with real-time price
+    if (period === '1D' && currentQuotePrice !== undefined && fullData.length > 0) {
+      const referencePrice = previousClose || fullData[0].value;
+      const currentPnl = currentQuotePrice - referencePrice;
+      const currentPnlPercent = referencePrice !== 0 ? (currentPnl / referencePrice) * 100 : 0;
+      
+      // Add a current data point with the real-time quote
+      const now = new Date();
+      const currentTime = formatDate(now, period);
+      
+      // Check if the last point is recent (within last 5 minutes)
+      const lastPoint = fullData[fullData.length - 1];
+      const lastTime = lastPoint.time;
+      
+      // Update or add the current price point
+      if (lastTime === currentTime || fullData.length === 0) {
+        // Update the last point with current quote
+        fullData[fullData.length - 1] = {
+          time: currentTime,
+          value: currentQuotePrice,
+          pnl: currentPnl,
+          pnlPercent: currentPnlPercent
+        };
+      } else {
+        // Add new point for current quote
+        fullData.push({
+          time: currentTime,
+          value: currentQuotePrice,
+          pnl: currentPnl,
+          pnlPercent: currentPnlPercent
+        });
+      }
+      
+      console.log(`Added/updated current quote to 1D data: price=$${currentQuotePrice}, pnl=$${currentPnl.toFixed(2)}, pnlPercent=${currentPnlPercent.toFixed(2)}%`);
     }
 
     return downsampleData(fullData, period);

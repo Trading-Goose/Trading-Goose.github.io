@@ -307,6 +307,18 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
     parseFloat(String(latestValue.pnlPercent)).toFixed(2) :
     (firstValue.value > 0 ? ((totalReturn / firstValue.value) * 100).toFixed(2) : '0.00');
   const isPositive = totalReturn >= 0;
+  
+  // Debug log for 1D period
+  if (selectedStock && selectedPeriod === '1D' && currentData.length > 0) {
+    console.log(`[PerformanceChart] ${selectedStock} 1D data:`, {
+      firstValue: firstValue.value,
+      latestValue: latestValue.value,
+      pnl: latestValue.pnl,
+      pnlPercent: latestValue.pnlPercent,
+      calculatedReturn: totalReturn,
+      calculatedPercent: totalReturnPercent
+    });
+  }
 
   // Calculate dynamic Y-axis domain for better visibility of small changes
   const getYAxisDomain = useCallback(() => {
@@ -617,6 +629,12 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
                           ${Math.abs(totalReturn).toFixed(2)}
                           ({totalReturn >= 0 ? '+' : ''}
                           {totalReturnPercent}%)
+                          {/* Debug info */}
+                          {selectedPeriod === '1D' && (
+                            <span className="text-xs block text-muted-foreground">
+                              (Last: ${latestValue.value?.toFixed(2)}, Ref: ${(latestValue.value - totalReturn).toFixed(2)})
+                            </span>
+                          )}
                         </>
                       ) : (
                         'Loading...'

@@ -176,27 +176,38 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
               updates.description = data.asset.name;
             }
 
-            // Add price data from quote
-            if (data.quote) {
-              const currentPrice = data.quote.ap || data.quote.bp || 0;
+            // Add price data - prefer latest trade over quote for accuracy
+            let currentPrice = 0;
+            
+            // First try to use latest trade price (most accurate)
+            if (data.latestTrade?.p) {
+              currentPrice = data.latestTrade.p;
+              console.log(`[StandaloneWatchlist] ${item.ticker}: Using latest trade price: $${currentPrice}`);
+            } 
+            // Fallback to quote if no trade available
+            else if (data.quote) {
+              // Use mid-point of bid/ask for better accuracy
+              const bid = data.quote.bp || 0;
+              const ask = data.quote.ap || 0;
+              if (bid > 0 && ask > 0) {
+                currentPrice = (bid + ask) / 2;
+              } else {
+                currentPrice = bid || ask || 0;
+              }
+              console.log(`[StandaloneWatchlist] ${item.ticker}: Using quote price: $${currentPrice} (bid=${bid}, ask=${ask})`);
+            }
+            
+            if (currentPrice > 0) {
               updates.currentPrice = currentPrice;
 
-              // Calculate today's change from open (during market hours)
-              // Use currentBar (today's bar) instead of previousBar
-              if (data.currentBar) {
-                const todayOpen = data.currentBar.o; // Today's open price
-                const dayChange = currentPrice - todayOpen;
-                const dayChangePercent = todayOpen > 0 ? (dayChange / todayOpen) * 100 : 0;
-                updates.priceChange = dayChange;
-                updates.priceChangePercent = dayChangePercent;
-                console.log(`${item.ticker}: Open: ${todayOpen}, Current: ${currentPrice}, Change: ${dayChange} (${dayChangePercent.toFixed(2)}%)`);
-              } else if (data.previousBar) {
-                // Fallback to previous close if no current bar (market closed)
+              // Calculate daily change from previous close (standard market calculation)
+              if (data.previousBar) {
                 const previousClose = data.previousBar.c;
                 const dayChange = currentPrice - previousClose;
                 const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;
                 updates.priceChange = dayChange;
                 updates.priceChangePercent = dayChangePercent;
+                console.log(`[StandaloneWatchlist] ${item.ticker}: previousClose=${previousClose}, dayChange=${dayChange} (${dayChangePercent.toFixed(2)}%)`)
               } else {
                 updates.priceChange = 0;
                 updates.priceChangePercent = 0;
@@ -496,20 +507,30 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
 
         const updates: Partial<WatchlistItem> = {};
 
-        // Update price data from quote
-        if (data.quote) {
-          const currentPrice = data.quote.ap || data.quote.bp || 0;
+        // Update price data - prefer latest trade over quote for accuracy
+        let currentPrice = 0;
+        
+        // First try to use latest trade price (most accurate)
+        if (data.latestTrade?.p) {
+          currentPrice = data.latestTrade.p;
+        } 
+        // Fallback to quote if no trade available
+        else if (data.quote) {
+          // Use mid-point of bid/ask for better accuracy
+          const bid = data.quote.bp || 0;
+          const ask = data.quote.ap || 0;
+          if (bid > 0 && ask > 0) {
+            currentPrice = (bid + ask) / 2;
+          } else {
+            currentPrice = bid || ask || 0;
+          }
+        }
+        
+        if (currentPrice > 0) {
           updates.currentPrice = currentPrice;
 
-          // Calculate today's change from open (during market hours)
-          if (data.currentBar) {
-            const todayOpen = data.currentBar.o; // Today's open price
-            const dayChange = currentPrice - todayOpen;
-            const dayChangePercent = todayOpen > 0 ? (dayChange / todayOpen) * 100 : 0;
-            updates.priceChange = dayChange;
-            updates.priceChangePercent = dayChangePercent;
-          } else if (data.previousBar) {
-            // Fallback to previous close if no current bar (market closed)
+          // Calculate daily change from previous close (standard market calculation)
+          if (data.previousBar) {
             const previousClose = data.previousBar.c;
             const dayChange = currentPrice - previousClose;
             const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;

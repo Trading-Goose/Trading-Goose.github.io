@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 const Dashboard = () => {
   const navigate = useNavigate();
   const [selectedStock, setSelectedStock] = useState<string | undefined>(undefined);
+  const [selectedStockDescription, setSelectedStockDescription] = useState<string | undefined>(undefined);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const { isAuthenticated, isLoading, user } = useAuth();
 
@@ -36,12 +37,14 @@ const Dashboard = () => {
     }
   }, [isLoading]);
 
-  const handleSelectStock = (symbol: string) => {
+  const handleSelectStock = (symbol: string, description?: string) => {
     setSelectedStock(symbol);
+    setSelectedStockDescription(description);
   };
 
   const handleClearSelection = () => {
     setSelectedStock(undefined);
+    setSelectedStockDescription(undefined);
   };
 
   // Show loading state while checking authentication
@@ -72,6 +75,7 @@ const Dashboard = () => {
           <div className="xl:col-span-2 space-y-6">
             <PerformanceChart 
               selectedStock={selectedStock}
+              selectedStockDescription={selectedStockDescription}
               onClearSelection={handleClearSelection}
             />
             <StandaloneWatchlist 

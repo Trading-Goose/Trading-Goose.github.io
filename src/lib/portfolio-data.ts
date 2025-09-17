@@ -220,7 +220,7 @@ const getPortfolioApiConfig = (period: string): { apiPeriod: string; timeframe: 
     'YTD': '1D',
     '1Y': '1D',
     '5Y': '1D',
-    'All': '1D'
+    'All': '1W'  // Use weekly for 'All' to handle potentially large datasets
   };
   
   return {
@@ -398,7 +398,7 @@ const getDateRange = (period: string): { start: string; end: string; timeframe: 
   let start: Date;
   
   const config = PERIOD_CONFIGS[period];
-  const timeframe = config?.timeframe || '1Day';
+  let timeframe = config?.timeframe || '1Day';
 
   switch (period) {
     case '1D':
@@ -427,7 +427,12 @@ const getDateRange = (period: string): { start: string; end: string; timeframe: 
       start.setFullYear(now.getFullYear() - 5);
       break;
     case 'All':
-      start = new Date('2015-01-01');
+      // For 'All' period, use an early start date and let Alpaca return whatever is available
+      // Alpaca will automatically return only the data that exists for the stock
+      start = new Date('1970-01-01'); // Use early date - Alpaca will return from actual data start
+      
+      // Default to daily timeframe, will be adjusted after we see how much data is returned
+      timeframe = '1Day';
       break;
     default:
       start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -457,7 +462,7 @@ export const fetchStockDataForPeriod = async (ticker: string, period: string): P
     console.log(`Fetching ${period} data for ${ticker} from Alpaca...`);
     checkAlpacaCredentials();
 
-    const { start, end, timeframe } = getDateRange(period);
+    let { start, end, timeframe } = getDateRange(period);
 
     // Log the request details for debugging
     console.log(`Fetching ${period} data for ${ticker}:`, {
@@ -473,6 +478,31 @@ export const fetchStockDataForPeriod = async (ticker: string, period: string): P
       start,
       end
     );
+
+    // For 'All' period, check the actual data span and re-fetch with weekly timeframe if needed
+    if (period === 'All' && bars && bars.length > 0) {
+      const firstBar = bars[0];
+      const lastBar = bars[bars.length - 1];
+      const firstDate = new Date(firstBar.t || firstBar.timestamp);
+      const lastDate = new Date(lastBar.t || lastBar.timestamp);
+      const yearsDiff = (lastDate.getTime() - firstDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+      
+      // If we have more than 5 years of data and using daily timeframe, switch to weekly
+      if (yearsDiff > 5 && timeframe === '1Day') {
+        console.log(`Stock ${ticker} has ${yearsDiff.toFixed(1)} years of data, re-fetching with weekly timeframe for better performance`);
+        timeframe = '1Week';
+        
+        // Re-fetch with weekly timeframe
+        bars = await alpacaAPI.getStockBars(
+          ticker,
+          timeframe,
+          start,
+          end
+        );
+      } else {
+        console.log(`Stock ${ticker} has ${yearsDiff.toFixed(1)} years of data from ${firstDate.toISOString().split('T')[0]} to ${lastDate.toISOString().split('T')[0]}`);
+      }
+    }
 
     console.log(`Response for ${ticker} ${period}:`, {
       barsReceived: bars?.length || 0,

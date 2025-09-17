@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { X, Loader2, AlertCircle, Settings } from "lucide-react";
+import { X, Loader2, AlertCircle, Settings, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -11,9 +11,11 @@ import { useAuth, isSessionValid, hasAlpacaCredentials } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { fetchPortfolioDataForPeriod, fetchStockDataForPeriod, type PortfolioData, type StockData, type PortfolioDataPoint } from "@/lib/portfolio-data";
 import { useNavigate } from "react-router-dom";
+import StockTickerAutocomplete from "@/components/StockTickerAutocomplete";
 
 interface PerformanceChartProps {
   selectedStock?: string;
+  selectedStockDescription?: string;
   onClearSelection?: () => void;
 }
 
@@ -57,7 +59,7 @@ const formatValue = (value: number | undefined, isMobile: boolean = false): stri
 
 // Remove the old hardcoded function - we'll create a dynamic one in the component
 
-const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: PerformanceChartProps) => {
+const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selectedStockDescription, onClearSelection }: PerformanceChartProps) => {
   const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("1D");
   const [loading, setLoading] = useState(false);
@@ -71,11 +73,37 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
   const hasConfiguredAlpaca = useMemo(() => hasAlpacaCredentials(apiSettings), [apiSettings]);
   const [hasAlpacaConfig, setHasAlpacaConfig] = useState(hasConfiguredAlpaca);
   const { toast } = useToast();
+  
+  // Internal state for selected stock (can be from prop or from search)
+  const [internalSelectedStock, setInternalSelectedStock] = useState<string | undefined>(propSelectedStock);
+  const [tickerInput, setTickerInput] = useState<string>("");
+  const [stockDescription, setStockDescription] = useState<string>(selectedStockDescription || "");
+  
+  // Use prop or internal state
+  const selectedStock = propSelectedStock || internalSelectedStock;
 
   // Track if we've already fetched for current apiSettings and selectedStock
   const fetchedRef = useRef<string>('');
   const lastFetchTimeRef = useRef<number>(0);
   const metricsLoaded = useRef(false);
+
+  // Handle viewing a stock from the search bar
+  const handleViewStock = useCallback(() => {
+    if (tickerInput.trim()) {
+      setInternalSelectedStock(tickerInput.trim().toUpperCase());
+      setTickerInput("");
+    }
+  }, [tickerInput]);
+
+  // Handle clearing the selection
+  const handleClearSelection = useCallback(() => {
+    if (onClearSelection) {
+      onClearSelection();
+    }
+    setInternalSelectedStock(undefined);
+    setTickerInput("");
+    setStockDescription("");
+  }, [onClearSelection]);
 
   const fetchData = useCallback(async (period: string) => {
     // Debounce fetches - don't fetch if we just fetched less than 2 seconds ago
@@ -109,6 +137,22 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
               [period]: stockHistoryData
             }
           }));
+        }
+        
+        // Fetch stock description if not already fetched
+        if (!stockDescription && hasConfiguredAlpaca) {
+          try {
+            const assetInfo = await alpacaAPI.getAsset(selectedStock).catch(err => {
+              console.warn(`Could not fetch asset info for ${selectedStock}:`, err);
+              return null;
+            });
+            
+            if (assetInfo?.name) {
+              setStockDescription(assetInfo.name);
+            }
+          } catch (err) {
+            console.warn(`Could not fetch description for ${selectedStock}:`, err);
+          }
         }
       } else {
         // Fetch portfolio data for this period if not cached
@@ -249,6 +293,15 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
   useEffect(() => {
     setHasAlpacaConfig(hasConfiguredAlpaca);
   }, [hasConfiguredAlpaca]);
+
+  // Sync internal state with prop changes
+  useEffect(() => {
+    if (propSelectedStock !== internalSelectedStock) {
+      setInternalSelectedStock(propSelectedStock);
+      // Update description if provided, otherwise clear it
+      setStockDescription(selectedStockDescription || "");
+    }
+  }, [propSelectedStock, selectedStockDescription]);
 
   // Get real stock metrics from positions
   const getStockMetrics = useCallback((symbol: string) => {
@@ -434,58 +487,89 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
     <Card>
       <CardHeader className="pb-4">
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CardTitle>Performance</CardTitle>
-              {selectedStock && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="default">{selectedStock}</Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={onClearSelection}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Data may be incomplete or delayed.{' '}
-            <a
-              href={selectedStock 
-                ? `https://app.alpaca.markets/trade/${selectedStock}`
-                : 'https://app.alpaca.markets/dashboard/overview'
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              View on Alpaca →
-            </a>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {!hasAlpacaConfig && (
-          <Alert className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>Connect your Alpaca account to view live performance data</span>
+          {!hasAlpacaConfig ? (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border p-4 bg-background">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm">Connect your Alpaca account to view live performance data</span>
+              </div>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/settings?tab=trading')}
-                className="ml-4"
+                onClick={() => navigate('/settings')}
+                className="w-full sm:w-auto"
               >
                 <Settings className="h-4 w-4 mr-2" />
                 Configure API
               </Button>
-            </AlertDescription>
-          </Alert>
-        )}
+            </div>
+          ) : (
+            <>
+              {selectedStock ? (
+                <Badge variant="default" className="flex items-center justify-between w-full pr-1.5 py-2 px-4">
+                  <div className="flex-1" /> {/* Spacer */}
+                  <span className="text-base">
+                    <span className="font-bold">{selectedStock}</span>
+                    {stockDescription && (
+                      <span className="font-medium text-muted-foreground ml-2">
+                        {stockDescription}
+                      </span>
+                    )}
+                  </span>
+                  <div className="flex-1 flex justify-end"> {/* Right-aligned container */}
+                    <button
+                      className="ml-4 rounded-full hover:bg-primary/30 p-0.5 transition-colors"
+                      onClick={handleClearSelection}
+                      type="button"
+                      aria-label="Clear stock selection"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </Badge>
+              ) : (
+                <div className="flex items-center gap-2 w-full">
+                  <StockTickerAutocomplete
+                    value={tickerInput}
+                    onChange={setTickerInput}
+                    onEnterPress={handleViewStock}
+                    onSelect={(suggestion) => {
+                      setInternalSelectedStock(suggestion.symbol);
+                      setStockDescription(suggestion.description || "");
+                      setTickerInput("");
+                    }}
+                    placeholder="Search stock..."
+                    className="flex-1"
+                  />
+                  <Button 
+                    size="sm"
+                    onClick={handleViewStock}
+                    disabled={!tickerInput.trim()}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </Button>
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground">
+                Data may be incomplete or delayed.{' '}
+                <a
+                  href={selectedStock 
+                    ? `https://app.alpaca.markets/trade/${selectedStock}`
+                    : 'https://app.alpaca.markets/dashboard/overview'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  View on Alpaca →
+                </a>
+              </div>
+            </>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
         <Tabs value={selectedPeriod} onValueChange={(value) => setSelectedPeriod(value as TimePeriod)} className="space-y-4">
           <TabsList className="grid w-full grid-cols-8 max-w-5xl mx-auto">
             {periods.map((period) => (

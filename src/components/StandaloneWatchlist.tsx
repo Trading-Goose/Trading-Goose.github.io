@@ -43,7 +43,7 @@ interface WatchlistItem {
 }
 
 interface StandaloneWatchlistProps {
-  onSelectStock?: (ticker: string) => void;
+  onSelectStock?: (ticker: string, description?: string) => void;
   selectedStock?: string;
 }
 
@@ -728,7 +728,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                   onClick={(e) => {
                     // Only trigger selection if not clicking on buttons
                     if ((e.target as HTMLElement).closest('button')) return;
-                    onSelectStock?.(item.ticker);
+                    onSelectStock?.(item.ticker, item.description);
                   }}
                 >
                   {/* Mobile and Desktop: Left side - Stock info */}

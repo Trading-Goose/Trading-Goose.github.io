@@ -41,10 +41,11 @@ interface Position {
   unrealizedPL: number;
   unrealizedPLPct: number;
   dayChange: number;
+  description?: string;
 }
 
 interface PortfolioPositionsProps {
-  onSelectStock?: (symbol: string) => void;
+  onSelectStock?: (symbol: string, description?: string) => void;
   selectedStock?: string;
 }
 
@@ -165,7 +166,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         return;
       }
 
-      // Get batch data for all positions to get today's open prices
+      // Get batch data for all positions to get today's open prices and asset info
       const symbols = alpacaPositions.map((pos: any) => pos.symbol);
       let batchData: any = {};
 
@@ -173,7 +174,8 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         try {
           batchData = await alpacaAPI.getBatchData(symbols, {
             includeQuotes: true,
-            includeBars: true
+            includeBars: true,
+            includeAssets: true // Add this to get company names
           });
         } catch (err) {
           console.warn('Could not fetch batch data for daily changes:', err);
@@ -198,6 +200,9 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
           dayChangePercent = previousClose > 0 ? (priceChange / previousClose) * 100 : 0;
         }
 
+        // Get company description from asset data
+        const description = stockData?.asset?.name || pos.symbol;
+
         return {
           symbol: pos.symbol,
           shares: parseFloat(pos.qty),
@@ -206,7 +211,8 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
           marketValue: parseFloat(pos.market_value),
           unrealizedPL: parseFloat(pos.unrealized_pl),
           unrealizedPLPct: parseFloat(pos.unrealized_plpc) * 100,
-          dayChange: dayChangePercent
+          dayChange: dayChangePercent,
+          description: description
         };
       });
 
@@ -600,7 +606,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                         key={position.symbol}
                         className={`cursor-pointer hover:bg-muted/50 transition-colors ${selectedStock === position.symbol ? 'bg-muted' : ''
                           }`}
-                        onClick={() => onSelectStock?.(position.symbol)}
+                        onClick={() => onSelectStock?.(position.symbol, position.description)}
                       >
                         <TableCell className="font-medium w-[60px]">
                           <Badge variant={selectedStock === position.symbol ? 'default' : 'outline'}>

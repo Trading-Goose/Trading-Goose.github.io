@@ -1299,19 +1299,27 @@ export const isSessionValid = (): boolean => {
 export const hasRequiredApiKeys = (settings: ApiSettings | null): boolean => {
   if (!settings) return false;
 
-  // At minimum, need an AI provider configured
-  if (!settings.ai_provider || !settings.ai_api_key) return false;
+  const provider = settings.ai_provider;
+  const apiKey = settings.ai_api_key;
+
+  if (!provider || !apiKey) return false;
+
+  // Settings fetched via settings-proxy return masked keys (with • characters).
+  // Treat masked values as valid so the UI reflects the saved configuration.
+  if (apiKey.includes('•') || apiKey.includes('*')) {
+    return true;
+  }
 
   // Check if the API key appears valid based on provider
-  switch (settings.ai_provider) {
+  switch (provider) {
     case 'openai':
-      return settings.ai_api_key.startsWith('sk-') && settings.ai_api_key.length > 20;
+      return apiKey.startsWith('sk-') && apiKey.length > 20;
     case 'anthropic':
-      return settings.ai_api_key.startsWith('sk-ant-') && settings.ai_api_key.length > 20;
+      return apiKey.startsWith('sk-ant-') && apiKey.length > 20;
     case 'openrouter':
-      return settings.ai_api_key.startsWith('sk-or-') && settings.ai_api_key.length > 20;
+      return apiKey.startsWith('sk-or-') && apiKey.length > 20;
     default:
-      return settings.ai_api_key.length > 10;
+      return apiKey.length > 10;
   }
 };
 

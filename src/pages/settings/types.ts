@@ -20,6 +20,7 @@ export interface ProvidersTabProps {
   errors: Record<string, string>;
   saved: boolean;
   activeTab: string;
+  isSaving: boolean;
   updateAiProvider: (id: string, field: 'nickname' | 'provider' | 'apiKey', value: string) => void;
   setDefaultAiModel: (model: string) => void;
   setDefaultCustomModel: (model: string) => void;
@@ -27,6 +28,7 @@ export interface ProvidersTabProps {
   addAiProvider: () => void;
   removeAiProvider: (id: string) => void;
   handleSaveTab: (tab: string) => void;
+  handleClearProviders?: () => void;
   getModelOptions: (provider: string) => string[];
   hasAdditionalProviderAccess?: boolean;
 }
@@ -61,6 +63,7 @@ export interface AgentsTabProps {
   defaultCustomModel: string;
   saved: boolean;
   activeTab: string;
+  isSaving: boolean;
   setResearchDebateRounds: (rounds: number) => void;
   setAnalysisTeamProviderId: (id: string) => void;
   setAnalysisTeamModel: (model: string) => void;
@@ -110,6 +113,7 @@ export interface RebalanceTabProps {
   saved: boolean;
   activeTab: string;
   errors: Record<string, string>;
+  isSaving: boolean;
   setRebalanceThreshold: (threshold: number) => void;
   setRebalanceMinPositionSize: (size: number) => void;
   setRebalanceMaxPositionSize: (size: number) => void;
@@ -136,6 +140,7 @@ export interface TradingTabProps {
   alpacaLiveSecretKey: string;
   alpacaPaperTrading: boolean;
   autoExecuteTrades: boolean;
+  autoNearLimitAnalysis: boolean;
   userRiskLevel: string;
   defaultPositionSizeDollars: number;
   profitTarget: number;
@@ -145,12 +150,14 @@ export interface TradingTabProps {
   showKeys: Record<string, boolean>;
   saved: boolean;
   activeTab: string;
+  isSaving: boolean;
   setAlpacaPaperApiKey: (key: string) => void;
   setAlpacaPaperSecretKey: (key: string) => void;
   setAlpacaLiveApiKey: (key: string) => void;
   setAlpacaLiveSecretKey: (key: string) => void;
   setAlpacaPaperTrading: (enabled: boolean) => void;
   setAutoExecuteTrades: (enabled: boolean) => void;
+  setAutoNearLimitAnalysis: (enabled: boolean) => void;
   setUserRiskLevel: (level: string) => void;
   setDefaultPositionSizeDollars: (amount: number) => void;
   setProfitTarget: (target: number) => void;
@@ -158,6 +165,7 @@ export interface TradingTabProps {
   setNearLimitThreshold: (threshold: number) => void;
   toggleShowKey: (key: string) => void;
   handleSaveTab: (tab: string) => void;
+  handleClearTrading?: () => void;
   canUseLiveTrading?: boolean;
   canUseAutoTrading?: boolean;
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity, Clock, AlertCircle, AlertTriangle, Lock } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
-import { useAuth, isSessionValid } from "@/lib/auth";
+import { useAuth, isSessionValid, hasAlpacaCredentials } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useAlpacaConnectionStore } from "@/hooks/useAlpacaConnection";
@@ -91,11 +91,21 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
     setShowRebalanceModal(true);
   };
 
+  const hasAlpacaConfig = useMemo(() => hasAlpacaCredentials(apiSettings), [apiSettings]);
+
   const fetchPositions = async () => {
     // Check session validity before fetching
     if (!isSessionValid()) {
       console.log('PortfolioPositions: Skipping fetch - session invalid');
       setLoading(false);
+      return;
+    }
+
+    if (!hasAlpacaConfig) {
+      console.log('PortfolioPositions: Skipping fetch - Alpaca credentials missing');
+      setPositions([]);
+      setLoading(false);
+      setError(null);
       return;
     }
     
@@ -226,6 +236,13 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
       setLoading(false);
       return;
     }
+
+    if (!hasAlpacaConfig) {
+      console.log('PortfolioPositions: Skipping auto-refresh - Alpaca credentials missing');
+      setPositions([]);
+      setLoading(false);
+      return;
+    }
     
     // Add a small delay on initial mount to ensure session is settled
     const timeoutId = setTimeout(() => {
@@ -245,7 +262,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
         delete (window as any).__portfolioPositionsInterval;
       }
     };
-  }, [apiSettings, isAuthenticated]);
+  }, [apiSettings, isAuthenticated, hasAlpacaConfig]);
 
   // Check for running analyses
   useEffect(() => {

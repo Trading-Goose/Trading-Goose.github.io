@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { useAuth, hasAlpacaCredentials } from "@/lib/auth";
 import { alpacaAPI } from "@/lib/alpaca";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,7 @@ export default function StockTickerAutocomplete({
   id
 }: StockTickerAutocompleteProps) {
   const { apiSettings } = useAuth();
+  const hasAlpacaConfig = useMemo(() => hasAlpacaCredentials(apiSettings), [apiSettings]);
   const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -48,6 +49,12 @@ export default function StockTickerAutocomplete({
   const searchSymbols = async (query: string) => {
     if (query.length < 1) {
       setSuggestions([]);
+      return;
+    }
+
+    if (!hasAlpacaConfig) {
+      setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
 
@@ -106,7 +113,7 @@ export default function StockTickerAutocomplete({
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [value]);
+  }, [value, hasAlpacaConfig]);
 
   // Handle click outside to close suggestions
   useEffect(() => {

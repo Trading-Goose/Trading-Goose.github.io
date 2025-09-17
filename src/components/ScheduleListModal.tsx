@@ -448,22 +448,24 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
                               onClick={() => {
                                 setEditingSchedule(schedule);
                                 setShowAddModal(true);
                               }}
                               disabled={!isAccessible}
+                              className="border border-border bg-background/95 backdrop-blur-sm hover:bg-accent hover:text-accent-foreground hover:border-primary/30 hover:shadow-md hover:scale-[1.01] active:scale-[0.99]"
                             >
-                              <Settings className="w-4 h-4 mr-1" />
-                              Edit
+                              <Settings className="w-4 h-4 sm:mr-1" />
+                              <span className="hidden sm:inline">Edit</span>
                             </Button>
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
                               onClick={() => handleToggleEnabled(schedule)}
                               disabled={!isAccessible}
+                              className="border border-border bg-background/95 backdrop-blur-sm hover:bg-accent hover:text-accent-foreground hover:border-primary/30 hover:shadow-md hover:scale-[1.01] active:scale-[0.99]"
                             >
                               {schedule.enabled ? (
                                 <>
@@ -482,9 +484,9 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
                               size="sm"
                               onClick={() => setDeletingSchedule(schedule)}
                               disabled={!isAccessible}
-                              className="hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
+                              className="bg-red-500/5 border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 hover:shadow-md hover:scale-[1.01] active:scale-[0.99]"
                             >
-                              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>

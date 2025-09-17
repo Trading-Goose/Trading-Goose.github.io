@@ -2,7 +2,7 @@
 // Extracted from ScheduleRebalanceModal.tsx
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth";
+import { useAuth, hasAlpacaCredentials } from "@/lib/auth";
 import { alpacaAPI } from "@/lib/alpaca";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +20,7 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
   const { getMaxRebalanceStocks, hasOpportunityAgentAccess } = useRBAC();
   const maxStocks = getMaxRebalanceStocks();
   const hasOppAccess = hasOpportunityAgentAccess();
+  const hasAlpacaConfig = hasAlpacaCredentials(apiSettings);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -178,56 +179,73 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
         }
       }
 
-      const [accountData, alpacaPositions] = await Promise.all([
-        alpacaAPI.getAccount(),
-        alpacaAPI.getPositions()
-      ]);
+      if (hasAlpacaConfig) {
+        const [accountData, alpacaPositions] = await Promise.all([
+          alpacaAPI.getAccount(),
+          alpacaAPI.getPositions()
+        ]);
 
-      if (accountData) {
-        const totalEquity = parseFloat(accountData.equity || '0');
-        const cashBalance = parseFloat(accountData.cash || '0');
-        setPortfolioTotalValue(totalEquity);
-        setPortfolioCashBalance(cashBalance);
-        setCashAllocation((cashBalance / totalEquity) * 100);
-      }
+        if (accountData) {
+          const totalEquity = parseFloat(accountData.equity || '0');
+          const cashBalance = parseFloat(accountData.cash || '0');
+          setPortfolioTotalValue(totalEquity);
+          setPortfolioCashBalance(cashBalance);
+          setCashAllocation(totalEquity > 0 ? (cashBalance / totalEquity) * 100 : 0);
+        } else {
+          setPortfolioTotalValue(0);
+          setPortfolioCashBalance(0);
+          setCashAllocation(0);
+        }
 
-      if (alpacaPositions && Array.isArray(alpacaPositions)) {
-        const totalEquity = parseFloat(accountData?.equity || '0');
-        const processedPositions: Position[] = alpacaPositions.map((pos: any) => ({
-          ticker: pos.symbol,
-          currentShares: parseFloat(pos.qty || '0'),
-          currentValue: parseFloat(pos.market_value || '0'),
-          currentAllocation: totalEquity > 0 ? (parseFloat(pos.market_value || '0') / totalEquity) * 100 : 0,
-          avgPrice: parseFloat(pos.avg_entry_price || '0')
-        }));
+        if (alpacaPositions && Array.isArray(alpacaPositions)) {
+          const totalEquity = parseFloat(accountData?.equity || '0');
+          const processedPositions: Position[] = alpacaPositions.map((pos: any) => ({
+            ticker: pos.symbol,
+            currentShares: parseFloat(pos.qty || '0'),
+            currentValue: parseFloat(pos.market_value || '0'),
+            currentAllocation: totalEquity > 0 ? (parseFloat(pos.market_value || '0') / totalEquity) * 100 : 0,
+            avgPrice: parseFloat(pos.avg_entry_price || '0')
+          }));
 
-        processedPositions.sort((a, b) => b.currentAllocation - a.currentAllocation);
-        setPositions(processedPositions);
+          processedPositions.sort((a, b) => b.currentAllocation - a.currentAllocation);
+          setPositions(processedPositions);
 
-        if (includeAllPositions) {
-          if (maxStocks > 0 && processedPositions.length > maxStocks) {
-            const limitedSelection = processedPositions.slice(0, maxStocks).map(p => p.ticker);
-            setSelectedPositions(new Set(limitedSelection));
-            toast({
-              title: "Stock Selection Limited",
-              description: `Selected the top ${maxStocks} stocks by allocation. You can deselect some to choose others.`,
-              variant: "default",
-            });
-          } else {
-            setSelectedPositions(new Set(processedPositions.map(p => p.ticker)));
+          if (includeAllPositions) {
+            if (maxStocks > 0 && processedPositions.length > maxStocks) {
+              const limitedSelection = processedPositions.slice(0, maxStocks).map(p => p.ticker);
+              setSelectedPositions(new Set(limitedSelection));
+              toast({
+                title: "Stock Selection Limited",
+                description: `Selected the top ${maxStocks} stocks by allocation. You can deselect some to choose others.`,
+                variant: "default",
+              });
+            } else {
+              setSelectedPositions(new Set(processedPositions.map(p => p.ticker)));
+            }
+          } else if (!scheduleData || !scheduleData.selected_tickers) {
+            if (maxStocks > 0 && processedPositions.length > maxStocks) {
+              const limitedSelection = processedPositions.slice(0, maxStocks).map(p => p.ticker);
+              setSelectedPositions(new Set(limitedSelection));
+              toast({
+                title: "Stock Selection Limited",
+                description: `Selected the top ${maxStocks} stocks by allocation. You can deselect some to choose others.`,
+                variant: "default",
+              });
+            } else {
+              setSelectedPositions(new Set(processedPositions.map(p => p.ticker)));
+            }
           }
-        } else if (!scheduleData || !scheduleData.selected_tickers) {
-          if (maxStocks > 0 && processedPositions.length > maxStocks) {
-            const limitedSelection = processedPositions.slice(0, maxStocks).map(p => p.ticker);
-            setSelectedPositions(new Set(limitedSelection));
-            toast({
-              title: "Stock Selection Limited",
-              description: `Selected the top ${maxStocks} stocks by allocation. You can deselect some to choose others.`,
-              variant: "default",
-            });
-          } else {
-            setSelectedPositions(new Set(processedPositions.map(p => p.ticker)));
-          }
+        } else {
+          setPositions([]);
+        }
+      } else {
+        console.log('useScheduleData: Alpaca credentials missing, skipping Alpaca data fetch');
+        setPortfolioTotalValue(0);
+        setPortfolioCashBalance(0);
+        setCashAllocation(0);
+        setPositions([]);
+        if (!scheduleData?.selected_tickers) {
+          setSelectedPositions(new Set());
         }
       }
     } catch (err) {

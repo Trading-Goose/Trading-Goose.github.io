@@ -3,13 +3,14 @@
 
 import { useState, useEffect } from "react";
 import { alpacaAPI } from "@/lib/alpaca";
-import { useAuth } from "@/lib/auth";
+import { useAuth, hasAlpacaCredentials } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useRBAC } from "@/hooks/useRBAC";
 import type { RebalancePosition, RebalanceConfig } from "../types";
 
 export function useRebalanceData(isOpen: boolean) {
   const { apiSettings } = useAuth();
+  const hasAlpacaConfig = hasAlpacaCredentials(apiSettings);
   const { toast } = useToast();
   const { hasOpportunityAgentAccess } = useRBAC();
   const [loading, setLoading] = useState(false);
@@ -36,31 +37,30 @@ export function useRebalanceData(isOpen: boolean) {
 
   // Load data when modal opens
   useEffect(() => {
-    if (isOpen && apiSettings) {
+    if (isOpen) {
+      if (!apiSettings || !hasAlpacaConfig) {
+        setError('Alpaca credentials not configured. Update settings to enable rebalancing.');
+        setPositions([]);
+        setCashAllocation(0);
+        setPortfolioTotalValue(0);
+        setPortfolioCashBalance(0);
+        return;
+      }
+
       loadData();
-    } else if (!isOpen) {
+    } else {
       // Reset state when modal closes
       setPositions([]);
       setCashAllocation(0);
       setSelectedPositions(new Set());
       setError(null);
     }
-  }, [isOpen, apiSettings]);
+  }, [isOpen, apiSettings, hasAlpacaConfig]);
 
   const loadData = async () => {
-    // Check if API settings are available
-    const isPaper = apiSettings?.alpaca_paper_trading ?? true;
-
-    if (isPaper) {
-      if (!apiSettings?.alpaca_paper_api_key || !apiSettings?.alpaca_paper_secret_key) {
-        setError("Alpaca paper trading credentials not configured");
-        return;
-      }
-    } else {
-      if (!apiSettings?.alpaca_live_api_key || !apiSettings?.alpaca_live_secret_key) {
-        setError("Alpaca live trading credentials not configured");
-        return;
-      }
+    if (!hasAlpacaConfig) {
+      setError('Alpaca credentials not configured. Update settings to enable rebalancing.');
+      return;
     }
 
     setLoading(true);

@@ -22,7 +22,8 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLiveAnalysis, setIsLiveAnalysis] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | undefined>();
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const isFetchingRef = useRef(false);
   const lastDatabaseUpdateRef = useRef<string | null>(null); // Track the actual DB updated_at
 
   useEffect(() => {
@@ -31,13 +32,50 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
       if (!isOpen) {
         lastDatabaseUpdateRef.current = null;
       }
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = undefined;
+      }
       return;
     }
 
     let mounted = true;
 
-    const loadAnalysis = async () => {
+    const clearPollTimeout = () => {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = undefined;
+      }
+    };
+
+    const schedulePoll = (delay = 3000) => {
+      clearPollTimeout();
+      pollTimeoutRef.current = setTimeout(() => {
+        loadAnalysis();
+      }, delay);
+    };
+
+    const loadAnalysis = async (isInitialLoad = false) => {
       if (!mounted) return;
+
+      if (typeof window !== 'undefined' && (window as any).__supabaseRefreshingToken) {
+        // Pause polling while a token refresh is in flight to avoid unnecessary aborts
+        schedulePoll(2000);
+        return;
+      }
+
+      if (isFetchingRef.current) {
+        return;
+      }
+
+      isFetchingRef.current = true;
+
+      if (isInitialLoad) {
+        setLoading(true);
+      }
+
+      let shouldContinuePolling = false;
+      let nextPollDelay = 3000;
 
       try {
         let analysisToLoad = null;
@@ -107,6 +145,7 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
         }
 
         if (analysisToLoad && mounted) {
+          setError(null);
           // Determine status - use new string-based status or fallback to numeric for backward compatibility
           let status = 'running';
 
@@ -228,40 +267,44 @@ export function useAnalysisData({ ticker, analysisId, analysisDate, isOpen }: Us
             console.log(`Loaded ${messageResult.totalCount} messages (${messageResult.historyCount} from history, ${messageResult.queueCount} from queue)`);
           }
 
-          // Start polling if running
-          if (isAnalysisActive(status as AnalysisStatus) && !analysisDate) {
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-            }
-            intervalRef.current = setInterval(() => {
-              loadAnalysis();
-            }, 3000); // Poll every 3 seconds
-          } else if (status !== 'running' && intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = undefined;
-          }
+          shouldContinuePolling = isAnalysisActive(status as AnalysisStatus) && !analysisDate;
         }
       } catch (err: any) {
-        console.error('Error loading analysis:', err);
-        if (mounted) {
-          setError(err.message || 'Failed to load analysis');
+        if (err?.name === 'AbortError') {
+          console.warn('Analysis polling aborted; will retry shortly.', err);
+          shouldContinuePolling = true;
+          nextPollDelay = 5000;
+        } else {
+          console.error('Error loading analysis:', err);
+          if (mounted) {
+            setError(err.message || 'Failed to load analysis');
+          }
         }
       } finally {
         if (mounted) {
           setLoading(false);
         }
+
+        isFetchingRef.current = false;
+
+        if (mounted) {
+          if (shouldContinuePolling) {
+            schedulePoll(nextPollDelay);
+          } else {
+            clearPollTimeout();
+          }
+        }
       }
     };
 
-    // Initial load
-    loadAnalysis();
+    // Reset stale state on new mount/context and kick off initial load
+    setError(null);
+    loadAnalysis(true);
 
     return () => {
       mounted = false;
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = undefined;
-      }
+      clearPollTimeout();
+      isFetchingRef.current = false;
     };
   }, [isOpen, ticker, analysisId, user, analysisDate]);
 

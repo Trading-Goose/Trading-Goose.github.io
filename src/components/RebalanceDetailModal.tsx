@@ -105,7 +105,8 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
   const [error, setError] = useState<string | null>(null);
   const [isLiveRebalance, setIsLiveRebalance] = useState(false);
   const [collapsedCards, setCollapsedCards] = useState<Set<string>>(new Set());
-  const intervalRef = useRef<NodeJS.Timeout | undefined>();
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const isFetchingRef = useRef(false);
 
   const [selectedAnalysis, setSelectedAnalysis] = useState<{
     ticker: string;
@@ -149,12 +150,50 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
 
   // Load rebalance data
   useEffect(() => {
-    if (!isOpen || !rebalanceId || !user?.id) return;
+    if (!isOpen || !rebalanceId || !user?.id) {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = undefined;
+      }
+      return;
+    }
 
     let mounted = true;
 
-    const loadRebalance = async () => {
+    const clearPollTimeout = () => {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = undefined;
+      }
+    };
+
+    const schedulePoll = (delay = 3000) => {
+      clearPollTimeout();
+      pollTimeoutRef.current = setTimeout(() => {
+        loadRebalance();
+      }, delay);
+    };
+
+    const loadRebalance = async (isInitialLoad = false) => {
       if (!mounted || !user?.id) return;
+
+      if (typeof window !== 'undefined' && (window as any).__supabaseRefreshingToken) {
+        schedulePoll(2000);
+        return;
+      }
+
+      if (isFetchingRef.current) {
+        return;
+      }
+
+      isFetchingRef.current = true;
+
+      if (isInitialLoad) {
+        setLoading(true);
+      }
+
+      let shouldContinuePolling = false;
+      let nextPollDelay = 3000;
 
       try {
         // Add a small delay to ensure auth state is stable
@@ -668,51 +707,45 @@ export default function RebalanceDetailModal({ rebalanceId, isOpen, onClose, reb
         };
 
         if (mounted) {
+          setError(null);
           setRebalanceData(rebalanceData);
         }
 
-        // Start polling if running
-        if (isRunning && !rebalanceDate) {
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-          }
-          // Poll every 2 seconds for updates
-          intervalRef.current = setInterval(async () => {
-            // Don't update state if component is unmounted
-            if (!mounted) {
-              if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = undefined;
-              }
-              return;
-            }
-            // Recursively call loadRebalance to fetch fresh data
-            await loadRebalance();
-          }, 3000); // Poll every 3 seconds instead of 2
-        } else if (!isRunning && intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = undefined;
-        }
+        shouldContinuePolling = isRunning && !rebalanceDate;
       } catch (err: any) {
-        console.error('Error loading rebalance:', err);
-        if (mounted) {
-          setError(err.message || 'Failed to load rebalance');
+        if (err?.name === 'AbortError') {
+          console.warn('Rebalance polling aborted; will retry shortly.', err);
+          shouldContinuePolling = true;
+          nextPollDelay = 5000;
+        } else {
+          console.error('Error loading rebalance:', err);
+          if (mounted) {
+            setError(err.message || 'Failed to load rebalance');
+          }
         }
       } finally {
         if (mounted) {
           setLoading(false);
         }
+
+        isFetchingRef.current = false;
+
+        if (mounted) {
+          if (shouldContinuePolling) {
+            schedulePoll(nextPollDelay);
+          } else {
+            clearPollTimeout();
+          }
+        }
       }
     };
 
-    loadRebalance();
+    loadRebalance(true);
 
     return () => {
       mounted = false;
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = undefined;
-      }
+      clearPollTimeout();
+      isFetchingRef.current = false;
     };
   }, [isOpen, rebalanceId, user, rebalanceDate]);
 

@@ -5,6 +5,27 @@
 import { useAuth } from './auth';
 import { supabase } from './supabase';
 
+const KNOWN_CRYPTO_QUOTES = ['USD', 'USDT', 'USDC', 'EUR', 'GBP'];
+
+const ensureCryptoPairSymbol = (symbol: string): string => {
+  const upper = symbol.toUpperCase();
+  if (upper.includes('/')) {
+    return upper;
+  }
+
+  for (const quote of KNOWN_CRYPTO_QUOTES) {
+    if (upper.endsWith(quote) && upper.length > quote.length) {
+      return `${upper.slice(0, upper.length - quote.length)}/${quote}`;
+    }
+  }
+
+  if (upper.length > 3) {
+    return `${upper.slice(0, upper.length - 3)}/${upper.slice(-3)}`;
+  }
+
+  return upper;
+};
+
 interface AlpacaConfig {
   apiKey: string;
   secretKey: string;
@@ -302,6 +323,47 @@ class AlpacaAPI {
     end?: string,
     limit?: number
   ): Promise<any> {
+    const upperSymbol = symbol.toUpperCase();
+    const isLikelyCrypto = upperSymbol.includes('/') || KNOWN_CRYPTO_QUOTES.some(quote => upperSymbol.endsWith(quote) && upperSymbol.length > quote.length);
+
+    if (isLikelyCrypto) {
+      const cryptoSymbol = ensureCryptoPairSymbol(upperSymbol);
+      const params: Record<string, string> = {
+        symbols: cryptoSymbol,
+        timeframe,
+        limit: (limit || 10000).toString()
+      };
+
+      if (start) params.start = start;
+      if (end) params.end = end;
+
+      const { data, error } = await supabase.functions.invoke('alpaca-proxy', {
+        body: {
+          method: 'GET',
+          endpoint: '/v1beta3/crypto/us/bars',
+          params
+        }
+      });
+
+      if (error) {
+        console.error(`Failed to fetch crypto bars for ${symbol}:`, error);
+        throw new Error(`Failed to fetch bars for ${symbol}: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error(`No bar data received for ${symbol}`);
+      }
+
+      if (data.error) {
+        console.error(`Failed to fetch crypto bars for ${symbol}:`, data.error);
+        throw new Error(`Failed to fetch bars for ${symbol}: ${typeof data.error === 'string' ? data.error : JSON.stringify(data.error)}`);
+      }
+
+      const bars = data.bars?.[cryptoSymbol] || data.bars?.[cryptoSymbol.replace('/', '')] || [];
+      console.log(`Alpaca crypto bars response for ${symbol} (${timeframe}): ${Array.isArray(bars) ? bars.length : 0} bars`);
+      return Array.isArray(bars) ? bars : [];
+    }
+
     const params: Record<string, string> = {
       timeframe,
       limit: (limit || 10000).toString(),
@@ -315,7 +377,7 @@ class AlpacaAPI {
     const { data, error } = await supabase.functions.invoke('alpaca-proxy', {
       body: {
         method: 'GET',
-        endpoint: `/v2/stocks/${symbol}/bars`,
+        endpoint: `/v2/stocks/${upperSymbol}/bars`,
         params
       }
     });
@@ -334,7 +396,6 @@ class AlpacaAPI {
       throw new Error(`Failed to fetch bars for ${symbol}: ${typeof data.error === 'string' ? data.error : JSON.stringify(data.error)}`);
     }
     
-    // Handle null bars response (no data for the requested period)
     if (data.bars === null) {
       console.log(`No bars data available for ${symbol} (${timeframe}) - market may be closed or date out of range`);
       return [];
@@ -343,22 +404,20 @@ class AlpacaAPI {
     console.log(`Alpaca bars response for ${symbol} (${timeframe}):`, {
       hasData: !!data,
       hasBars: !!data.bars,
-      symbolKey: data.bars?.[symbol] ? 'found' : 'not found',
-      barCount: data.bars?.[symbol]?.length || 0,
+      symbolKey: data.bars?.[upperSymbol] ? 'found' : 'not found',
+      barCount: data.bars?.[upperSymbol]?.length || 0,
       keys: Object.keys(data)
     });
     
-    // Alpaca v2 API returns: { bars: [...], symbol: "SYMBOL", next_page_token: null }
-    // The bars are in an array directly, not nested under symbol
     if (data.bars && Array.isArray(data.bars)) {
       console.log(`Returning ${data.bars.length} bars from data.bars array`);
       return data.bars;
-    } else if (data.bars && data.bars[symbol]) {
-      console.log(`Returning ${data.bars[symbol].length} bars from data.bars[${symbol}]`);
-      return data.bars[symbol];
-    } else if (data[symbol]) {
-      console.log(`Returning ${data[symbol].length} bars from data[${symbol}]`);
-      return data[symbol];
+    } else if (data.bars && data.bars[upperSymbol]) {
+      console.log(`Returning ${data.bars[upperSymbol].length} bars from data.bars[${upperSymbol}]`);
+      return data.bars[upperSymbol];
+    } else if (data[upperSymbol]) {
+      console.log(`Returning ${data[upperSymbol].length} bars from data[${upperSymbol}]`);
+      return data[upperSymbol];
     } else if (Array.isArray(data)) {
       console.log(`Returning ${data.length} bars from direct array`);
       return data;

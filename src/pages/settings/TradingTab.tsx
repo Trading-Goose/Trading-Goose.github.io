@@ -18,6 +18,7 @@ import {
   TrendingUp,
   TrendingDown,
   Save,
+  Loader2,
   AlertCircle,
   Check,
   Eye,
@@ -27,6 +28,7 @@ import {
   Lock,
   Target,
   ShieldAlert,
+  Trash2,
 } from "lucide-react";
 import type { TradingTabProps } from "./types";
 
@@ -37,6 +39,7 @@ export default function TradingTab({
   alpacaLiveSecretKey,
   alpacaPaperTrading,
   autoExecuteTrades,
+  autoNearLimitAnalysis,
   userRiskLevel,
   defaultPositionSizeDollars,
   profitTarget,
@@ -46,12 +49,14 @@ export default function TradingTab({
   showKeys,
   saved,
   activeTab,
+  isSaving,
   setAlpacaPaperApiKey,
   setAlpacaPaperSecretKey,
   setAlpacaLiveApiKey,
   setAlpacaLiveSecretKey,
   setAlpacaPaperTrading,
   setAutoExecuteTrades,
+  setAutoNearLimitAnalysis,
   setUserRiskLevel,
   setDefaultPositionSizeDollars,
   setProfitTarget,
@@ -59,6 +64,7 @@ export default function TradingTab({
   setNearLimitThreshold,
   toggleShowKey,
   handleSaveTab,
+  handleClearTrading,
   canUseLiveTrading = true,
   canUseAutoTrading = true,
 }: TradingTabProps) {
@@ -220,14 +226,6 @@ export default function TradingTab({
                   className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
                 />
               </div>
-              {autoExecuteTrades && canUseAutoTrading && (
-                <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
-                  <p className="text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    <span>Auto-execution will use {alpacaPaperTrading ? 'paper' : 'live'} trading mode</span>
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -414,37 +412,76 @@ export default function TradingTab({
             </div>
           </div>
 
-          {/* Near Limit Threshold */}
-          <div className="space-y-2">
-            <LabelWithHelp
-              htmlFor="near-limit-threshold"
-              label={`Near Limit Threshold: ${nearLimitThreshold}%`}
-              helpContent={
-                <HelpContent
-                  description="Defines when a position is considered 'near' profit target or stop loss."
-                  example="If set to 20%, a position at 80% of profit target (e.g., 20% gain with 25% target) is considered 'near target'"
-                  tips={[
-                    "Lower values (5-10%): More conservative, earlier warnings",
-                    "Medium values (15-20%): Balanced approach (recommended)",
-                    "Higher values (20-25%): Less sensitive to approaches",
-                    "Affects when AI starts considering exit strategies"
-                  ]}
-                />
-              }
-              className="text-sm"
-            />
-            <Slider
-              id="near-limit-threshold"
-              min={5}
-              max={25}
-              step={1}
-              value={[nearLimitThreshold]}
-              onValueChange={(value) => setNearLimitThreshold(value[0])}
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground">
-              Position considered "near" when within {nearLimitThreshold}% of profit target or stop loss
-            </p>
+          {/* Near Limit Threshold and Auto Analysis */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Near Limit Threshold */}
+            <div className="space-y-2">
+              <LabelWithHelp
+                htmlFor="near-limit-threshold"
+                label={`Near Limit Threshold: ${nearLimitThreshold}%`}
+                helpContent={
+                  <HelpContent
+                    description="Defines when a position is considered 'near' profit target or stop loss."
+                    example="If set to 20%, a position at 80% of profit target (e.g., 20% gain with 25% target) is considered 'near target'"
+                    tips={[
+                      "Lower values (5-10%): More conservative, earlier warnings",
+                      "Medium values (15-20%): Balanced approach (recommended)",
+                      "Higher values (20-25%): Less sensitive to approaches",
+                      "Affects when AI starts considering exit strategies"
+                    ]}
+                  />
+                }
+                className="text-sm"
+              />
+              <Slider
+                id="near-limit-threshold"
+                min={5}
+                max={25}
+                step={1}
+                value={[nearLimitThreshold]}
+                onValueChange={(value) => setNearLimitThreshold(value[0])}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Position considered "near" when within {nearLimitThreshold}% of profit target or stop loss
+              </p>
+            </div>
+
+            {/* Auto Near-Limit Analysis */}
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <LabelWithHelp
+                      htmlFor="auto-near-limit"
+                      label="Auto Near-Limit Analysis"
+                      helpContent={
+                        <HelpContent
+                          description="Automatically trigger analysis when positions approach profit target or stop loss thresholds."
+                          tips={[
+                            "Monitors your portfolio every 30 minutes",
+                            "Triggers analysis when positions enter near-limit zone",
+                            "Helps with timely exit decisions",
+                            "Won't trigger if you already have running analysis",
+                            "Respects 2-hour cooldown per stock"
+                          ]}
+                        />
+                      }
+                      className="text-base font-medium cursor-pointer"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Monitor positions and auto-analyze when approaching limits
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto-near-limit"
+                    checked={autoNearLimitAnalysis || false}
+                    onCheckedChange={setAutoNearLimitAnalysis}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <Alert className="mt-4">
@@ -714,18 +751,41 @@ export default function TradingTab({
           </div>
         </div>
 
-        {/* Save Button for Trading Tab */}
-        <div className="flex justify-end pt-4">
-          <Button
-            onClick={() => {
-              console.log('Button clicked - calling handleSaveTab for trading');
-              handleSaveTab('trading');
-            }}
-            size="lg"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Save Trading Settings
-          </Button>
+        {/* Save and Clear Buttons for Trading Tab */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:justify-between pt-4">
+          {handleClearTrading && (
+            <Button
+              onClick={handleClearTrading}
+              disabled={isSaving}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border backdrop-blur-sm hover:shadow-md hover:scale-[1.01] active:scale-[0.99] h-11 rounded-md px-8 bg-red-500/5 border-red-500/30 text-red-600 dark:bg-red-500/5 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 order-2 sm:order-1"
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear All Trading Settings
+            </Button>
+          )}
+          <div className={`${!handleClearTrading ? "w-full" : "w-full sm:w-auto"} order-1 sm:order-2`}>
+            <Button
+              onClick={() => {
+                console.log('Button clicked - calling handleSaveTab for trading');
+                handleSaveTab('trading');
+              }}
+              size="lg"
+              disabled={isSaving}
+              className="w-full sm:w-auto"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving Trading Settings ...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Trading Settings
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

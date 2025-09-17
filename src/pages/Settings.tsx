@@ -86,6 +86,7 @@ export default function SettingsPage() {
   } = useRBAC();
 
   const [saved, setSaved] = useState(false);
+  const [savingTab, setSavingTab] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "providers");
@@ -160,6 +161,7 @@ export default function SettingsPage() {
   const [alpacaLiveSecretKey, setAlpacaLiveSecretKey] = useState(apiSettings?.alpaca_live_secret_key || '');
   const [alpacaPaperTrading, setAlpacaPaperTrading] = useState(apiSettings?.alpaca_paper_trading ?? true);
   const [autoExecuteTrades, setAutoExecuteTrades] = useState(apiSettings?.auto_execute_trades ?? false);
+  const [autoNearLimitAnalysis, setAutoNearLimitAnalysis] = useState(apiSettings?.auto_near_limit_analysis ?? false);
   const [userRiskLevel, setUserRiskLevel] = useState(apiSettings?.user_risk_level || 'moderate');
   const [defaultPositionSizeDollars, setDefaultPositionSizeDollars] = useState(apiSettings?.default_position_size_dollars || 1000);
   const [profitTarget, setProfitTarget] = useState(apiSettings?.profit_target || 25);
@@ -264,6 +266,7 @@ export default function SettingsPage() {
       // Non-credential settings from apiSettings
       setAlpacaPaperTrading(apiSettings.alpaca_paper_trading ?? true);
       setAutoExecuteTrades(apiSettings.auto_execute_trades ?? false);
+      setAutoNearLimitAnalysis(apiSettings.auto_near_limit_analysis ?? false);
       setUserRiskLevel(apiSettings.user_risk_level || 'moderate');
       setDefaultPositionSizeDollars(apiSettings.default_position_size_dollars || 1000);
 
@@ -308,6 +311,7 @@ export default function SettingsPage() {
 
   const handleSaveTab = async (tab: string) => {
     console.log(`Save button clicked for tab: ${tab}`);
+    setSavingTab(tab);
 
     try {
       // Skip session check since we already have the user from useAuth
@@ -698,6 +702,7 @@ export default function SettingsPage() {
           alpaca_live_secret_key: alpacaLiveSecretKey,
           alpaca_paper_trading: alpacaPaperTrading,
           auto_execute_trades: autoExecuteTrades,
+          auto_near_limit_analysis: autoNearLimitAnalysis,
           user_risk_level: userRiskLevel,
           default_position_size_dollars: defaultPositionSizeDollars,
           profit_target: profitTarget,
@@ -877,6 +882,8 @@ export default function SettingsPage() {
       });
 
       setErrors({ save: `Failed to save ${tab} settings: ${errorMessage}` });
+    } finally {
+      setSavingTab(null);
     }
   };
 
@@ -982,6 +989,132 @@ export default function SettingsPage() {
       console.error('Error removing provider:', error);
       setErrorDialogMessage('Failed to remove provider. It may be in use by agent teams.');
       setErrorDialogOpen(true);
+    }
+  };
+
+  // Clear all provider settings
+  const handleClearProviders = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setSavingTab('providers');
+      
+      // Clear all provider settings - only set fields that exist in api_settings table
+      const clearedSettings = {
+        ai_provider: 'openrouter', // Keep a default provider to satisfy required field
+        ai_api_key: '',  // Use empty string instead of null
+        ai_model: 'gpt-4',
+      };
+
+      const { data, error } = await supabase.functions.invoke('settings-proxy', {
+        body: {
+          action: 'update_settings',
+          settings: clearedSettings
+        }
+      });
+
+      if (error) throw error;
+
+      // Also clear additional provider configurations
+      if (aiProviders.length > 1) {
+        // Delete all non-default providers from database
+        for (const provider of aiProviders.slice(1)) {
+          if (provider.id !== '1') {
+            await supabaseHelpers.deleteProviderConfiguration(user.id, provider.nickname);
+          }
+        }
+      }
+
+      // Clear local state
+      setAiProviders([{ id: '1', nickname: 'Default AI', provider: 'openrouter', apiKey: '' }]);
+      setDefaultAiModel('gpt-4');
+      setDefaultCustomModel('');
+      
+      // Reload settings from backend to refresh auth context
+      await checkConfiguredProviders();
+      await loadProviderConfigurations();
+      
+      toast({
+        title: "Provider settings cleared",
+        description: "All provider API keys have been removed.",
+      });
+      
+    } catch (error) {
+      console.error('Error clearing provider settings:', error);
+      toast({
+        title: "Error clearing settings",
+        description: "Failed to clear provider settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingTab(null);
+    }
+  };
+
+  // Clear all trading settings
+  const handleClearTrading = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setSavingTab('trading');
+      
+      // Clear all trading settings - use empty strings for API keys
+      const clearedSettings = {
+        alpaca_paper_api_key: '',
+        alpaca_paper_secret_key: '',
+        alpaca_live_api_key: '',
+        alpaca_live_secret_key: '',
+        alpaca_paper_trading: true,
+        auto_execute_trades: false,
+        auto_near_limit_analysis: false,
+        user_risk_level: 'moderate',
+        default_position_size_dollars: 1000,
+        profit_target: 25,
+        stop_loss: 10,
+        near_limit_threshold: 20,
+      };
+
+      const { data, error } = await supabase.functions.invoke('settings-proxy', {
+        body: {
+          action: 'update_settings',
+          settings: clearedSettings
+        }
+      });
+
+      if (error) throw error;
+
+      // Clear local state
+      setAlpacaPaperApiKey('');
+      setAlpacaPaperSecretKey('');
+      setAlpacaLiveApiKey('');
+      setAlpacaLiveSecretKey('');
+      setAlpacaPaperTrading(true);
+      setAutoExecuteTrades(false);
+      setAutoNearLimitAnalysis(false);
+      setUserRiskLevel('moderate');
+      setDefaultPositionSizeDollars(1000);
+      setProfitTarget(25);
+      setStopLoss(10);
+      setNearLimitThreshold(20);
+      
+      // Reload settings from backend to refresh auth context
+      await checkConfiguredProviders();
+      await loadMaskedTradingCredentials();
+      
+      toast({
+        title: "Trading settings cleared",
+        description: "All Alpaca credentials have been removed and settings reset to defaults.",
+      });
+      
+    } catch (error) {
+      console.error('Error clearing trading settings:', error);
+      toast({
+        title: "Error clearing settings",
+        description: "Failed to clear trading settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingTab(null);
     }
   };
 
@@ -1490,6 +1623,7 @@ export default function SettingsPage() {
               errors={errors}
               saved={saved}
               activeTab={activeTab}
+              isSaving={savingTab === 'providers'}
               updateAiProvider={updateAiProvider}
               setDefaultAiModel={setDefaultAiModel}
               setDefaultCustomModel={setDefaultCustomModel}
@@ -1497,6 +1631,7 @@ export default function SettingsPage() {
               addAiProvider={addAiProvider}
               removeAiProvider={removeAiProvider}
               handleSaveTab={handleSaveTab}
+              handleClearProviders={handleClearProviders}
               getModelOptions={getModelOptions}
               hasAdditionalProviderAccess={hasAdditionalProviderAccess()}
             />
@@ -1542,6 +1677,7 @@ export default function SettingsPage() {
               defaultCustomModel={defaultCustomModel}
               saved={saved}
               activeTab={activeTab}
+              isSaving={savingTab === 'agents'}
               setResearchDebateRounds={setResearchDebateRounds}
               setAnalysisTeamProviderId={setAnalysisTeamProviderId}
               setAnalysisTeamModel={setAnalysisTeamModel}
@@ -1593,6 +1729,7 @@ export default function SettingsPage() {
               saved={saved}
               activeTab={activeTab}
               errors={errors}
+              isSaving={savingTab === 'rebalance'}
               setRebalanceThreshold={setRebalanceThreshold}
               setRebalanceMinPositionSize={setRebalanceMinPositionSize}
               setRebalanceMaxPositionSize={setRebalanceMaxPositionSize}
@@ -1621,6 +1758,7 @@ export default function SettingsPage() {
               alpacaLiveSecretKey={alpacaLiveSecretKey}
               alpacaPaperTrading={alpacaPaperTrading}
               autoExecuteTrades={autoExecuteTrades}
+              autoNearLimitAnalysis={autoNearLimitAnalysis}
               userRiskLevel={userRiskLevel}
               defaultPositionSizeDollars={defaultPositionSizeDollars}
               profitTarget={profitTarget}
@@ -1630,12 +1768,14 @@ export default function SettingsPage() {
               showKeys={showKeys}
               saved={saved}
               activeTab={activeTab}
+              isSaving={savingTab === 'trading'}
               setAlpacaPaperApiKey={setAlpacaPaperApiKey}
               setAlpacaPaperSecretKey={setAlpacaPaperSecretKey}
               setAlpacaLiveApiKey={setAlpacaLiveApiKey}
               setAlpacaLiveSecretKey={setAlpacaLiveSecretKey}
               setAlpacaPaperTrading={setAlpacaPaperTrading}
               setAutoExecuteTrades={setAutoExecuteTrades}
+              setAutoNearLimitAnalysis={setAutoNearLimitAnalysis}
               setUserRiskLevel={setUserRiskLevel}
               setDefaultPositionSizeDollars={setDefaultPositionSizeDollars}
               setProfitTarget={setProfitTarget}
@@ -1643,6 +1783,7 @@ export default function SettingsPage() {
               setNearLimitThreshold={setNearLimitThreshold}
               toggleShowKey={toggleShowKey}
               handleSaveTab={handleSaveTab}
+              handleClearTrading={handleClearTrading}
               canUseLiveTrading={canUseLiveTrading()}
               canUseAutoTrading={canUseAutoTrading()}
             />

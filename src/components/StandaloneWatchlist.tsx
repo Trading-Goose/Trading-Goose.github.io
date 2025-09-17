@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAlpacaConnectionStore } from "@/hooks/useAlpacaConnection";
 import StockTickerAutocomplete from "@/components/StockTickerAutocomplete";
-import { Plus, X, TrendingUp, TrendingDown, Loader2, RefreshCw, Play, Eye, AlertCircle } from "lucide-react";
+import { Plus, X, TrendingUp, TrendingDown, Loader2, RefreshCw, Play, Eye, AlertCircle, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth, isSessionValid } from "@/lib/auth";
+import { useAuth, isSessionValid, hasAlpacaCredentials } from "@/lib/auth";
 import { useRBAC } from "@/hooks/useRBAC";
 import { alpacaAPI } from "@/lib/alpaca";
 import AnalysisDetailModal from "./AnalysisDetailModal";
@@ -49,6 +49,7 @@ interface StandaloneWatchlistProps {
 
 export default function StandaloneWatchlist({ onSelectStock, selectedStock }: StandaloneWatchlistProps) {
   const { user, isAuthenticated, apiSettings } = useAuth();
+  const hasAlpacaConfig = useMemo(() => hasAlpacaCredentials(apiSettings), [apiSettings]);
   const { getMaxParallelAnalysis, getMaxWatchlistStocks } = useRBAC();
   const { toast } = useToast();
   const { isConnected: isAlpacaConnected } = useAlpacaConnectionStore();
@@ -73,6 +74,10 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
 
   // Fetch stock data including description and price using Alpaca
   const fetchStockData = async (ticker: string) => {
+    if (!hasAlpacaConfig) {
+      return { description: ticker };
+    }
+
     try {
       // Get asset info and latest quote in parallel
       const [assetInfo, quoteData] = await Promise.all([
@@ -156,74 +161,76 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
 
         setWatchlist(watchlistItems);
 
-        // Fetch all stock data in a single batch request
-        try {
-          const tickers = watchlistItems.map(item => item.ticker);
-          const batchData = await alpacaAPI.getBatchData(tickers, {
-            includeQuotes: true,
-            includeBars: true
-          });
+        if (hasAlpacaConfig) {
+          // Fetch all stock data in a single batch request
+          try {
+            const tickers = watchlistItems.map(item => item.ticker);
+            const batchData = await alpacaAPI.getBatchData(tickers, {
+              includeQuotes: true,
+              includeBars: true
+            });
 
-          // Update watchlist with batch data
-          setWatchlist(prev => prev.map(item => {
-            const data = batchData[item.ticker];
-            if (!data) return item;
+            // Update watchlist with batch data
+            setWatchlist(prev => prev.map(item => {
+              const data = batchData[item.ticker];
+              if (!data) return item;
 
-            const updates: Partial<WatchlistItem> = {};
+              const updates: Partial<WatchlistItem> = {};
 
-            // Add description from asset data
-            if (data.asset?.name) {
-              updates.description = data.asset.name;
-            }
-
-            // Add price data - prefer latest trade over quote for accuracy
-            let currentPrice = 0;
-            
-            // First try to use latest trade price (most accurate)
-            if (data.latestTrade?.p) {
-              currentPrice = data.latestTrade.p;
-              console.log(`[StandaloneWatchlist] ${item.ticker}: Using latest trade price: $${currentPrice}`);
-            } 
-            // Fallback to quote if no trade available
-            else if (data.quote) {
-              // Use mid-point of bid/ask for better accuracy
-              const bid = data.quote.bp || 0;
-              const ask = data.quote.ap || 0;
-              if (bid > 0 && ask > 0) {
-                currentPrice = (bid + ask) / 2;
-              } else {
-                currentPrice = bid || ask || 0;
+              // Add description from asset data
+              if (data.asset?.name) {
+                updates.description = data.asset.name;
               }
-              console.log(`[StandaloneWatchlist] ${item.ticker}: Using quote price: $${currentPrice} (bid=${bid}, ask=${ask})`);
-            }
-            
-            if (currentPrice > 0) {
-              updates.currentPrice = currentPrice;
 
-              // Calculate daily change from previous close (standard market calculation)
-              if (data.previousBar) {
-                const previousClose = data.previousBar.c;
-                const dayChange = currentPrice - previousClose;
-                const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;
-                updates.priceChange = dayChange;
-                updates.priceChangePercent = dayChangePercent;
-                console.log(`[StandaloneWatchlist] ${item.ticker}: previousClose=${previousClose}, dayChange=${dayChange} (${dayChangePercent.toFixed(2)}%)`)
-              } else {
-                updates.priceChange = 0;
-                updates.priceChangePercent = 0;
+              // Add price data - prefer latest trade over quote for accuracy
+              let currentPrice = 0;
+
+              // First try to use latest trade price (most accurate)
+              if (data.latestTrade?.p) {
+                currentPrice = data.latestTrade.p;
+                console.log(`[StandaloneWatchlist] ${item.ticker}: Using latest trade price: $${currentPrice}`);
               }
-            }
+              // Fallback to quote if no trade available
+              else if (data.quote) {
+                // Use mid-point of bid/ask for better accuracy
+                const bid = data.quote.bp || 0;
+                const ask = data.quote.ap || 0;
+                if (bid > 0 && ask > 0) {
+                  currentPrice = (bid + ask) / 2;
+                } else {
+                  currentPrice = bid || ask || 0;
+                }
+                console.log(`[StandaloneWatchlist] ${item.ticker}: Using quote price: $${currentPrice} (bid=${bid}, ask=${ask})`);
+              }
 
-            return { ...item, ...updates };
-          }));
-        } catch (batchError) {
-          console.error('Error fetching batch stock data:', batchError);
-          // Fallback to individual fetches if batch fails
-          for (const item of watchlistItems) {
-            const stockData = await fetchStockData(item.ticker);
-            setWatchlist(prev => prev.map(w =>
-              w.ticker === item.ticker ? { ...w, ...stockData } : w
-            ));
+              if (currentPrice > 0) {
+                updates.currentPrice = currentPrice;
+
+                // Calculate daily change from previous close (standard market calculation)
+                if (data.previousBar) {
+                  const previousClose = data.previousBar.c;
+                  const dayChange = currentPrice - previousClose;
+                  const dayChangePercent = previousClose > 0 ? (dayChange / previousClose) * 100 : 0;
+                  updates.priceChange = dayChange;
+                  updates.priceChangePercent = dayChangePercent;
+                  console.log(`[StandaloneWatchlist] ${item.ticker}: previousClose=${previousClose}, dayChange=${dayChange} (${dayChangePercent.toFixed(2)}%)`)
+                } else {
+                  updates.priceChange = 0;
+                  updates.priceChangePercent = 0;
+                }
+              }
+
+              return { ...item, ...updates };
+            }));
+          } catch (batchError) {
+            console.error('Error fetching batch stock data:', batchError);
+            // Fallback to individual fetches if batch fails
+            for (const item of watchlistItems) {
+              const stockData = await fetchStockData(item.ticker);
+              setWatchlist(prev => prev.map(w =>
+                w.ticker === item.ticker ? { ...w, ...stockData } : w
+              ));
+            }
           }
         }
       } else {
@@ -253,7 +260,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
       setWatchlist([]);
       setLoading(false);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, hasAlpacaConfig]);
 
   // Use ref to track previous running analyses
   const previousRunningRef = useRef<Set<string>>(new Set());
@@ -714,7 +721,7 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
               {watchlist.map((item) => (
                 <div
                   key={item.ticker}
-                  className={`relative flex flex-col sm:flex-row sm:items-center sm:justify-between sm:p-4 rounded-lg border transition-colors cursor-pointer ${selectedStock === item.ticker
+                  className={`relative flex flex-row items-center justify-between p-3 sm:p-4 rounded-lg border transition-colors cursor-pointer ${selectedStock === item.ticker
                     ? 'border-primary bg-primary/10'
                     : 'border-border hover:bg-muted/50'
                     }`}
@@ -724,58 +731,83 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                     onSelectStock?.(item.ticker);
                   }}
                 >
-                  {/* Mobile: X button in top-right corner */}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="absolute top-2 right-2 sm:hidden h-8 w-8 p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFromWatchlist(item.ticker);
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-
-                  <div className="flex-1 p-4 pb-2 sm:p-0 pr-10 sm:pr-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                      <span className="font-semibold">{item.ticker}</span>
+                  {/* Mobile and Desktop: Left side - Stock info */}
+                  <div className="flex-1 pr-2">
+                    {/* Mobile: Compact 3-line layout */}
+                    <div className="sm:hidden">
+                      {/* Line 1: Ticker */}
+                      <div className="font-semibold text-base">{item.ticker}</div>
+                      
+                      {/* Line 2: Description */}
                       {item.description && (
-                        <span className="text-sm text-muted-foreground line-clamp-1">
+                        <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                           {item.description}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 text-sm">
-                      {item.currentPrice > 0 && (
-                        <span className="font-medium">
-                          ${item.currentPrice.toFixed(2)}
-                        </span>
-                      )}
-                      {item.priceChangePercent !== undefined && (
-                        <div className={`flex items-center gap-1 ${item.priceChangePercent >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                          {item.priceChangePercent >= 0 ? (
-                            <TrendingUp className="h-3 w-3" />
-                          ) : (
-                            <TrendingDown className="h-3 w-3" />
-                          )}
-                          <span>{Math.abs(item.priceChangePercent).toFixed(2)}%</span>
                         </div>
                       )}
-                      <span className="text-muted-foreground hidden sm:inline">
-                        Last: {item.lastAnalysis || new Date().toISOString().split('T')[0]}
-                      </span>
-                      {getDecisionBadge(item.lastDecision)}
+                      
+                      {/* Line 3: Price, Change, Decision */}
+                      <div className="flex items-center gap-2 mt-1">
+                        {item.currentPrice > 0 && (
+                          <span className="text-sm font-medium">
+                            ${item.currentPrice.toFixed(2)}
+                          </span>
+                        )}
+                        {item.priceChangePercent !== undefined && (
+                          <div className={`flex items-center gap-0.5 text-xs ${item.priceChangePercent >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                            {item.priceChangePercent >= 0 ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : (
+                              <TrendingDown className="h-3 w-3" />
+                            )}
+                            <span>{Math.abs(item.priceChangePercent).toFixed(2)}%</span>
+                          </div>
+                        )}
+                        {getDecisionBadge(item.lastDecision)}
+                      </div>
+                    </div>
+
+                    {/* Desktop: Original layout */}
+                    <div className="hidden sm:block">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{item.ticker}</span>
+                        {item.description && (
+                          <span className="text-sm text-muted-foreground line-clamp-1">
+                            {item.description}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm">
+                        {item.currentPrice > 0 && (
+                          <span className="font-medium">
+                            ${item.currentPrice.toFixed(2)}
+                          </span>
+                        )}
+                        {item.priceChangePercent !== undefined && (
+                          <div className={`flex items-center gap-1 ${item.priceChangePercent >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                            {item.priceChangePercent >= 0 ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : (
+                              <TrendingDown className="h-3 w-3" />
+                            )}
+                            <span>{Math.abs(item.priceChangePercent).toFixed(2)}%</span>
+                          </div>
+                        )}
+                        <span className="text-muted-foreground">
+                          Last: {item.lastAnalysis || new Date().toISOString().split('T')[0]}
+                        </span>
+                        {getDecisionBadge(item.lastDecision)}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Mobile: Show analyze button below at full width */}
-                  <div className="sm:hidden border-t border-border/50 px-4 py-2 bg-muted/30">
+                  {/* Mobile: Right side - Action buttons */}
+                  <div className="flex items-center gap-1.5 sm:hidden">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="w-full border border-slate-700"
+                      className="h-8 px-2 border border-slate-700"
                       disabled={!isAlpacaConnected && !runningAnalyses.has(item.ticker)}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -783,21 +815,23 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                       }}
                     >
                       {!isAlpacaConnected && !runningAnalyses.has(item.ticker) ? (
-                        <>
-                          <AlertCircle className="h-4 w-4 mr-1" />
-                          Connection Error
-                        </>
+                        <AlertCircle className="h-4 w-4" />
                       ) : runningAnalyses.has(item.ticker) ? (
-                        <>
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Progress
-                        </>
+                        <Eye className="h-4 w-4" />
                       ) : (
-                        <>
-                          <Play className="h-4 w-4 mr-1" />
-                          Analyze
-                        </>
+                        <Play className="h-4 w-4" />
                       )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 bg-red-500/5 border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 hover:shadow-md hover:scale-[1.01] active:scale-[0.99]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromWatchlist(item.ticker);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
 
@@ -832,14 +866,14 @@ export default function StandaloneWatchlist({ onSelectStock, selectedStock }: St
                     </Button>
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="border border-slate-700"
+                      variant="ghost"
+                      className="bg-red-500/5 border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 hover:shadow-md hover:scale-[1.01] active:scale-[0.99]"
                       onClick={(e) => {
                         e.stopPropagation();
                         removeFromWatchlist(item.ticker);
                       }}
                     >
-                      <X className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

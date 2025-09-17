@@ -36,6 +36,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+
 interface Invitation {
   id: string;
   email: string;
@@ -157,6 +159,7 @@ export default function AdminInvitationsNew() {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
+            'apikey': SUPABASE_PUBLISHABLE_KEY,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({

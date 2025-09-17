@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   RefreshCw,
   Save,
+  Loader2,
   AlertCircle,
   Check,
   Lock,
@@ -40,6 +41,7 @@ export default function RebalanceTab({
   saved,
   activeTab,
   errors,
+  isSaving,
   setRebalanceThreshold,
   setRebalanceMinPositionSize,
   setRebalanceMaxPositionSize,
@@ -374,10 +376,20 @@ export default function RebalanceTab({
           <Button
             onClick={() => handleSaveTab('rebalance')}
             size="lg"
-            disabled={!hasRebalanceAccess && !hasOpportunityAgentAccess}
+            disabled={(!hasRebalanceAccess && !hasOpportunityAgentAccess) || isSaving}
+            className="w-full sm:w-auto"
           >
-            <Save className="w-4 h-4 mr-2" />
-            Save Rebalance Configuration
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving Rebalance Config ...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save Rebalance Configuration
+              </>
+            )}
           </Button>
         </div>
       </CardContent>

@@ -14,6 +14,7 @@ import { Slider } from "@/components/ui/slider";
 import {
   Bot,
   Save,
+  Loader2,
   AlertCircle,
   Check,
   Lock,
@@ -52,6 +53,7 @@ export default function AgentsTab({
   defaultCustomModel,
   saved,
   activeTab,
+  isSaving,
   setResearchDebateRounds,
   setAnalysisTeamProviderId,
   setAnalysisTeamModel,
@@ -741,10 +743,20 @@ export default function AgentsTab({
           <Button
             onClick={() => handleSaveTab('agents')}
             size="lg"
-            disabled={!hasAgentConfigAccess}
+            disabled={!hasAgentConfigAccess || isSaving}
+            className="w-full sm:w-auto"
           >
-            <Save className="w-4 h-4 mr-2" />
-            Save Agent Configuration
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving Agents Config ...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save Agent Configuration
+              </>
+            )}
           </Button>
         </div>
       </CardContent>

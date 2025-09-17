@@ -25,6 +25,11 @@ let cachedSessionExpiry: number = 0;
 // Export function to check rate limit status
 export const isRateLimited = () => rateLimitedUntil > Date.now();
 
+// Track when a token refresh is currently running so callers can temporarily pause polling
+if (typeof window !== 'undefined' && typeof (window as any).__supabaseRefreshingToken === 'undefined') {
+  (window as any).__supabaseRefreshingToken = false;
+}
+
 export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
     persistSession: true,
@@ -60,12 +65,47 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   },
   // Add global fetch options with timeout and better error handling
   global: {
-    fetch: async (url: RequestInfo | URL, options: RequestInit = {}) => {
+    fetch: async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      let requestInit: RequestInit = { ...init };
+      let requestUrl: string | null = null;
+      let headers = new Headers(init.headers || {});
+
+      if (typeof input === 'string') {
+        requestUrl = input;
+      } else if (input instanceof URL) {
+        requestUrl = input.toString();
+      } else if (input instanceof Request) {
+        const clonedRequest = input.clone();
+        requestUrl = clonedRequest.url;
+
+        headers = new Headers(clonedRequest.headers);
+
+        if (requestInit.method === undefined) requestInit.method = clonedRequest.method;
+        if (requestInit.body === undefined) requestInit.body = clonedRequest.body;
+        if (requestInit.credentials === undefined) requestInit.credentials = clonedRequest.credentials;
+        if (requestInit.cache === undefined) requestInit.cache = clonedRequest.cache;
+        if (requestInit.mode === undefined) requestInit.mode = clonedRequest.mode;
+        if (requestInit.redirect === undefined) requestInit.redirect = clonedRequest.redirect;
+        if (requestInit.referrer === undefined) requestInit.referrer = clonedRequest.referrer;
+        if (requestInit.referrerPolicy === undefined) requestInit.referrerPolicy = clonedRequest.referrerPolicy;
+        if (requestInit.integrity === undefined) requestInit.integrity = clonedRequest.integrity;
+        if (requestInit.keepalive === undefined) requestInit.keepalive = clonedRequest.keepalive;
+        if (requestInit.signal === undefined) requestInit.signal = clonedRequest.signal;
+      }
+
+      // Merge headers from init
+      new Headers(init.headers || {}).forEach((value, key) => {
+        headers.set(key, value);
+      });
+
+      const isRestRequest = typeof requestUrl === 'string' && requestUrl.includes('/rest/v1/');
+      const isEdgeFunction = typeof requestUrl === 'string' && (requestUrl.includes('/functions/v1/') || requestUrl.includes('.functions.supabase.co/'));
+
       // For all Supabase API calls, ensure we're using the latest session
-      if (typeof url === 'string' && (url.includes('/rest/v1/') || url.includes('/functions/v1/'))) {
+      if (isRestRequest || isEdgeFunction) {
         try {
-          let accessToken = null;
-          
+          let accessToken: string | null = null;
+
           // First check our in-memory cache (valid for 5 seconds to batch rapid API calls)
           const now = Date.now();
           if (cachedSessionToken && cachedSessionExpiry > now) {
@@ -74,7 +114,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
             // Cache expired, check localStorage next
             const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
             const storedSession = localStorage.getItem(storageKey);
-            
+
             if (storedSession) {
               try {
                 const sessionData = JSON.parse(storedSession);
@@ -84,7 +124,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
                   const tokenExp = payload.exp;
                   const nowSeconds = Math.floor(now / 1000);
                   const timeUntilExpiry = tokenExp - nowSeconds;
-                  
+
                   if (timeUntilExpiry > -7200) { // Within 2 hours of expiry
                     accessToken = sessionData.access_token;
                     // Cache it for 5 seconds to avoid repeated parsing
@@ -96,7 +136,7 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
                 // Ignore parsing errors
               }
             }
-            
+
             // Only call getSession if we absolutely need to (no cached or stored token)
             // AND we're not rate limited
             if (!accessToken && !isRateLimited()) {
@@ -109,13 +149,24 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
               }
             }
           }
-          
+
           // Set the Authorization header if we have a token
           if (accessToken) {
-            const headers = new Headers(options.headers || {});
             headers.set('Authorization', `Bearer ${accessToken}`);
             headers.set('apikey', supabasePublishableKey); // Also ensure API key is set
-            options = { ...options, headers };
+            if (isEdgeFunction) {
+              try {
+                const authPrefix = accessToken.length > 10 ? `${accessToken.substring(0, 10)}...` : accessToken;
+                console.log('[Supabase fetch] Edge function auth headers applied', {
+                  url: requestUrl,
+                  hasAuth: !!accessToken,
+                  authPrefix,
+                  hasApiKey: headers.get('apikey')?.length ? true : false
+                });
+              } catch (logError) {
+                // Ignore logging errors
+              }
+            }
           }
         } catch (e) {
           // If getting session fails, proceed with original options
@@ -123,7 +174,10 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
         }
       }
       // Check if this is a token refresh request
-      const isTokenRefresh = typeof url === 'string' && url.includes('/auth/v1/token?grant_type=refresh_token');
+      const isTokenRefresh = typeof requestUrl === 'string' && requestUrl.includes('/auth/v1/token?grant_type=refresh_token');
+
+      // Apply merged headers back to request init
+      requestInit = { ...requestInit, headers };
 
       // If we're rate limited and this is a token refresh, skip it
       if (isTokenRefresh && rateLimitedUntil > Date.now()) {
@@ -155,20 +209,19 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
         throw new Error('Rate limited - using cached session');
       }
 
-      // Check if this is an Edge Function call
-      const isEdgeFunction = typeof url === 'string' && url.includes('/functions/v1/');
+      const finalUrl: RequestInfo | URL = requestUrl ?? input;
 
       // For Edge Functions, use a longer timeout and respect existing signals
       if (isEdgeFunction) {
         // If there's already a signal in options, check if it's already aborted
-        if (options.signal) {
-          if (options.signal.aborted) {
+        if (requestInit.signal) {
+          if (requestInit.signal.aborted) {
             console.log('Skipping fetch - signal already aborted');
             throw new DOMException('The user aborted a request.', 'AbortError');
           }
           try {
-            const response = await fetch(url, {
-              ...options,
+            const response = await fetch(finalUrl, {
+              ...requestInit,
               credentials: 'same-origin',
               cache: 'no-cache'
             });
@@ -187,8 +240,8 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for Edge Functions
 
         try {
-          const response = await fetch(url, {
-            ...options,
+          const response = await fetch(finalUrl, {
+            ...requestInit,
             signal: controller.signal,
             credentials: 'same-origin',
             cache: 'no-cache'
@@ -211,9 +264,9 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
 
       // Merge signals if one already exists
       let signal = controller.signal;
-      if (options.signal) {
+      if (requestInit.signal) {
         // Check if the existing signal is already aborted
-        if (options.signal.aborted) {
+        if (requestInit.signal.aborted) {
           clearTimeout(timeoutId);
           // Don't log for routine aborts (component unmounts, etc)
           if (!(window as any).__suppressAbortLogs) {
@@ -228,14 +281,14 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
             combinedController.abort();
           }
         };
-        options.signal.addEventListener('abort', abortHandler, { once: true });
+        requestInit.signal.addEventListener('abort', abortHandler, { once: true });
         controller.signal.addEventListener('abort', abortHandler, { once: true });
         signal = combinedController.signal;
       }
 
       try {
-        const response = await fetch(url, {
-          ...options,
+        const response = await fetch(finalUrl, {
+          ...requestInit,
           signal,
           credentials: 'same-origin',
           cache: 'no-cache'
@@ -248,17 +301,21 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
 
           // Try to refresh the token using refreshSession which forces an actual refresh
           try {
+            if (typeof window !== 'undefined') {
+              (window as any).__supabaseRefreshingToken = true;
+            }
+
             const refreshResponse = await supabase.auth.refreshSession();
             if (refreshResponse.data.session && !refreshResponse.error) {
               console.log('🔐 Token refreshed after 401, retrying original request...');
 
               // Update the authorization header with the new token
-              const updatedHeaders = new Headers(options.headers || {});
+              const updatedHeaders = new Headers(requestInit.headers || {});
               updatedHeaders.set('Authorization', `Bearer ${refreshResponse.data.session.access_token}`);
 
               // Retry the original request with the new token
-              const retryResponse = await fetch(url, {
-                ...options,
+              const retryResponse = await fetch(finalUrl, {
+                ...requestInit,
                 headers: updatedHeaders,
                 signal,
                 credentials: 'same-origin',
@@ -271,6 +328,10 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
             }
           } catch (refreshError) {
             console.error('🔐 Failed to refresh token after 401:', refreshError);
+          } finally {
+            if (typeof window !== 'undefined') {
+              (window as any).__supabaseRefreshingToken = false;
+            }
           }
         }
 
@@ -464,6 +525,8 @@ export interface ApiSettings {
   opportunity_market_range?: string;
   // Trade execution settings
   auto_execute_trades?: boolean;
+  auto_near_limit_analysis?: boolean;
+  near_limit_threshold?: number;
   default_position_size_dollars?: number;
   user_risk_level?: 'conservative' | 'moderate' | 'aggressive';
   created_at: string;

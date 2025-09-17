@@ -327,36 +327,78 @@ export default function UnifiedAnalysisHistory() {
     }
   }, [isAuthenticated, user, selectedDate]); // Reload when selectedDate changes
 
-  // Poll for updates with smart retry logic
+  // Only poll for running analyses updates, not the entire list
   useEffect(() => {
-    if (!user) return;
+    if (!user || !initialLoadComplete) return;
 
-    let errorCount = 0;
-    const maxErrors = 3;
+    // Only set up polling if there are actually running analyses
+    if (runningAnalyses.length === 0) return;
 
-    const interval = setInterval(() => {
-      // Only poll if there are running analyses or we haven't loaded yet
-      if (runningAnalyses.length > 0 || (history.length === 0 && !loading)) {
-        loadAllAnalyses().then(() => {
-          errorCount = 0; // Reset error count on success
-        }).catch(() => {
-          errorCount++;
-          if (errorCount >= maxErrors) {
-            console.log('Too many errors, stopping polling temporarily');
-            clearInterval(interval);
-            // Restart polling after 30 seconds
-            setTimeout(() => {
-              if (user) {
-                loadAllAnalyses();
+    let intervalId: NodeJS.Timeout;
+
+    // Much slower polling - every 15 seconds instead of 3-5 seconds
+    // Users can manually refresh if they want faster updates
+    intervalId = setInterval(async () => {
+      try {
+        // Only check status of running analyses, don't reload everything
+        const runningIds = runningAnalyses.map(a => a.id);
+        
+        // Build date range for the selected date
+        const [year, month, day] = selectedDate.split('-').map(Number);
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+        // Only fetch the specific running analyses to check their status
+        const { data, error } = await supabase
+          .from('analysis_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('id', runningIds)
+          .gte('created_at', startOfDay.toISOString())
+          .lte('created_at', endOfDay.toISOString());
+
+        if (!error && data) {
+          // Check if any running analyses have completed
+          const stillRunning: RunningAnalysisItem[] = [];
+          const newlyCompleted: AnalysisHistoryItem[] = [];
+
+          for (const item of data) {
+            const status: AnalysisStatus = typeof item.analysis_status === 'number'
+              ? convertLegacyAnalysisStatus(item.analysis_status)
+              : item.analysis_status as AnalysisStatus;
+
+            if (status === ANALYSIS_STATUS.RUNNING || status === ANALYSIS_STATUS.PENDING) {
+              const existingItem = runningAnalyses.find(r => r.id === item.id);
+              if (existingItem) {
+                stillRunning.push({
+                  ...existingItem,
+                  full_analysis: item.full_analysis,
+                  agent_insights: item.agent_insights,
+                });
               }
-            }, 30000);
+            } else if (status === ANALYSIS_STATUS.COMPLETED) {
+              newlyCompleted.push(item);
+            }
           }
-        });
-      }
-    }, runningAnalyses.length > 0 ? 3000 : 10000); // Poll every 3s if running, 10s otherwise
 
-    return () => clearInterval(interval);
-  }, [user, runningAnalyses.length, history.length]);
+          // Only update state if something actually changed
+          if (stillRunning.length !== runningAnalyses.length || newlyCompleted.length > 0) {
+            setRunningAnalyses(stillRunning);
+            if (newlyCompleted.length > 0) {
+              setHistory(prev => [...newlyCompleted, ...prev]);
+              setFilteredHistory(prev => [...newlyCompleted, ...prev]);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking running analyses:', error);
+      }
+    }, 15000); // Poll every 15 seconds instead of 3-5 seconds
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [user, runningAnalyses.length, selectedDate, initialLoadComplete]); // Keep minimal dependencies
 
   const viewRunningAnalysis = (ticker: string) => {
     setSelectedTicker(ticker);
@@ -427,8 +469,7 @@ export default function UnifiedAnalysisHistory() {
       setSelectedAnalysisId(null);
       setSelectedAnalysisTicker(null);
 
-      // Refresh the analysis lists to show the canceled item
-      loadAllAnalyses();
+      // Don't refresh - state is already updated
 
       // Close modal if this analysis was being viewed
       if (selectedTicker === ticker || selectedViewAnalysisId === analysisId) {
@@ -673,7 +714,7 @@ export default function UnifiedAnalysisHistory() {
                     setSelectedAnalysisTicker(item.ticker);
                     setShowDeleteDialog(true);
                   }}
-                  className="text-red-500 hover:text-white hover:bg-red-600"
+                  className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete
@@ -697,7 +738,22 @@ export default function UnifiedAnalysisHistory() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Analysis History</h3>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {/* Manual refresh button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => loadAllAnalyses()}
+                disabled={loading}
+                className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
+                title="Refresh"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+              
+              <div className="w-px h-6 bg-border" />
+              
+              <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -820,6 +876,7 @@ export default function UnifiedAnalysisHistory() {
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              </div>
             </div>
           </div>
 
@@ -1061,7 +1118,7 @@ export default function UnifiedAnalysisHistory() {
                                     setSelectedAnalysisTicker(item.ticker);
                                     setShowDeleteDialog(true);
                                   }}
-                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                  className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete
@@ -1205,7 +1262,7 @@ export default function UnifiedAnalysisHistory() {
                                   setSelectedAnalysisTicker(item.ticker);
                                   setShowCancelDialog(true);
                                 }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
+                                className="bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                               >
                                 <StopCircle className="h-4 w-4 mr-2" />
                                 Cancel Analysis
@@ -1217,7 +1274,7 @@ export default function UnifiedAnalysisHistory() {
                                   setSelectedAnalysisTicker(item.ticker);
                                   setShowDeleteDialog(true);
                                 }}
-                                className="text-red-500 hover:text-white hover:bg-red-600"
+                                className="bg-red-500/5 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
@@ -1364,7 +1421,7 @@ export default function UnifiedAnalysisHistory() {
                                     setSelectedAnalysisTicker(item.ticker);
                                     setShowDeleteDialog(true);
                                   }}
-                                  className="text-red-500 hover:text-white hover:bg-red-600"
+                                  className="text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
                                   Delete
@@ -1394,7 +1451,7 @@ export default function UnifiedAnalysisHistory() {
             setSelectedTicker(null);
             setSelectedAnalysisDate(null);
             setSelectedViewAnalysisId(null);
-            loadAllAnalyses();
+            // Don't refresh on close - not needed
           }}
         />
       )}

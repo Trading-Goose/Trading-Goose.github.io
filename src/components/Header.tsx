@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   TrendingUp,
@@ -15,11 +15,11 @@ import {
   Menu,
   Loader2
 } from "lucide-react";
-import { useAuth, hasRequiredApiKeys, isSessionValid } from "@/lib/auth";
+import { useAuth, hasRequiredApiKeys, hasAlpacaCredentials, isSessionValid } from "@/lib/auth";
 import { RoleBadge, RoleGate } from "@/components/RoleBasedAccess";
 import { useRBAC } from "@/hooks/useRBAC";
 import { supabase } from "@/lib/supabase";
-import { 
+import {
   ANALYSIS_STATUS,
   convertLegacyAnalysisStatus,
   isAnalysisActive,
@@ -41,7 +41,20 @@ export default function Header() {
   const [runningAnalyses, setRunningAnalyses] = useState(0);
   const [runningRebalances, setRunningRebalances] = useState(0);
 
-  const hasApiKeys = hasRequiredApiKeys(apiSettings);
+  const hasAiConfig = hasRequiredApiKeys(apiSettings);
+  const hasAlpacaConfig = hasAlpacaCredentials(apiSettings);
+  const systemStatus = useMemo(() => {
+    if (hasAiConfig && hasAlpacaConfig) {
+      return { dotClass: 'bg-buy', message: 'All Agents Ready' };
+    }
+    if (hasAiConfig && !hasAlpacaConfig) {
+      return { dotClass: 'bg-yellow-500', message: 'Alpaca Config Required' };
+    }
+    if (!hasAiConfig && hasAlpacaConfig) {
+      return { dotClass: 'bg-yellow-500', message: 'AI Config Required' };
+    }
+    return { dotClass: 'bg-red-500', message: 'Require API Configurations' };
+  }, [hasAiConfig, hasAlpacaConfig]);
   const primaryRole = getPrimaryRole();
 
   // Check for running analyses and rebalances
@@ -59,7 +72,7 @@ export default function Header() {
         // Check running analyses - only fetch from last 24 hours
         const twentyFourHoursAgo = new Date();
         twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
-        
+
         const { data: analysisData } = await supabase
           .from('analysis_history')
           .select('id, analysis_status, is_canceled')
@@ -68,14 +81,14 @@ export default function Header() {
 
         if (analysisData) {
           const runningCount = analysisData.filter(item => {
-            const currentStatus = typeof item.analysis_status === 'number' 
+            const currentStatus = typeof item.analysis_status === 'number'
               ? convertLegacyAnalysisStatus(item.analysis_status)
               : item.analysis_status;
-            
+
             if (item.is_canceled || currentStatus === ANALYSIS_STATUS.CANCELLED) {
               return false;
             }
-            
+
             return isAnalysisActive(currentStatus);
           }).length;
           setRunningAnalyses(runningCount);
@@ -88,7 +101,7 @@ export default function Header() {
           .eq('user_id', user.id);
 
         if (rebalanceData) {
-          const runningCount = rebalanceData.filter(item => 
+          const runningCount = rebalanceData.filter(item =>
             isRebalanceActive(item.status)
           ).length;
           setRunningRebalances(runningCount);
@@ -157,9 +170,9 @@ export default function Header() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild className="hidden md:flex">
                       {isRoleLoading ? (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="max-w-[150px] sm:max-w-none"
                           disabled
                         >
@@ -167,14 +180,13 @@ export default function Header() {
                           <span className="truncate">Loading...</span>
                         </Button>
                       ) : (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className={`max-w-[150px] sm:max-w-none transition-all duration-200 ${
-                            primaryRole?.color 
-                              ? `border border-opacity-30 hover:bg-opacity-20` 
-                              : 'border border-border hover:bg-accent'
-                          }`}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`max-w-[150px] sm:max-w-none transition-all duration-200 ${primaryRole?.color
+                            ? `border border-opacity-30 hover:bg-opacity-20`
+                            : 'border border-border hover:bg-accent'
+                            }`}
                           style={primaryRole?.color ? {
                             borderColor: `${primaryRole.color}4D`, // 30% opacity
                             backgroundColor: `${primaryRole.color}1A`, // 10% opacity
@@ -192,8 +204,8 @@ export default function Header() {
                           }}
                         >
                           {primaryRole?.icon_url ? (
-                            <img 
-                              src={primaryRole.icon_url} 
+                            <img
+                              src={primaryRole.icon_url}
                               alt={primaryRole.display_name}
                               className="h-4 w-4 mr-2 object-contain"
                             />
@@ -333,9 +345,9 @@ export default function Header() {
                   <div className="text-right hidden sm:block">
                     <p className="text-sm font-medium text-foreground">System Status</p>
                     <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${hasApiKeys ? 'bg-buy' : 'bg-yellow-500'} animate-pulse`}></div>
+                      <div className={`h-2 w-2 rounded-full ${systemStatus.dotClass} animate-pulse`}></div>
                       <span className="text-xs text-muted-foreground">
-                        {hasApiKeys ? 'All Agents Ready' : 'API Keys Required'}
+                        {systemStatus.message}
                       </span>
                     </div>
                   </div>
@@ -364,7 +376,7 @@ export default function Header() {
           </div>
         </div>
       </header>
-      
+
       {/* Running tasks banner */}
       {isAuthenticated && (runningAnalyses > 0 || runningRebalances > 0) && (
         <div className="bg-primary/10 border-b border-primary/20 backdrop-blur-sm">

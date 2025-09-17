@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw, Loader2, ExternalLink, FileText, BarChart3 } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
-import { useAuth, isSessionValid } from "@/lib/auth";
+import { useAuth, isSessionValid, hasAlpacaCredentials } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getCachedSession } from "@/lib/cachedAuth";
 import { useToast } from "@/hooks/use-toast";
 import AnalysisDetailModal from "@/components/AnalysisDetailModal";
 import RebalanceDetailModal from "@/components/RebalanceDetailModal";
+
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
 interface TradeDecision {
   id: string;
@@ -41,6 +43,7 @@ function RecentTrades() {
   const [selectedRebalanceId, setSelectedRebalanceId] = useState<string | null>(null);
   const [executingOrderId, setExecutingOrderId] = useState<string | null>(null);
   const { apiSettings, user, isAuthenticated } = useAuth();
+  const hasAlpacaConfig = useMemo(() => hasAlpacaCredentials(apiSettings), [apiSettings]);
   const { toast } = useToast();
 
   // Fetch recent trades from trading_actions table (last 48 hours for dashboard widget)
@@ -107,7 +110,7 @@ function RecentTrades() {
 
   // Function to update Alpaca order status for approved orders using batch API
   const updateAlpacaOrderStatus = async () => {
-    if (!user?.id || !apiSettings) return;
+    if (!user?.id || !apiSettings || !hasAlpacaConfig) return;
 
     try {
       // Get recent trading actions (last 48 hours) - same timeframe as displayed trades
@@ -141,10 +144,18 @@ function RecentTrades() {
       
       // Fetch all orders from Alpaca using batch API
       const session = await getCachedSession();
+      if (!session?.access_token) {
+        console.error('No access token available for Alpaca batch fetch');
+        return;
+      }
+
+      const accessToken = session.access_token;
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/alpaca-batch`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
+          'Authorization': `Bearer ${accessToken}`,
+          'apikey': SUPABASE_PUBLISHABLE_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -282,21 +293,18 @@ function RecentTrades() {
       fetchAllTrades();
       
       // Also update Alpaca order status if credentials exist
-      const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
-      if (hasCredentials) {
+      if (hasAlpacaConfig) {
         console.log('Alpaca credentials detected, updating order status...');
         updateAlpacaOrderStatus();
       }
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [user?.id, isAuthenticated, fetchAllTrades, apiSettings]); // Include isAuthenticated and apiSettings in dependencies
+  }, [user?.id, isAuthenticated, fetchAllTrades, apiSettings, hasAlpacaConfig]); // Include isAuthenticated and apiSettings in dependencies
 
   // Periodically update Alpaca order status
   useEffect(() => {
-    const hasCredentials = apiSettings?.alpaca_paper_api_key || apiSettings?.alpaca_live_api_key;
-
-    if (!hasCredentials) return;
+    if (!hasAlpacaConfig) return;
 
     const interval = setInterval(() => {
       console.log('Periodic order status update...');
@@ -304,7 +312,7 @@ function RecentTrades() {
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(interval);
-  }, [apiSettings, user]);
+  }, [apiSettings, user, hasAlpacaConfig]);
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);

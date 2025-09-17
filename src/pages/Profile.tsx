@@ -1151,14 +1151,14 @@ export default function ProfilePage() {
                   <p className="text-sm text-muted-foreground">
                     Keep your account secure with a strong password. We recommend updating it regularly.
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       className="flex-1"
                       onClick={() => setShowChangePasswordModal(true)}
                     >
-                      <Lock className="mr-2 h-4 w-4" />
+                      <Lock className="mr-2 h-4 w-4 hidden sm:inline-block" />
                       Change Password
                     </Button>
                     <Button
@@ -1175,7 +1175,7 @@ export default function ProfilePage() {
                         </>
                       ) : (
                         <>
-                          <Mail className="mr-2 h-4 w-4" />
+                          <Mail className="mr-2 h-4 w-4 hidden sm:inline-block" />
                           Reset via Email
                         </>
                       )}

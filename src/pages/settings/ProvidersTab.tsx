@@ -12,6 +12,7 @@ import {
 import {
   Key,
   Save,
+  Loader2,
   AlertCircle,
   Check,
   Eye,
@@ -19,6 +20,7 @@ import {
   Plus,
   X,
   Lock,
+  Trash2,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { HelpButton, LabelWithHelp, HelpContent } from "@/components/ui/help-button";
@@ -32,6 +34,7 @@ export default function ProvidersTab({
   errors,
   saved,
   activeTab,
+  isSaving,
   updateAiProvider,
   setDefaultAiModel,
   setDefaultCustomModel,
@@ -39,6 +42,7 @@ export default function ProvidersTab({
   addAiProvider,
   removeAiProvider,
   handleSaveTab,
+  handleClearProviders,
   getModelOptions,
   hasAdditionalProviderAccess = true,
 }: ProvidersTabProps) {
@@ -411,15 +415,38 @@ export default function ProvidersTab({
           </div>
         </div>
 
-        {/* Save Button for Providers Tab */}
-        <div className="flex justify-end pt-4">
-          <Button
-            onClick={() => handleSaveTab('providers')}
-            size="lg"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Save Provider Settings
-          </Button>
+        {/* Save and Clear Buttons for Providers Tab */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:justify-between pt-4">
+          {handleClearProviders && (
+            <Button
+              onClick={handleClearProviders}
+              disabled={isSaving}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border backdrop-blur-sm hover:shadow-md hover:scale-[1.01] active:scale-[0.99] h-11 rounded-md px-8 bg-red-500/5 border-red-500/30 text-red-600 dark:bg-red-500/5 dark:text-red-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/50 order-2 sm:order-1"
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear All Provider Settings
+            </Button>
+          )}
+          <div className={`${!handleClearProviders ? "w-full" : "w-full sm:w-auto"} order-1 sm:order-2`}>
+            <Button
+              onClick={() => handleSaveTab('providers')}
+              size="lg"
+              disabled={isSaving}
+              className="w-full sm:w-auto"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving Provider Settings ...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Provider Settings
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card >

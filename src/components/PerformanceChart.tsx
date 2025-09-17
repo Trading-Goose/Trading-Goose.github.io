@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { alpacaAPI } from "@/lib/alpaca";
-import { useAuth, isSessionValid } from "@/lib/auth";
+import { useAuth, isSessionValid, hasAlpacaCredentials } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { fetchPortfolioDataForPeriod, fetchStockDataForPeriod, type PortfolioData, type StockData, type PortfolioDataPoint } from "@/lib/portfolio-data";
 import { useNavigate } from "react-router-dom";
@@ -31,6 +31,29 @@ const periods: Array<{ value: TimePeriod; label: string }> = [
   { value: "All", label: "All" },
 ];
 
+// Helper function to format values for mobile display
+const formatValue = (value: number | undefined, isMobile: boolean = false): string => {
+  if (value === undefined || value === null) return 'Loading...';
+  
+  if (!isMobile) {
+    // Desktop: show full formatted number
+    return value.toLocaleString();
+  }
+  
+  // Mobile: shorten large numbers
+  const absValue = Math.abs(value);
+  
+  if (absValue >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`;
+  } else if (absValue >= 10000) {
+    return `${Math.round(value / 1000)}K`;
+  } else if (absValue >= 1000) {
+    return `${(value / 1000).toFixed(1)}K`;
+  }
+  
+  // For smaller values, just format with commas
+  return value.toLocaleString();
+};
 
 // Remove the old hardcoded function - we'll create a dynamic one in the component
 
@@ -44,8 +67,9 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
   const [portfolioData, setPortfolioData] = useState<{ [period: string]: PortfolioDataPoint[] }>({});
   const [stockData, setStockData] = useState<{ [ticker: string]: { [period: string]: PortfolioDataPoint[] } }>({});
   const [positions, setPositions] = useState<any[]>([]);
-  const [hasAlpacaConfig, setHasAlpacaConfig] = useState(true); // Assume configured initially
   const { apiSettings, isAuthenticated } = useAuth();
+  const hasConfiguredAlpaca = useMemo(() => hasAlpacaCredentials(apiSettings), [apiSettings]);
+  const [hasAlpacaConfig, setHasAlpacaConfig] = useState(hasConfiguredAlpaca);
   const { toast } = useToast();
 
   // Track if we've already fetched for current apiSettings and selectedStock
@@ -63,6 +87,14 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
 
     setLoading(true);
     setError(null);
+
+    if (!hasConfiguredAlpaca) {
+      setLoading(false);
+      setPositionsLoading(false);
+      setError(null);
+      setHasAlpacaConfig(false);
+      return;
+    }
 
     try {
       // Fetch data for the specific period
@@ -179,13 +211,21 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
     } finally {
       setLoading(false);
     }
-  }, [selectedStock, portfolioData, stockData, toast]);
+  }, [selectedStock, portfolioData, stockData, toast, hasConfiguredAlpaca]);
 
   // Fetch data when period or stock changes
   useEffect(() => {
     // Don't fetch if not authenticated or session is invalid
     if (!isAuthenticated || !isSessionValid()) {
       console.log('PerformanceChart: Skipping fetch - session invalid or not authenticated');
+      return;
+    }
+
+    if (!hasConfiguredAlpaca) {
+      console.log('PerformanceChart: Skipping fetch - Alpaca credentials missing');
+      setHasAlpacaConfig(false);
+      setLoading(false);
+      setPositionsLoading(false);
       return;
     }
     
@@ -204,7 +244,11 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
     }, 500);
     
     return () => clearTimeout(timeoutId);
-  }, [selectedStock, selectedPeriod, fetchData, isAuthenticated]); // Include fetchData and isAuthenticated in dependencies
+  }, [selectedStock, selectedPeriod, fetchData, isAuthenticated, hasConfiguredAlpaca]);
+
+  useEffect(() => {
+    setHasAlpacaConfig(hasConfiguredAlpaca);
+  }, [hasConfiguredAlpaca]);
 
   // Get real stock metrics from positions
   const getStockMetrics = useCallback((symbol: string) => {
@@ -389,22 +433,24 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
   return (
     <Card>
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CardTitle>Performance</CardTitle>
-            {selectedStock && (
-              <div className="flex items-center gap-2">
-                <Badge variant="default">{selectedStock}</Badge>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={onClearSelection}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            )}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle>Performance</CardTitle>
+              {selectedStock && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="default">{selectedStock}</Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={onClearSelection}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
           <div className="text-xs text-muted-foreground">
             Data may be incomplete or delayed.{' '}
@@ -542,20 +588,29 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
               {!selectedStock ? (
                 // Portfolio metrics
                 <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-                    <div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 pt-4 border-t">
+                    <div className="col-span-2 sm:col-span-1">
                       <p className="text-xs text-muted-foreground">Portfolio Value</p>
-                      <p className="text-base font-semibold">
-                        ${metrics?.accountValue?.toLocaleString() || 'Loading...'}
+                      <p className="text-sm sm:text-base font-semibold">
+                        <span className="hidden sm:inline">${metrics?.accountValue?.toLocaleString() || 'Loading...'}</span>
+                        <span className="sm:hidden">${formatValue(metrics?.accountValue, true)}</span>
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Period Return ({selectedPeriod})</p>
-                      <p className={`text-base font-semibold ${totalReturn >= 0 ? 'text-success' : 'text-danger'}`}>
+                      <p className="text-xs text-muted-foreground">Period ({selectedPeriod})</p>
+                      <p className={`text-sm sm:text-base font-semibold ${totalReturn >= 0 ? 'text-success' : 'text-danger'}`}>
                         {currentData.length > 0 ? (
                           <>
-                            {totalReturn >= 0 ? '+' : ''}${Math.abs(totalReturn).toLocaleString()}
-                            ({totalReturn >= 0 ? '+' : ''}{totalReturnPercent}%)
+                            <span className="hidden sm:inline">
+                              {totalReturn >= 0 ? '+' : '-'}${Math.abs(totalReturn).toLocaleString()}
+                              ({totalReturn >= 0 ? '+' : '-'}{Math.abs(parseFloat(totalReturnPercent))}%)
+                            </span>
+                            <span className="sm:hidden">
+                              {totalReturn >= 0 ? '+' : '-'}${formatValue(Math.abs(totalReturn), true)}
+                              <span className="text-xs">
+                                ({totalReturn >= 0 ? '+' : '-'}{Math.abs(parseFloat(totalReturnPercent))}%)
+                              </span>
+                            </span>
                           </>
                         ) : (
                           'Loading...'
@@ -564,11 +619,19 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Total Return</p>
-                      <p className={`text-base font-semibold ${metrics?.totalReturn >= 0 ? 'text-success' : 'text-danger'}`}>
+                      <p className={`text-sm sm:text-base font-semibold ${metrics?.totalReturn >= 0 ? 'text-success' : 'text-danger'}`}>
                         {metrics ? (
                           <>
-                            {metrics.totalReturn >= 0 ? '+' : ''}${metrics.totalReturn.toLocaleString()}
-                            ({metrics.totalReturnPct >= 0 ? '+' : ''}{metrics.totalReturnPct.toFixed(2)}%)
+                            <span className="hidden sm:inline">
+                              {metrics.totalReturn >= 0 ? '+' : ''}${metrics.totalReturn.toLocaleString()}
+                              ({metrics.totalReturnPct >= 0 ? '+' : ''}{metrics.totalReturnPct.toFixed(1)}%)
+                            </span>
+                            <span className="sm:hidden">
+                              {metrics.totalReturn >= 0 ? '+' : ''}${formatValue(metrics.totalReturn, true)}
+                              <span className="text-xs">
+                                ({metrics.totalReturnPct >= 0 ? '+' : ''}{metrics.totalReturnPct.toFixed(1)}%)
+                              </span>
+                            </span>
                           </>
                         ) : (
                           'Loading...'
@@ -576,28 +639,30 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
                       </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-4 pt-4 border-t">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-4 border-t">
                     <div>
-                      <p className="text-xs text-muted-foreground">Cash Available</p>
-                      <p className="text-base font-semibold">
-                        ${metrics?.cashAvailable?.toLocaleString() || 'Loading...'}
+                      <p className="text-xs text-muted-foreground">Cash</p>
+                      <p className="text-sm sm:text-base font-semibold">
+                        <span className="hidden sm:inline">${metrics?.cashAvailable?.toLocaleString() || 'Loading...'}</span>
+                        <span className="sm:hidden">${formatValue(metrics?.cashAvailable, true)}</span>
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Buying Power</p>
-                      <p className="text-base font-semibold">
-                        ${metrics?.buyingPower?.toLocaleString() || 'Loading...'}
+                      <p className="text-sm sm:text-base font-semibold">
+                        <span className="hidden sm:inline">${metrics?.buyingPower?.toLocaleString() || 'Loading...'}</span>
+                        <span className="sm:hidden">${formatValue(metrics?.buyingPower, true)}</span>
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Sharpe Ratio</p>
-                      <p className={`text-base font-semibold ${metrics?.sharpeRatio > 1 ? 'text-success' : ''}`}>
+                      <p className="text-xs text-muted-foreground">Sharpe</p>
+                      <p className={`text-sm sm:text-base font-semibold ${metrics?.sharpeRatio > 1 ? 'text-success' : ''}`}>
                         {metrics?.sharpeRatio?.toFixed(2) || 'Loading...'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Max Drawdown</p>
-                      <p className="text-base font-semibold text-danger">
+                      <p className="text-xs text-muted-foreground">Max DD</p>
+                      <p className="text-sm sm:text-base font-semibold text-danger">
                         -{metrics?.maxDrawdown?.toFixed(1) || 'Loading...'}%
                       </p>
                     </div>
@@ -610,28 +675,34 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
                 </div>
               ) : (
                 // Individual stock metrics
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 pt-4 border-t">
                   <div>
-                    <p className="text-sm text-muted-foreground">Current Price</p>
-                    <p className="text-lg font-semibold">
-                      ${getStockMetrics(selectedStock).currentPrice ?
-                        getStockMetrics(selectedStock).currentPrice.toFixed(2) :
-                        latestValue.value.toLocaleString()}
+                    <p className="text-xs sm:text-sm text-muted-foreground">Current Price</p>
+                    <p className="text-base sm:text-lg font-semibold">
+                      {getStockMetrics(selectedStock).currentPrice ? (
+                        `$${getStockMetrics(selectedStock).currentPrice.toFixed(2)}`
+                      ) : (
+                        <>
+                          <span className="hidden sm:inline">${latestValue.value.toLocaleString()}</span>
+                          <span className="sm:hidden">${formatValue(latestValue.value, true)}</span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Period Change ({selectedPeriod})</p>
-                    <p className={`text-lg font-semibold ${totalReturn >= 0 ? 'text-success' : 'text-danger'
+                    <p className="text-xs sm:text-sm text-muted-foreground">Period Change ({selectedPeriod})</p>
+                    <p className={`text-base sm:text-lg font-semibold ${totalReturn >= 0 ? 'text-success' : 'text-danger'
                       }`}>
                       {currentData.length > 0 ? (
                         <>
                           {totalReturn >= 0 ? '+' : ''}
                           ${Math.abs(totalReturn).toFixed(2)}
-                          ({totalReturn >= 0 ? '+' : ''}
-                          {totalReturnPercent}%)
+                          <span className="text-xs sm:text-sm">
+                            ({totalReturn >= 0 ? '+' : ''}{totalReturnPercent}%)
+                          </span>
                           {/* Debug info */}
                           {selectedPeriod === '1D' && (
-                            <span className="text-xs block text-muted-foreground">
+                            <span className="text-xs block text-muted-foreground hidden">
                               (Last: ${latestValue.value?.toFixed(2)}, Ref: ${(latestValue.value - totalReturn).toFixed(2)})
                             </span>
                           )}
@@ -646,58 +717,67 @@ const PerformanceChart = React.memo(({ selectedStock, onClearSelection }: Perfor
 
               {selectedStock && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 pt-4 border-t">
                     <div>
-                      <p className="text-xs text-muted-foreground">Position P&L Today</p>
-                      <p className={`text-sm font-medium ${positionsLoading ? '' : getStockMetrics(selectedStock).dailyReturn >= 0 ? 'text-success' : 'text-danger'
+                      <p className="text-xs text-muted-foreground">Today P&L</p>
+                      <p className={`text-xs sm:text-sm font-medium ${positionsLoading ? '' : getStockMetrics(selectedStock).dailyReturn >= 0 ? 'text-success' : 'text-danger'
                         }`}>
                         {positionsLoading ? 'Loading...' : (
                           <>
                             {getStockMetrics(selectedStock).dailyReturn >= 0 ? '+' : ''}
                             ${getStockMetrics(selectedStock).dailyReturn.toFixed(2)}
-                            ({getStockMetrics(selectedStock).dailyReturnPercent >= 0 ? '+' : ''}
-                            {getStockMetrics(selectedStock).dailyReturnPercent.toFixed(2)}%)
+                            <span className="text-xs">
+                              ({getStockMetrics(selectedStock).dailyReturnPercent >= 0 ? '+' : ''}
+                              {getStockMetrics(selectedStock).dailyReturnPercent.toFixed(1)}%)
+                            </span>
                           </>
                         )}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Total Position P&L</p>
-                      <p className={`text-sm font-medium ${positionsLoading ? '' : getStockMetrics(selectedStock).totalReturn >= 0 ? 'text-success' : 'text-danger'
+                      <p className="text-xs text-muted-foreground">Total P&L</p>
+                      <p className={`text-xs sm:text-sm font-medium ${positionsLoading ? '' : getStockMetrics(selectedStock).totalReturn >= 0 ? 'text-success' : 'text-danger'
                         }`}>
                         {positionsLoading ? 'Loading...' : (
                           <>
                             {getStockMetrics(selectedStock).totalReturn >= 0 ? '+' : ''}
                             ${getStockMetrics(selectedStock).totalReturn.toFixed(2)}
-                            ({getStockMetrics(selectedStock).totalReturnPercent >= 0 ? '+' : ''}
-                            {getStockMetrics(selectedStock).totalReturnPercent.toFixed(2)}%)
+                            <span className="text-xs">
+                              ({getStockMetrics(selectedStock).totalReturnPercent >= 0 ? '+' : ''}
+                              {getStockMetrics(selectedStock).totalReturnPercent.toFixed(1)}%)
+                            </span>
                           </>
                         )}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Shares Owned</p>
-                      <p className="text-sm font-medium">
+                    <div className="col-span-2 sm:col-span-1">
+                      <p className="text-xs text-muted-foreground">Shares</p>
+                      <p className="text-xs sm:text-sm font-medium">
                         {positionsLoading ? 'Loading...' : getStockMetrics(selectedStock).shares}
                       </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 pt-4 border-t">
                     <div>
                       <p className="text-xs text-muted-foreground">Avg Cost</p>
-                      <p className="text-sm font-medium">
+                      <p className="text-xs sm:text-sm font-medium">
                         {positionsLoading ? 'Loading...' : `$${getStockMetrics(selectedStock).avgCost.toFixed(2)}`}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Total Position</p>
-                      <p className="text-sm font-medium">
-                        {positionsLoading ? 'Loading...' : `$${getStockMetrics(selectedStock).positionValue.toLocaleString()}`}
+                      <p className="text-xs text-muted-foreground">Position</p>
+                      <p className="text-xs sm:text-sm font-medium">
+                        {positionsLoading ? 'Loading...' : (
+                          <>
+                            <span className="hidden sm:inline">${getStockMetrics(selectedStock).positionValue.toLocaleString()}</span>
+                            <span className="sm:hidden">${formatValue(getStockMetrics(selectedStock).positionValue, true)}</span>
+                          </>
+                        )}
                       </p>
                     </div>
-                    <div>
+                    <div className="col-span-2 sm:col-span-1">
                       <p className="text-xs text-muted-foreground">% of Portfolio</p>
-                      <p className="text-sm font-medium">
+                      <p className="text-xs sm:text-sm font-medium">
                         {positionsLoading ? 'Loading...' : `${getStockMetrics(selectedStock).portfolioPercent.toFixed(1)}%`}
                       </p>
                     </div>

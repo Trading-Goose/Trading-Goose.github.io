@@ -129,37 +129,42 @@ export default function RebalanceHistoryTable() {
     }
   }, [user, selectedDate]); // Reload when selectedDate changes
 
-  // Separate useEffect for polling and subscriptions
+  // Separate useEffect for polling running rebalances only
   useEffect(() => {
-    if (user && runningRebalances.length > 0) {
-      // Set up real-time subscription for instant updates
-      const subscription = supabase
-        .channel('rebalance_updates')
-        .on('postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'rebalance_requests',
-            filter: `user_id=eq.${user.id}`
-          },
-          (payload) => {
+    if (!user || !initialLoadComplete) return;
+    
+    // Only set up polling if there are actually running rebalances
+    if (runningRebalances.length === 0) return;
+
+    // Set up real-time subscription for instant updates
+    const subscription = supabase
+      .channel('rebalance_updates')
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rebalance_requests',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          // Only fetch if it's an update to a running rebalance
+          if (payload.new && runningRebalances.some(r => r.id === payload.new.id)) {
             fetchRebalanceRequests();
           }
-        )
-        .subscribe();
+        }
+      )
+      .subscribe();
 
-      // Poll for updates every 3 seconds to catch status changes quickly
-      // This ensures failed rebalances are detected promptly
-      const interval = setInterval(() => {
-        fetchRebalanceRequests();
-      }, 3000);
+    // Much slower polling - every 15 seconds instead of 3 seconds
+    const interval = setInterval(() => {
+      fetchRebalanceRequests();
+    }, 15000); // Poll every 15 seconds for running rebalances
 
-      return () => {
-        subscription.unsubscribe();
-        clearInterval(interval);
-      };
-    }
-  }, [user, runningRebalances.length]);
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(interval);
+    };
+  }, [user, runningRebalances.length > 0, selectedDate, initialLoadComplete]); // Use boolean comparison
 
   const fetchAnalysisDataForRebalance = async (rebalanceId: string) => {
     try {
@@ -280,8 +285,10 @@ export default function RebalanceHistoryTable() {
         description: 'Rebalance record deleted successfully'
       });
 
-      // Refresh the list
-      fetchRebalanceRequests();
+      // Remove from state instead of refreshing everything
+      setRunningRebalances(prev => prev.filter(r => r.id !== selectedRebalanceId));
+      setCompletedRebalances(prev => prev.filter(r => r.id !== selectedRebalanceId));
+      setCancelledRebalances(prev => prev.filter(r => r.id !== selectedRebalanceId));
     } catch (error) {
       console.error('Error deleting rebalance:', error);
       toast({
@@ -348,8 +355,12 @@ export default function RebalanceHistoryTable() {
         description: 'Rebalance cancelled successfully'
       });
 
-      // Refresh the list
-      await fetchRebalanceRequests();
+      // Move from running to cancelled instead of refreshing everything
+      const cancelledItem = runningRebalances.find(r => r.id === selectedRebalanceId);
+      if (cancelledItem) {
+        setRunningRebalances(prev => prev.filter(r => r.id !== selectedRebalanceId));
+        setCancelledRebalances(prev => [{...cancelledItem, status: REBALANCE_STATUS.CANCELLED}, ...prev]);
+      }
     } catch (error: any) {
       console.error('Error cancelling rebalance:', error);
       toast({
@@ -579,7 +590,22 @@ export default function RebalanceHistoryTable() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Rebalance History</h3>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {/* Manual refresh button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => fetchRebalanceRequests()}
+                disabled={loading}
+                className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
+                title="Refresh"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+              
+              <div className="w-px h-6 bg-border" />
+              
+              <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -702,6 +728,7 @@ export default function RebalanceHistoryTable() {
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              </div>
             </div>
           </div>
 
@@ -994,7 +1021,7 @@ export default function RebalanceHistoryTable() {
                     />
                     <div className="text-left text-muted-foreground">
                       <p>No rebalances on {getDateDisplay()}</p>
-                      <p className="text-sm mt-2">Try selecting a different date or start a new rebalance</p>
+                      <p className="text-sm mt-2">Select a different date to view more rebalances</p>
                     </div>
                   </div>
                 )

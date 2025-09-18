@@ -91,17 +91,26 @@ function RebalanceWorkflowSteps({
       return 'error';
     }
 
+    const normalizedStatus = step.status || 'pending';
+
     // Special handling for analysis step - check if all analyses are complete
-    if (step.id === 'analysis' && step.stockAnalyses?.length > 0) {
-      const completionPercentage = calculateAgentStepCompletion(step.stockAnalyses);
-      if (completionPercentage >= 100) {
+    if (step.id === 'analysis') {
+      if (normalizedStatus === 'completed') {
         return 'completed';
-      } else if (completionPercentage > 0) {
-        return 'running';
+      }
+
+      if (step.stockAnalyses?.length > 0) {
+        const completionPercentage = calculateAgentStepCompletion(step.stockAnalyses);
+        if (completionPercentage >= 99.5) {
+          return 'completed';
+        }
+        if (completionPercentage > 0) {
+          return 'running';
+        }
       }
     }
 
-    return step.status || 'pending';
+    return normalizedStatus;
   };
 
   const getAgentStatus = (agentKey: string, stockAnalysis?: any) => {

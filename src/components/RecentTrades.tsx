@@ -82,7 +82,7 @@ function RecentTrades() {
           totalValue: item.dollar_amount ? Number(item.dollar_amount) : Number(item.shares) * Number(item.price),
           status: item.status,
           executedAt: item.executed_at ? formatTimestamp(item.executed_at) : null,
-          sourceType: item.source_type,
+          sourceType: item.source_type == 'rebalance' ? item.source_type : 'analysis',
           analysisId: item.analysis_id,
           rebalanceRequestId: item.rebalance_request_id,
           alpacaOrderId: item.metadata?.alpaca_order?.id,
@@ -141,7 +141,7 @@ function RecentTrades() {
       // Extract all Alpaca order IDs
       const alpacaOrderIds = ordersWithAlpacaIds.map(o => o.metadata.alpaca_order.id);
       console.log(`Fetching status for ${alpacaOrderIds.length} Alpaca orders:`, alpacaOrderIds);
-      
+
       // Fetch all orders from Alpaca using batch API
       const session = await getCachedSession();
       if (!session?.access_token) {
@@ -182,25 +182,25 @@ function RecentTrades() {
 
         if (alpacaOrder) {
           console.log(`Found Alpaca order ${alpacaOrderId} with status: ${alpacaOrder.status}`);
-          
+
           // Check if status has changed or if there's new fill information
           const currentAlpacaStatus = order.metadata?.alpaca_order?.status;
           const currentFilledQty = order.metadata?.alpaca_order?.filled_qty;
           const hasStatusChanged = currentAlpacaStatus !== alpacaOrder.status;
           const hasNewFillData = alpacaOrder.filled_qty && alpacaOrder.filled_qty !== currentFilledQty;
-          
+
           // Always update if we don't have a status yet, or if something changed
           if (!currentAlpacaStatus || hasStatusChanged || hasNewFillData) {
             console.log(`Order ${alpacaOrderId} updating: current status "${currentAlpacaStatus}" -> new status "${alpacaOrder.status}"`);
             hasUpdates = true;
-            
+
             // Build the alpaca_order object, only including defined values
             const alpacaOrderUpdate: any = {
               ...(order.metadata?.alpaca_order || {}),
               status: alpacaOrder.status,
               updated_at: new Date().toISOString()
             };
-            
+
             // Only add filled_qty and filled_avg_price if they exist
             if (alpacaOrder.filled_qty) {
               alpacaOrderUpdate.filled_qty = parseFloat(alpacaOrder.filled_qty);
@@ -208,7 +208,7 @@ function RecentTrades() {
             if (alpacaOrder.filled_avg_price) {
               alpacaOrderUpdate.filled_avg_price = parseFloat(alpacaOrder.filled_avg_price);
             }
-            
+
             // Update metadata with latest Alpaca order info
             const updatedMetadata = {
               ...(order.metadata || {}),
@@ -236,7 +236,7 @@ function RecentTrades() {
               .update(updates)
               .eq('id', order.id)
               .select();
-              
+
             if (updateError) {
               console.error(`Failed to update order ${order.id}:`, updateError);
               console.error('Update payload was:', updates);
@@ -291,7 +291,7 @@ function RecentTrades() {
     // Add a small delay on initial mount to ensure session is settled
     const timeoutId = setTimeout(() => {
       fetchAllTrades();
-      
+
       // Also update Alpaca order status if credentials exist
       if (hasAlpacaConfig) {
         console.log('Alpaca credentials detected, updating order status...');
@@ -587,12 +587,6 @@ function RecentTrades() {
                   </div>
                 )}
 
-                {/* Show filled details if available */}
-                {decision.alpacaFilledQty && decision.alpacaFilledPrice ? (
-                  <div className="text-xs text-muted-foreground text-center">
-                    {Number(decision.alpacaFilledQty).toFixed(2)} @ ${Number(decision.alpacaFilledPrice || 0).toFixed(2)}
-                  </div>
-                ) : null}
               </>
             )}
 

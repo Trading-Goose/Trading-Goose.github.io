@@ -24,7 +24,8 @@ import {
   isTradeOrderApproved,
   isTradeOrderRejected,
   getTradeOrderStatusDisplayText,
-  getAlpacaStatusDisplayText
+  getAlpacaStatusDisplayText,
+  isValidAlpacaOrderStatus
 } from "@/lib/statusTypes";
 
 interface TradeOrderCardProps {
@@ -45,13 +46,13 @@ export default function TradeOrderCard({
 }: TradeOrderCardProps) {
   // Use the actual trade order data if available (from trading_actions table)
   const tradeOrder = analysisData.tradeOrder;
-  
+
   // Use Portfolio Manager's decision if available, preferring trade order action
   const decision = tradeOrder?.action ||
-                   analysisData.agent_insights?.portfolioManager?.finalDecision?.action || 
-                   analysisData.agent_insights?.portfolioManager?.decision?.action ||
-                   analysisData.agent_insights?.portfolioManager?.action ||
-                   analysisData.decision;
+    analysisData.agent_insights?.portfolioManager?.finalDecision?.action ||
+    analysisData.agent_insights?.portfolioManager?.decision?.action ||
+    analysisData.agent_insights?.portfolioManager?.action ||
+    analysisData.decision;
   const confidence = analysisData.confidence;
   const ticker = analysisData.ticker;
 
@@ -172,7 +173,7 @@ export default function TradeOrderCard({
   const isApproved = isTradeOrderApproved(orderStatus) || isExecuted;  // Also check isExecuted prop
   const isRejected = isTradeOrderRejected(orderStatus);
   const isOrderExecuted = orderStatus === 'executed' || isExecuted;
-  
+
   // Get Alpaca order details if available
   const alpacaOrderId = tradeOrder?.alpacaOrderId;
   const alpacaOrderStatus = tradeOrder?.alpacaOrderStatus;
@@ -183,7 +184,7 @@ export default function TradeOrderCard({
     if (decision === 'HOLD') {
       return '';
     }
-    
+
     if (isPending) {
       return 'bg-yellow-500/5 border-yellow-500/20 hover:bg-yellow-500/10';
     } else if (isOrderExecuted) {
@@ -257,45 +258,100 @@ export default function TradeOrderCard({
         <div className="flex flex-col gap-1">
           {/* Alpaca Order Status Badge */}
           {tradeOrder?.alpacaOrderId && tradeOrder?.alpacaOrderStatus && (
-            <div className="flex items-center justify-center">
+            <div className="flex flex-col items-center justify-center">
               {(() => {
-                const status = tradeOrder.alpacaOrderStatus.toLowerCase();
-                let variant: any = "outline";
-                let icon = null;
-                let displayText = tradeOrder.alpacaOrderStatus;
-                let customClasses = "";
-
-                if (status === ALPACA_ORDER_STATUS.FILLED) {
-                  variant = "success";
-                  icon = <CheckCircle className="h-3 w-3 mr-1" />;
-                  displayText = "filled";
-                } else if (status === ALPACA_ORDER_STATUS.PARTIALLY_FILLED) {
-                  variant = "default";
-                  icon = <Clock className="h-3 w-3 mr-1" />;
-                  displayText = "partial filled";
-                  customClasses = "bg-blue-500 text-white border-blue-500";
-                } else if ([ALPACA_ORDER_STATUS.NEW, ALPACA_ORDER_STATUS.PENDING_NEW, ALPACA_ORDER_STATUS.ACCEPTED].includes(status as AlpacaOrderStatus)) {
-                  variant = "warning";
-                  icon = <Clock className="h-3 w-3 mr-1" />;
-                  displayText = "placed";
-                } else if (status === ALPACA_ORDER_STATUS.CANCELED) {
-                  variant = "destructive";
-                  icon = <XCircle className="h-3 w-3 mr-1" />;
-                  displayText = "failed";
-                } else if (status === ALPACA_ORDER_STATUS.REJECTED) {
-                  variant = "destructive";
-                  icon = <XCircle className="h-3 w-3 mr-1" />;
-                  displayText = "rejected";
+                let rawStatus = tradeOrder.alpacaOrderStatus.toString().toLowerCase();
+                if (rawStatus === 'cancelled') {
+                  rawStatus = ALPACA_ORDER_STATUS.CANCELED;
                 }
 
+                const isKnownStatus = isValidAlpacaOrderStatus(rawStatus);
+                const normalizedStatus = isKnownStatus ? (rawStatus as AlpacaOrderStatus) : null;
+
+                let variant: any = "outline";
+                let icon = null;
+                let customClasses = "";
+
+                const pendingStatuses: AlpacaOrderStatus[] = [
+                  ALPACA_ORDER_STATUS.NEW,
+                  ALPACA_ORDER_STATUS.PENDING_NEW,
+                  ALPACA_ORDER_STATUS.ACCEPTED,
+                  ALPACA_ORDER_STATUS.PENDING_REPLACE,
+                  ALPACA_ORDER_STATUS.PENDING_CANCEL,
+                  ALPACA_ORDER_STATUS.ACCEPTED_FOR_BIDDING
+                ];
+
+                const negativeStatuses: AlpacaOrderStatus[] = [
+                  ALPACA_ORDER_STATUS.CANCELED,
+                  ALPACA_ORDER_STATUS.EXPIRED,
+                  ALPACA_ORDER_STATUS.REPLACED,
+                  ALPACA_ORDER_STATUS.REJECTED,
+                  ALPACA_ORDER_STATUS.STOPPED,
+                  ALPACA_ORDER_STATUS.SUSPENDED
+                ];
+
+                if (normalizedStatus === ALPACA_ORDER_STATUS.FILLED) {
+                  variant = "success";
+                  icon = <CheckCircle className="h-3 w-3 mr-1" />;
+                } else if (normalizedStatus === ALPACA_ORDER_STATUS.PARTIALLY_FILLED) {
+                  variant = "default";
+                  icon = <Clock className="h-3 w-3 mr-1" />;
+                  customClasses = "bg-blue-500 text-white border-blue-500";
+                } else if (normalizedStatus && pendingStatuses.includes(normalizedStatus)) {
+                  variant = "warning";
+                  icon = <Clock className="h-3 w-3 mr-1" />;
+                } else if (normalizedStatus && negativeStatuses.includes(normalizedStatus)) {
+                  variant = "destructive";
+                  icon = <XCircle className="h-3 w-3 mr-1" />;
+                }
+
+                const displayText = normalizedStatus
+                  ? getAlpacaStatusDisplayText(normalizedStatus)
+                  : tradeOrder.alpacaOrderStatus;
+
+                const filledQty = typeof tradeOrder.alpacaFilledQty === 'number'
+                  ? tradeOrder.alpacaFilledQty
+                  : tradeOrder.alpacaFilledQty
+                    ? Number(tradeOrder.alpacaFilledQty)
+                    : 0;
+
+                const totalOrderShares = typeof tradeOrder.shares === 'number'
+                  ? tradeOrder.shares
+                  : tradeOrder.shares
+                    ? Number(tradeOrder.shares)
+                    : 0;
+
+                const showPartialDetails = normalizedStatus === ALPACA_ORDER_STATUS.PARTIALLY_FILLED &&
+                  filledQty > 0 && totalOrderShares > 0;
+
+                const filledPrice = typeof tradeOrder.alpacaFilledPrice === 'number'
+                  ? tradeOrder.alpacaFilledPrice
+                  : tradeOrder.alpacaFilledPrice
+                    ? Number(tradeOrder.alpacaFilledPrice)
+                    : 0;
+
+                const hasFillDetails = filledQty > 0 && filledPrice > 0;
+
                 return (
-                  <Badge
-                    variant={variant}
-                    className={`text-xs ${customClasses}`}
-                  >
-                    {icon}
-                    {displayText}
-                  </Badge>
+                  <>
+                    <Badge
+                      variant={variant}
+                      className={`text-xs ${customClasses}`}
+                    >
+                      {icon}
+                      {displayText}
+                      {showPartialDetails && (
+                        <span className="ml-1">
+                          ({filledQty.toFixed(2)}/{totalOrderShares.toFixed(2)})
+                        </span>
+                      )}
+                    </Badge>
+                    {hasFillDetails && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {filledQty.toFixed(2)} @ ${filledPrice.toFixed(2)}
+                      </div>
+                    )}
+                  </>
                 );
               })()}
             </div>
@@ -308,7 +364,7 @@ export default function TradeOrderCard({
               Approved
             </Badge>
           )}
-          
+
           {isRejected && (
             <Badge variant="outline" className="text-xs">
               <XCircle className="h-3 w-3 mr-1" />
@@ -401,7 +457,7 @@ export default function TradeOrderCard({
       <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
         <span>Portfolio Manager</span>
         <span>•</span>
-        <span className="capitalize">individual analysis</span>
+        <span className="capitalize">Analysis</span>
         <span>•</span>
         <span>Confidence: {confidence}%</span>
         {tradeOrder?.createdAt && (

@@ -172,30 +172,35 @@ function RebalancePositionCard({ position, onApprove, onReject, isExecuted, orde
                       const status = (orderStatus.alpacaStatus || '').toLowerCase();
                       let variant: any = "outline";
                       let icon = null;
-                      let displayText = orderStatus.alpacaStatus;
                       let customClasses = "";
 
                       if (status === 'filled') {
                         variant = "success";
                         icon = <CheckCircle className="h-3 w-3 mr-1" />;
-                        displayText = "filled";
                       } else if (status === 'partially_filled') {
                         variant = "default";
                         icon = <Clock className="h-3 w-3 mr-1" />;
-                        displayText = "partial filled";
                         customClasses = "bg-blue-500 text-white border-blue-500";
-                      } else if (['new', 'pending_new', 'accepted'].includes(status)) {
+                      } else if ([
+                        'new',
+                        'pending_new',
+                        'accepted',
+                        'pending_replace',
+                        'pending_cancel'
+                      ].includes(status)) {
                         variant = "warning";
                         icon = <Clock className="h-3 w-3 mr-1" />;
-                        displayText = "placed";
-                      } else if (['canceled', 'cancelled'].includes(status)) {
+                      } else if ([
+                        'canceled',
+                        'cancelled',
+                        'expired',
+                        'replaced'
+                      ].includes(status)) {
                         variant = "destructive";
                         icon = <XCircle className="h-3 w-3 mr-1" />;
-                        displayText = "failed";
                       } else if (status === 'rejected') {
                         variant = "destructive";
                         icon = <XCircle className="h-3 w-3 mr-1" />;
-                        displayText = "rejected";
                       }
 
                       return (
@@ -204,7 +209,7 @@ function RebalancePositionCard({ position, onApprove, onReject, isExecuted, orde
                           className={`text-xs ${customClasses}`}
                         >
                           {icon}
-                          {displayText}
+                          {orderStatus.alpacaStatus}
                         </Badge>
                       );
                     })()}
@@ -772,16 +777,363 @@ export default function RebalanceActionsTab({
       return true;
     }) || [];
 
-  const totalBuyValue = pendingPositions
-    .filter((p: RebalancePosition) => p.action === 'BUY')
-    .reduce((sum: number, p: RebalancePosition) => sum + Math.abs(p.shareChange * (p.currentValue / p.currentShares || 200)), 0);
+  const tradingActions = Array.isArray(rebalanceData?.trading_actions)
+    ? rebalanceData.trading_actions
+    : [];
 
-  const totalSellValue = pendingPositions
-    .filter((p: RebalancePosition) => p.action === 'SELL')
-    .reduce((sum: number, p: RebalancePosition) => sum + Math.abs(p.shareChange * (p.currentValue / p.currentShares)), 0);
+  const recommendedPositions = Array.isArray(rebalanceData?.recommendedPositions)
+    ? rebalanceData.recommendedPositions
+    : [];
 
-  const netCashFlow = totalSellValue - totalBuyValue;
+  const planActionsArray = Array.isArray(rebalanceData?.rebalance_plan?.actions)
+    ? rebalanceData.rebalance_plan.actions
+    : [];
+
+  const tradeActionById = new Map<string, any>();
+  const tradeActionByTicker = new Map<string, any>();
+  tradingActions.forEach((action: any) => {
+    if (action?.id) {
+      tradeActionById.set(action.id, action);
+    }
+    if (action?.ticker) {
+      tradeActionByTicker.set(action.ticker, action);
+    }
+  });
+
+  const positionByTradeActionId = new Map<string, RebalancePosition>();
+  const positionByTicker = new Map<string, RebalancePosition>();
+  recommendedPositions.forEach((position: RebalancePosition) => {
+    if (position?.tradeActionId) {
+      positionByTradeActionId.set(position.tradeActionId, position);
+    }
+    if (position?.ticker) {
+      positionByTicker.set(position.ticker, position);
+    }
+  });
+
+  const planActionByTicker = new Map<string, any>();
+  planActionsArray.forEach((action: any) => {
+    if (action?.ticker) {
+      planActionByTicker.set(action.ticker, action);
+    }
+  });
+
+  const parseNumeric = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+  };
+
+  const extractPositiveNumbers = (...values: any[]): number[] =>
+    values
+      .map(parseNumeric)
+      .filter((value) => Number.isFinite(value) && value > 0);
+
+  const extractNonZeroNumbers = (...values: any[]): number[] =>
+    values
+      .map(parseNumeric)
+      .filter((value) => Number.isFinite(value) && value !== 0);
+
+  const calculateOrderNotional = (
+    position: RebalancePosition | undefined,
+    tradeAction: any,
+    planAction: any
+  ): number => {
+    const directValue = extractPositiveNumbers(
+      tradeAction?.dollar_amount,
+      tradeAction?.dollarAmount,
+      tradeAction?.metadata?.dollarAmount,
+      planAction?.dollarAmount,
+      planAction?.dollar_amount,
+      planAction?.amount
+    );
+    if (directValue.length > 0) {
+      return directValue[0];
+    }
+
+    const valueChange = extractNonZeroNumbers(
+      tradeAction?.metadata?.changes?.value,
+      planAction?.valueChange,
+      planAction?.value_change,
+      planAction?.valueDelta,
+      planAction?.deltaValue
+    );
+    if (valueChange.length > 0) {
+      return Math.abs(valueChange[0]);
+    }
+
+    const shareCandidates = extractNonZeroNumbers(
+      tradeAction?.shares,
+      tradeAction?.metadata?.changes?.shares,
+      planAction?.shareChange,
+      planAction?.share_change,
+      planAction?.shares,
+      planAction?.quantity,
+      planAction?.qty,
+      position?.shareChange,
+      planAction?.targetShares && planAction?.currentShares
+        ? planAction.targetShares - planAction.currentShares
+        : 0
+    );
+
+    let priceCandidates = extractPositiveNumbers(
+      tradeAction?.price,
+      tradeAction?.metadata?.price,
+      tradeAction?.metadata?.targetPrice,
+      tradeAction?.metadata?.target_price,
+      planAction?.price,
+      planAction?.targetPrice,
+      planAction?.pricePerShare,
+      planAction?.averagePrice,
+      planAction?.estimatedPrice
+    );
+
+    if (tradeAction?.metadata?.beforePosition) {
+      const beforeShares = parseNumeric(tradeAction.metadata.beforePosition.shares);
+      const beforeValue = parseNumeric(tradeAction.metadata.beforePosition.value);
+      if (beforeShares > 0 && beforeValue > 0) {
+        const impliedPrice = beforeValue / beforeShares;
+        if (Number.isFinite(impliedPrice) && impliedPrice > 0) {
+          priceCandidates.push(impliedPrice);
+        }
+      }
+    }
+
+    if (tradeAction?.metadata?.afterPosition) {
+      const afterShares = parseNumeric(tradeAction.metadata.afterPosition.shares);
+      const afterValue = parseNumeric(tradeAction.metadata.afterPosition.value);
+      if (afterShares > 0 && afterValue > 0) {
+        const impliedPrice = afterValue / afterShares;
+        if (Number.isFinite(impliedPrice) && impliedPrice > 0) {
+          priceCandidates.push(impliedPrice);
+        }
+      }
+    }
+
+    if (position) {
+      const currentShares = parseNumeric(position.currentShares);
+      const currentValue = parseNumeric(position.currentValue);
+      if (currentShares > 0 && currentValue > 0) {
+        const currentPrice = currentValue / currentShares;
+        if (Number.isFinite(currentPrice) && currentPrice > 0) {
+          priceCandidates.push(currentPrice);
+        }
+      }
+
+      const recommendedShares = parseNumeric(position.recommendedShares);
+      const planTargetValue = parseNumeric(planAction?.targetValue);
+      if (recommendedShares > 0 && planTargetValue > 0) {
+        const impliedPrice = planTargetValue / recommendedShares;
+        if (Number.isFinite(impliedPrice) && impliedPrice > 0) {
+          priceCandidates.push(impliedPrice);
+        }
+      }
+    }
+
+    if (shareCandidates.length > 0 && priceCandidates.length > 0) {
+      return Math.abs(shareCandidates[0]) * priceCandidates[0];
+    }
+
+    if (shareCandidates.length > 0) {
+      const metadataValue = parseNumeric(tradeAction?.metadata?.changes?.value);
+      const metadataShares = parseNumeric(tradeAction?.metadata?.changes?.shares);
+      if (metadataValue !== 0 && metadataShares !== 0) {
+        const impliedPrice = Math.abs(metadataValue) / Math.abs(metadataShares);
+        if (Number.isFinite(impliedPrice) && impliedPrice > 0) {
+          return Math.abs(shareCandidates[0]) * impliedPrice;
+        }
+      }
+    }
+
+    const beforeValue = parseNumeric(tradeAction?.metadata?.beforePosition?.value);
+    const afterValue = parseNumeric(tradeAction?.metadata?.afterPosition?.value);
+    if (beforeValue !== 0 || afterValue !== 0) {
+      const delta = afterValue - beforeValue;
+      if (delta !== 0) {
+        return Math.abs(delta);
+      }
+    }
+
+    const planTargetValue = parseNumeric(planAction?.targetValue);
+    const planCurrentValue = parseNumeric(planAction?.currentValue);
+    if (planTargetValue !== 0 || planCurrentValue !== 0) {
+      const delta = planTargetValue - planCurrentValue;
+      if (delta !== 0) {
+        return Math.abs(delta);
+      }
+    }
+
+    return 0;
+  };
+
+  const actionableTradeActions = tradingActions.filter((action: any) => {
+    if (!action) return false;
+    const status = (action.status || '').toString().toLowerCase();
+    if (status === 'rejected') return false;
+    const actionType = (action.action || '').toString().toUpperCase();
+    return actionType === 'BUY' || actionType === 'SELL';
+  });
+
+  const tradeActionsNeedingFallback: Array<{ position?: RebalancePosition; planAction?: any; action: any }> = [];
+
+  const summaryMetrics = actionableTradeActions.reduce(
+    (acc: { totalBuyValue: number; totalSellValue: number; buyCount: number; sellCount: number }, action: any) => {
+      const position = action?.id
+        ? positionByTradeActionId.get(action.id) || positionByTicker.get(action.ticker)
+        : positionByTicker.get(action?.ticker);
+      const planAction = planActionByTicker.get(action?.ticker);
+      const orderValue = calculateOrderNotional(position, action, planAction);
+      if (!Number.isFinite(orderValue) || orderValue <= 0) {
+        tradeActionsNeedingFallback.push({ position, planAction, action });
+        return acc;
+      }
+
+      const actionType = (action.action || '').toString().toUpperCase();
+      if (actionType === 'BUY') {
+        acc.totalBuyValue += orderValue;
+        acc.buyCount += 1;
+      } else if (actionType === 'SELL') {
+        acc.totalSellValue += orderValue;
+        acc.sellCount += 1;
+      }
+      return acc;
+    },
+    { totalBuyValue: 0, totalSellValue: 0, buyCount: 0, sellCount: 0 }
+  );
+
+  tradeActionsNeedingFallback.forEach(({ position, planAction, action }) => {
+    const fallbackValue = calculateOrderNotional(position, undefined, planAction);
+    if (!Number.isFinite(fallbackValue) || fallbackValue <= 0) {
+      return;
+    }
+    const actionType = (action?.action || '').toString().toUpperCase();
+    if (actionType === 'BUY') {
+      summaryMetrics.totalBuyValue += fallbackValue;
+      summaryMetrics.buyCount += 1;
+    } else if (actionType === 'SELL') {
+      summaryMetrics.totalSellValue += fallbackValue;
+      summaryMetrics.sellCount += 1;
+    }
+  });
+
+  const unmatchedPositions = recommendedPositions.filter((position: RebalancePosition) => {
+    if (position.shareChange === 0 || position.action === 'HOLD') {
+      return false;
+    }
+    if (rejectedTickers.has(position.ticker)) {
+      return false;
+    }
+    const tradeAction = position.tradeActionId
+      ? tradeActionById.get(position.tradeActionId)
+      : tradeActionByTicker.get(position.ticker);
+    return !tradeAction;
+  });
+
+  unmatchedPositions.forEach((position: RebalancePosition) => {
+    const planAction = planActionByTicker.get(position.ticker);
+    const orderValue = calculateOrderNotional(position, undefined, planAction);
+    if (!Number.isFinite(orderValue) || orderValue <= 0) {
+      return;
+    }
+    if (position.action === 'BUY') {
+      summaryMetrics.totalBuyValue += orderValue;
+      summaryMetrics.buyCount += 1;
+    } else if (position.action === 'SELL') {
+      summaryMetrics.totalSellValue += orderValue;
+      summaryMetrics.sellCount += 1;
+    }
+  });
+
+  const netCashFlow = summaryMetrics.totalSellValue - summaryMetrics.totalBuyValue;
   const hasPendingOrders = pendingPositions.length > 0;
+
+  const formatCurrency = (value: number) =>
+    Number.isFinite(value)
+      ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : '0.00';
+
+  const formatSignedCurrency = (value: number) => {
+    if (!Number.isFinite(value) || value === 0) {
+      return '$0.00';
+    }
+    const prefix = value > 0 ? '+' : '-';
+    return `${prefix}$${formatCurrency(Math.abs(value))}`;
+  };
+
+  const totalActionableOrders = summaryMetrics.buyCount + summaryMetrics.sellCount;
+
+  const executedOrdersInfo = actionableTradeActions.reduce<{
+    executedCount: number;
+    executedValue: number;
+    processedTickers: Set<string>;
+  }>((acc, action: any) => {
+    const ticker = action?.ticker;
+    if (!ticker) {
+      return acc;
+    }
+
+    const status = (action.status || '').toString().toLowerCase();
+    const orderStatus = orderStatuses.get(ticker);
+    const isExecuted = status === 'approved'
+      || executedTickers.has(ticker)
+      || orderStatus?.status === 'approved';
+
+    if (!isExecuted) {
+      return acc;
+    }
+
+    const position = action?.id
+      ? positionByTradeActionId.get(action.id) || positionByTicker.get(ticker)
+      : positionByTicker.get(ticker);
+    const planAction = planActionByTicker.get(ticker);
+
+    let orderValue = calculateOrderNotional(position, action, planAction);
+    if (!Number.isFinite(orderValue) || orderValue <= 0) {
+      orderValue = calculateOrderNotional(position, undefined, planAction);
+    }
+
+    const actionType = (action.action || '').toString().toUpperCase();
+    if (Number.isFinite(orderValue) && orderValue > 0) {
+      acc.executedValue += actionType === 'SELL' ? orderValue : -orderValue;
+    }
+
+    acc.executedCount += 1;
+    acc.processedTickers.add(ticker);
+    return acc;
+  }, {
+    executedCount: 0,
+    executedValue: 0,
+    processedTickers: new Set<string>()
+  });
+
+  recommendedPositions.forEach((position: RebalancePosition) => {
+    const ticker = position.ticker;
+    if (!ticker) {
+      return;
+    }
+
+    const orderStatus = orderStatuses.get(ticker);
+    const isExecuted = executedTickers.has(ticker) || orderStatus?.status === 'approved';
+    if (!isExecuted || executedOrdersInfo.processedTickers.has(ticker)) {
+      return;
+    }
+
+    const planAction = planActionByTicker.get(ticker);
+    const orderValue = calculateOrderNotional(position, undefined, planAction);
+    if (!Number.isFinite(orderValue) || orderValue <= 0) {
+      return;
+    }
+
+    executedOrdersInfo.executedValue += position.action === 'SELL'
+      ? orderValue
+      : -orderValue;
+    executedOrdersInfo.executedCount += 1;
+    executedOrdersInfo.processedTickers.add(ticker);
+  });
+
+  const executedSummaryText = (totalActionableOrders > 0 && executedOrdersInfo.executedCount > 0)
+    ? `${executedOrdersInfo.executedCount}/${totalActionableOrders} executed -> actual change: ${formatSignedCurrency(executedOrdersInfo.executedValue)}`
+    : null;
 
   const isRunning = rebalanceData.status === 'running';
   const isAnalyzing = rebalanceData.status === 'analyzing' || rebalanceData.status === 'initializing';
@@ -1042,10 +1394,10 @@ export default function RebalanceActionsTab({
                       <TrendingUp className="w-4 h-4 text-green-500" />
                     </div>
                     <p className="text-lg font-semibold text-green-600">
-                      ${totalBuyValue.toLocaleString()}
+                      ${formatCurrency(summaryMetrics.totalBuyValue)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {pendingPositions.filter((p: RebalancePosition) => p.action === 'BUY').length} positions
+                      {summaryMetrics.buyCount} {summaryMetrics.buyCount === 1 ? 'position' : 'positions'}
                     </p>
                   </Card>
                   <Card className="p-4">
@@ -1054,10 +1406,10 @@ export default function RebalanceActionsTab({
                       <TrendingDown className="w-4 h-4 text-red-500" />
                     </div>
                     <p className="text-lg font-semibold text-red-600">
-                      ${totalSellValue.toLocaleString()}
+                      ${formatCurrency(summaryMetrics.totalSellValue)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {pendingPositions.filter((p: RebalancePosition) => p.action === 'SELL').length} positions
+                      {summaryMetrics.sellCount} {summaryMetrics.sellCount === 1 ? 'position' : 'positions'}
                     </p>
                   </Card>
                   <Card className="p-4">
@@ -1065,12 +1417,14 @@ export default function RebalanceActionsTab({
                       <span className="text-sm text-muted-foreground">Net Cash Flow</span>
                       <DollarSign className="w-4 h-4 text-blue-500" />
                     </div>
-                    <p className={`text-lg font-semibold ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {netCashFlow >= 0 ? '+' : ''}${Math.abs(netCashFlow).toLocaleString()}
+                    <p className="text-lg font-semibold" style={{ color: '#fc0' }}>
+                      {formatSignedCurrency(netCashFlow)}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {netCashFlow >= 0 ? 'Cash inflow' : 'Cash needed'}
-                    </p>
+                    {executedSummaryText && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {executedSummaryText}
+                      </p>
+                    )}
                   </Card>
                 </div>
 

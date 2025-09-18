@@ -86,13 +86,13 @@ export default function TradeHistoryTable() {
   const navigateDate = (direction: 'prev' | 'next') => {
     const [year, month, day] = selectedDate.split('-').map(Number);
     const currentDate = new Date(year, month - 1, day);
-    
+
     if (direction === 'prev') {
       currentDate.setDate(currentDate.getDate() - 1);
     } else {
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     const newDateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
     setSelectedDate(newDateString);
   };
@@ -140,7 +140,7 @@ export default function TradeHistoryTable() {
           totalValue: item.dollar_amount ? Number(item.dollar_amount) : Number(item.shares) * Number(item.price),
           status: item.status,
           executedAt: item.executed_at ? formatTimestamp(item.executed_at) : null,
-          sourceType: item.source_type,
+          sourceType: item.source_type == 'rebalance' ? item.source_type : 'analysis',
           analysisId: item.analysis_id,
           rebalanceRequestId: item.rebalance_request_id,
           alpacaOrderId: item.metadata?.alpaca_order?.id,
@@ -194,7 +194,7 @@ export default function TradeHistoryTable() {
       // Extract all Alpaca order IDs
       const alpacaOrderIds = ordersWithAlpacaIds.map(o => o.metadata.alpaca_order.id);
       console.log(`Fetching status for ${alpacaOrderIds.length} Alpaca orders:`, alpacaOrderIds);
-      
+
       // Fetch all orders from Alpaca using batch API
       const session = await getCachedSession();
       if (!session?.access_token) {
@@ -233,25 +233,25 @@ export default function TradeHistoryTable() {
 
         if (alpacaOrder) {
           console.log(`Found Alpaca order ${alpacaOrderId} with status: ${alpacaOrder.status}`);
-          
+
           // Check if status has changed or if there's new fill information
           const currentAlpacaStatus = order.metadata?.alpaca_order?.status;
           const currentFilledQty = order.metadata?.alpaca_order?.filled_qty;
           const hasStatusChanged = currentAlpacaStatus !== alpacaOrder.status;
           const hasNewFillData = alpacaOrder.filled_qty && alpacaOrder.filled_qty !== currentFilledQty;
-          
+
           // Always update if we don't have a status yet, or if something changed
           if (!currentAlpacaStatus || hasStatusChanged || hasNewFillData) {
             console.log(`Order ${alpacaOrderId} updating: current status "${currentAlpacaStatus}" -> new status "${alpacaOrder.status}"`);
             hasUpdates = true;
-            
+
             // Build the alpaca_order object, only including defined values
             const alpacaOrderUpdate: any = {
               ...(order.metadata?.alpaca_order || {}),
               status: alpacaOrder.status,
               updated_at: new Date().toISOString()
             };
-            
+
             // Only add filled_qty and filled_avg_price if they exist
             if (alpacaOrder.filled_qty) {
               alpacaOrderUpdate.filled_qty = parseFloat(alpacaOrder.filled_qty);
@@ -259,7 +259,7 @@ export default function TradeHistoryTable() {
             if (alpacaOrder.filled_avg_price) {
               alpacaOrderUpdate.filled_avg_price = parseFloat(alpacaOrder.filled_avg_price);
             }
-            
+
             // Update metadata with latest Alpaca order info
             const updatedMetadata = {
               ...(order.metadata || {}),
@@ -287,7 +287,7 @@ export default function TradeHistoryTable() {
               .update(updates)
               .eq('id', order.id)
               .select();
-              
+
             if (updateError) {
               console.error(`Failed to update order ${order.id}:`, updateError);
               console.error('Update payload was:', updates);
@@ -441,15 +441,15 @@ export default function TradeHistoryTable() {
   // Filter trades by status
   const getFilteredTrades = (status?: string) => {
     if (!status || status === 'all') return allTrades;
-    
+
     // Special handling for executed - look at Alpaca order status
     if (status === 'executed') {
-      return allTrades.filter(trade => 
-        trade.alpacaOrderStatus === 'filled' || 
+      return allTrades.filter(trade =>
+        trade.alpacaOrderStatus === 'filled' ||
         trade.alpacaOrderStatus === 'partially_filled'
       );
     }
-    
+
     return allTrades.filter(trade => trade.status === status);
   };
 
@@ -475,16 +475,16 @@ export default function TradeHistoryTable() {
     });
 
     // Convert to array and sort chronologically (mixing both types)
-    
+
     // Sort trades within each rebalance group
     Array.from(rebalanceGroups.values()).forEach(group => {
       group.trades.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     });
-    
+
     // Combine rebalance groups and standalone trades, then sort by creation time
     const rebalanceGroupsArray = Array.from(rebalanceGroups.values());
     const allItems: (TradeDecision | RebalanceGroup)[] = [...rebalanceGroupsArray, ...standaloneTradesList];
-    
+
     // Sort all items by their creation time (newest first)
     allItems.sort((a, b) => {
       const timeA = new Date(a.createdAt).getTime();
@@ -527,9 +527,8 @@ export default function TradeHistoryTable() {
     return (
       <div
         key={decision.id}
-        className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${
-          isInGroup ? 'border-l-2 border-l-border ml-4' : ''
-        } ${getCardClasses()}`}
+        className={`p-3 rounded-lg border transition-colors flex flex-col gap-3 ${isInGroup ? 'border-l-2 border-l-border ml-4' : ''
+          } ${getCardClasses()}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex gap-3 flex-1">
@@ -544,8 +543,8 @@ export default function TradeHistoryTable() {
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-sm">{decision.symbol}</span>
-                <Badge 
-                  variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'} 
+                <Badge
+                  variant={decision.action === 'BUY' ? 'buy' : decision.action === 'SELL' ? 'sell' : 'hold'}
                   className="text-xs"
                 >
                   {decision.action}
@@ -717,7 +716,7 @@ export default function TradeHistoryTable() {
             )}
           </div>
         </div>
-        
+
         {/* Metadata - at bottom of card */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-slate-800 pt-2">
           {decision.agent && !decision.agent.toLowerCase().includes('portfolio') && (
@@ -729,10 +728,10 @@ export default function TradeHistoryTable() {
           {decision.sourceType && (
             <>
               <span className="capitalize">{decision.sourceType.replace('_', ' ')}</span>
-              <span>•</span>
+              {!isApproved && <span>•</span>}
             </>
           )}
-          <span>{decision.timestamp}</span>
+          {!isApproved && <span>{decision.timestamp}</span>}
           {decision.executedAt && (
             <>
               <span>•</span>
@@ -795,7 +794,7 @@ export default function TradeHistoryTable() {
                       {formatFullDate(group.createdAt)}
                     </div>
                   </div>
-                  
+
                   {/* Rebalance Trades */}
                   <div className="space-y-3">
                     {group.trades.map(trade => renderTradeCard(trade, true))}
@@ -820,7 +819,7 @@ export default function TradeHistoryTable() {
             <TrendingUp className="h-5 w-5 text-primary" />
             Trade History
           </CardTitle>
-          
+
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
@@ -830,7 +829,7 @@ export default function TradeHistoryTable() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -840,7 +839,7 @@ export default function TradeHistoryTable() {
               <CalendarIcon className="h-4 w-4 mr-2" />
               {getDateDisplay()}
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -850,7 +849,7 @@ export default function TradeHistoryTable() {
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            
+
             <div className="ml-2">
               <Button
                 variant="ghost"
@@ -874,7 +873,7 @@ export default function TradeHistoryTable() {
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
@@ -899,23 +898,23 @@ export default function TradeHistoryTable() {
               <span className="hidden sm:inline">Rejected ({getFilteredTrades('rejected').length})</span>
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="all" className="mt-6">
             {renderContent(getFilteredTrades('all'))}
           </TabsContent>
-          
+
           <TabsContent value="pending" className="mt-6">
             {renderContent(getFilteredTrades('pending'))}
           </TabsContent>
-          
+
           <TabsContent value="approved" className="mt-6">
             {renderContent(getFilteredTrades('approved'))}
           </TabsContent>
-          
+
           <TabsContent value="executed" className="mt-6">
             {renderContent(getFilteredTrades('executed'))}
           </TabsContent>
-          
+
           <TabsContent value="rejected" className="mt-6">
             {renderContent(getFilteredTrades('rejected'))}
           </TabsContent>

@@ -63,53 +63,79 @@ export default function TradeOrderCard({
   // Otherwise use Portfolio Manager's final decision data
   const finalDecision = portfolioManagerInsight?.finalDecision;
 
+  // Check if the order has been rejected
+  const orderStatus = tradeOrder?.status as TradeOrderStatus;
+  const isOrderRejected = isTradeOrderRejected(orderStatus);
+
   // Extract allocation values from various possible locations
-  // First check if we have the data from the trade order (fetched from database)
-  // Then fallback to portfolio manager's insight data
-  const beforeAllocation = tradeOrder?.beforeAllocation ||
-    finalDecision?.beforeAllocation ||
-    finalDecision?.currentAllocation ||
-    finalDecision?.beforePosition?.allocation ||
-    finalDecision?.currentPosition?.allocation ||
-    portfolioManagerInsight?.currentAllocation ||
-    0;
+  // For rejected orders, ALWAYS use the saved trade order data if available
+  // to show what was intended at the time of creation, not current values
+  const beforeAllocation = (isOrderRejected && tradeOrder?.beforeAllocation !== undefined) 
+    ? tradeOrder.beforeAllocation
+    : tradeOrder?.beforeAllocation ||
+      finalDecision?.beforeAllocation ||
+      finalDecision?.currentAllocation ||
+      finalDecision?.beforePosition?.allocation ||
+      finalDecision?.currentPosition?.allocation ||
+      portfolioManagerInsight?.currentAllocation ||
+      0;
 
-  const afterAllocation = tradeOrder?.afterAllocation ||
-    finalDecision?.afterAllocation ||
-    finalDecision?.targetAllocation ||
-    finalDecision?.afterPosition?.allocation ||
-    finalDecision?.targetPosition?.allocation ||
-    finalDecision?.percentOfPortfolio ||
-    portfolioManagerInsight?.targetAllocation ||
-    portfolioManagerInsight?.percentOfPortfolio ||
-    0;
+  const afterAllocation = (isOrderRejected && tradeOrder?.afterAllocation !== undefined)
+    ? tradeOrder.afterAllocation  
+    : tradeOrder?.afterAllocation ||
+      finalDecision?.afterAllocation ||
+      finalDecision?.targetAllocation ||
+      finalDecision?.afterPosition?.allocation ||
+      finalDecision?.targetPosition?.allocation ||
+      finalDecision?.percentOfPortfolio ||
+      portfolioManagerInsight?.targetAllocation ||
+      portfolioManagerInsight?.percentOfPortfolio ||
+      0;
 
-  const percentOfPortfolio = tradeOrder?.afterAllocation ||
-    finalDecision?.percentOfPortfolio ||
-    finalDecision?.targetAllocation ||
-    afterAllocation;
+  const percentOfPortfolio = (isOrderRejected && tradeOrder?.afterAllocation !== undefined)
+    ? tradeOrder.afterAllocation
+    : tradeOrder?.afterAllocation ||
+      finalDecision?.percentOfPortfolio ||
+      finalDecision?.targetAllocation ||
+      afterAllocation;
 
   // Extract order size information
-  const orderDollarAmount = tradeOrder?.dollarAmount ||
-    finalDecision?.dollarAmount ||
-    finalDecision?.orderSize?.dollarAmount ||
-    finalDecision?.changes?.value ||
-    portfolioManagerInsight?.dollarAmount ||
-    portfolioManagerInsight?.finalDecision?.dollarAmount;
+  // For rejected orders, always use saved data to show what was intended
+  const orderDollarAmount = (isOrderRejected && tradeOrder?.dollarAmount !== undefined)
+    ? tradeOrder.dollarAmount
+    : tradeOrder?.dollarAmount ||
+      finalDecision?.dollarAmount ||
+      finalDecision?.orderSize?.dollarAmount ||
+      finalDecision?.changes?.value ||
+      portfolioManagerInsight?.dollarAmount ||
+      portfolioManagerInsight?.finalDecision?.dollarAmount;
 
-  const orderShares = tradeOrder?.shares ||
-    finalDecision?.shares ||
-    finalDecision?.orderSize?.shares ||
-    finalDecision?.quantity ||
-    finalDecision?.shareChange ||
-    portfolioManagerInsight?.shares ||
-    portfolioManagerInsight?.finalDecision?.shares;
+  const orderShares = (isOrderRejected && tradeOrder?.shares !== undefined)
+    ? tradeOrder.shares
+    : tradeOrder?.shares ||
+      finalDecision?.shares ||
+      finalDecision?.orderSize?.shares ||
+      finalDecision?.quantity ||
+      finalDecision?.shareChange ||
+      portfolioManagerInsight?.shares ||
+      portfolioManagerInsight?.finalDecision?.shares;
 
   // Also extract before/after shares and values if available
-  const beforeShares = tradeOrder?.beforeShares || finalDecision?.beforePosition?.shares || 0;
-  const afterShares = tradeOrder?.afterShares || finalDecision?.afterPosition?.shares || orderShares;
-  const beforeValue = tradeOrder?.beforeValue || finalDecision?.beforePosition?.value || 0;
-  const afterValue = tradeOrder?.afterValue || finalDecision?.afterPosition?.value || orderDollarAmount;
+  const beforeShares = (isOrderRejected && tradeOrder?.beforeShares !== undefined)
+    ? tradeOrder.beforeShares
+    : tradeOrder?.beforeShares || finalDecision?.beforePosition?.shares || 0;
+  
+  const afterShares = (isOrderRejected && tradeOrder?.afterShares !== undefined)
+    ? tradeOrder.afterShares
+    : tradeOrder?.afterShares || finalDecision?.afterPosition?.shares || orderShares;
+  
+  const beforeValue = (isOrderRejected && tradeOrder?.beforeValue !== undefined)
+    ? tradeOrder.beforeValue
+    : tradeOrder?.beforeValue || finalDecision?.beforePosition?.value || 0;
+  
+  const afterValue = (isOrderRejected && tradeOrder?.afterValue !== undefined)
+    ? tradeOrder.afterValue
+    : tradeOrder?.afterValue || finalDecision?.afterPosition?.value || orderDollarAmount;
 
   // Debug logging to understand data structure
   console.log('TradeOrderCard - Full analysisData:', analysisData);
@@ -168,15 +194,15 @@ export default function TradeOrderCard({
 
   // Check the actual order status from database or props
   // The tradeOrder status is updated immediately in the parent component
-  const orderStatus = tradeOrder?.status as TradeOrderStatus;
+  // orderStatus is already defined above
   const isPending = !orderStatus || isTradeOrderPending(orderStatus);
   const isApproved = isTradeOrderApproved(orderStatus) || isExecuted;  // Also check isExecuted prop
-  const isRejected = isTradeOrderRejected(orderStatus);
-  const isOrderExecuted = orderStatus === 'executed' || isExecuted;
-
+  const isRejected = isOrderRejected;  // Use the already computed value
+  
   // Get Alpaca order details if available
   const alpacaOrderId = tradeOrder?.alpacaOrderId;
   const alpacaOrderStatus = tradeOrder?.alpacaOrderStatus;
+  const isOrderExecuted = alpacaOrderStatus === ALPACA_ORDER_STATUS.FILLED || isExecuted;
 
   // Determine card background based on status and action
   const getCardClasses = () => {
@@ -229,14 +255,14 @@ export default function TradeOrderCard({
                 {decision}
               </Badge>
               <span className="text-xs text-muted-foreground">
-                {orderDollarAmount && orderDollarAmount > 0
+                {orderDollarAmount > 0
                   ? `$${Number(orderDollarAmount).toLocaleString()} order`
                   : orderShares
                     ? `${Number(orderShares).toFixed(2)} shares`
                     : 'Order details pending'
                 }
               </span>
-              {orderDollarAmount && orderDollarAmount > 0 && (
+              {orderDollarAmount > 0 && (
                 <span className="text-xs font-medium">
                   ${Number(orderDollarAmount).toLocaleString()}
                 </span>

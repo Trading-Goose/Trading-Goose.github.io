@@ -47,6 +47,7 @@ interface RebalanceGroup {
 
 export default function TradeHistoryTable() {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // Separate state for refresh button
   const [allTrades, setAllTrades] = useState<TradeDecision[]>([]);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const [selectedRebalanceId, setSelectedRebalanceId] = useState<string | null>(null);
@@ -61,6 +62,9 @@ export default function TradeHistoryTable() {
   const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const [selectedDate, setSelectedDate] = useState<string>(todayString);
   const isViewingToday = selectedDate === todayString;
+
+  // Track if initial data has been loaded
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   // Helper to format date display
   const getDateDisplay = () => {
@@ -112,11 +116,24 @@ export default function TradeHistoryTable() {
     setSelectedDate(todayString);
   };
 
+  // Manual refresh handler
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    await fetchAllTrades(false);
+    if (hasAlpacaConfig) {
+      await updateAlpacaOrderStatus();
+    }
+    setRefreshing(false);
+  };
+
   // Fetch all trades from trading_actions table
-  const fetchAllTrades = async () => {
+  const fetchAllTrades = async (isInitialLoad = false) => {
     if (!user?.id) return;
 
-    setLoading(true);
+    // Only show loading state on initial load or when explicitly requested
+    if (isInitialLoad) {
+      setLoading(true);
+    }
     try {
       // Build date range for the selected date using local date parsing
       const [year, month, day] = selectedDate.split('-').map(Number);
@@ -171,7 +188,10 @@ export default function TradeHistoryTable() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
+      setInitialLoadComplete(true);
     }
   };
 
@@ -315,7 +335,7 @@ export default function TradeHistoryTable() {
       if (hasUpdates) {
         console.log('Updates were made, refreshing trades...');
         setTimeout(() => {
-          fetchAllTrades();
+          fetchAllTrades(false);
         }, 500);
       }
     } catch (err) {
@@ -330,7 +350,8 @@ export default function TradeHistoryTable() {
       return;
     }
 
-    fetchAllTrades();
+    // Pass true for isInitialLoad only when we haven't loaded data yet
+    fetchAllTrades(!initialLoadComplete);
   }, [user?.id, selectedDate]);
 
   useEffect(() => {
@@ -344,15 +365,17 @@ export default function TradeHistoryTable() {
 
   // Periodically update Alpaca order status
   useEffect(() => {
-    if (!user?.id || !hasAlpacaConfig || !isViewingToday) return;
+    if (!user?.id || !hasAlpacaConfig || !isViewingToday || !initialLoadComplete) return;
 
     const interval = setInterval(() => {
       console.log('Periodic order status update...');
       updateAlpacaOrderStatus();
+      // Also refresh trades but without loading indicator
+      fetchAllTrades(false);
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(interval);
-  }, [user?.id, hasAlpacaConfig, isViewingToday]);
+  }, [user?.id, hasAlpacaConfig, isViewingToday, initialLoadComplete]);
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -404,7 +427,7 @@ export default function TradeHistoryTable() {
         });
 
         // Refresh trades
-        fetchAllTrades();
+        fetchAllTrades(false);
       } else {
         toast({
           title: "Order Failed",
@@ -442,7 +465,7 @@ export default function TradeHistoryTable() {
       });
 
       // Refresh trades
-      fetchAllTrades();
+      fetchAllTrades(false);
     } catch (err) {
       console.error('Error rejecting decision:', err);
       toast({
@@ -835,112 +858,107 @@ export default function TradeHistoryTable() {
             Trade History
           </CardTitle>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            {/* Manual refresh button */}
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigateDate('prev')}
+              onClick={handleManualRefresh}
+              disabled={refreshing}
               className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
+              title="Refresh"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="px-3 min-w-[140px] hover:border-[#fc0] hover:bg-[#fc0]/10 hover:text-[#fc0] transition-all duration-200"
-                >
-                  <CalendarIcon className="h-4 w-4 mr-2" />
-                  {getDateDisplay()}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-auto p-0 bg-background border-border"
-                align="center"
-              >
-                <div className="space-y-2 p-3">
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
-                      onClick={() => {
-                        const yesterday = new Date();
-                        yesterday.setDate(yesterday.getDate() - 1);
-                        const year = yesterday.getFullYear();
-                        const month = String(yesterday.getMonth() + 1).padStart(2, '0');
-                        const day = String(yesterday.getDate()).padStart(2, '0');
-                        setSelectedDate(`${year}-${month}-${day}`);
-                      }}
-                    >
-                      Yesterday
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
-                      onClick={jumpToToday}
-                    >
-                      Today
-                    </Button>
-                  </div>
-                </div>
-                <DatePicker
-                  mode="single"
-                  selected={(() => {
-                    const [year, month, day] = selectedDate.split('-').map(Number);
-                    return new Date(year, month - 1, day);
-                  })()}
-                  onSelect={(date) => {
-                    if (date) {
-                      const year = date.getFullYear();
-                      const month = String(date.getMonth() + 1).padStart(2, '0');
-                      const day = String(date.getDate()).padStart(2, '0');
-                      setSelectedDate(`${year}-${month}-${day}`);
-                    }
-                  }}
-                  disabled={(date) => {
-                    const today = new Date();
-                    today.setHours(23, 59, 59, 999);
-                    return date > today;
-                  }}
-                  showOutsideDays={false}
-                  initialFocus
-                  className="rounded-b-lg"
-                />
-              </PopoverContent>
-            </Popover>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigateDate('next')}
-              disabled={selectedDate === todayString}
-              className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0] disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-
-            <div className="ml-2">
+            
+            <div className="w-px h-6 bg-border" />
+            
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => {
-                  fetchAllTrades();
-                  if (hasAlpacaConfig) {
-                    updateAlpacaOrderStatus();
-                  }
-                }}
-                disabled={loading}
+                size="sm"
+                onClick={() => navigateDate('prev')}
+                className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
               >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="px-3 min-w-[140px] hover:border-[#fc0] hover:bg-[#fc0]/10 hover:text-[#fc0] transition-all duration-200"
+                  >
+                    <CalendarIcon className="h-4 w-4 mr-2" />
+                    {getDateDisplay()}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-auto p-0 bg-background border-border"
+                  align="center"
+                >
+                  <div className="space-y-2 p-3">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
+                        onClick={() => {
+                          const yesterday = new Date();
+                          yesterday.setDate(yesterday.getDate() - 1);
+                          const year = yesterday.getFullYear();
+                          const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+                          const day = String(yesterday.getDate()).padStart(2, '0');
+                          setSelectedDate(`${year}-${month}-${day}`);
+                        }}
+                      >
+                        Yesterday
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
+                        onClick={jumpToToday}
+                      >
+                        Today
+                      </Button>
+                    </div>
+                  </div>
+                  <DatePicker
+                    mode="single"
+                    selected={(() => {
+                      const [year, month, day] = selectedDate.split('-').map(Number);
+                      return new Date(year, month - 1, day);
+                    })()}
+                    onSelect={(date) => {
+                      if (date) {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        setSelectedDate(`${year}-${month}-${day}`);
+                      }
+                    }}
+                    disabled={(date) => {
+                      const today = new Date();
+                      today.setHours(23, 59, 59, 999);
+                      return date > today;
+                    }}
+                    showOutsideDays={false}
+                    initialFocus
+                    className="rounded-b-lg"
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigateDate('next')}
+                disabled={selectedDate === todayString}
+                className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0] disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              >
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>

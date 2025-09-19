@@ -86,6 +86,7 @@ export function StockSelectionTab({
                   checked={includeWatchlist}
                   onCheckedChange={onIncludeWatchlistChange}
                   disabled={loadingWatchlist}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
                 />
               </div>
               

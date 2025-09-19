@@ -80,6 +80,7 @@ export default function RebalanceHistoryTable() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // Separate state for refresh button
   const [runningRebalances, setRunningRebalances] = useState<RebalanceRequest[]>([]);
   const [completedRebalances, setCompletedRebalances] = useState<RebalanceRequest[]>([]);
   const [cancelledRebalances, setCancelledRebalances] = useState<RebalanceRequest[]>([]);
@@ -125,7 +126,8 @@ export default function RebalanceHistoryTable() {
 
   useEffect(() => {
     if (user) {
-      fetchRebalanceRequests();
+      // Pass true for isInitialLoad only when we haven't loaded data yet
+      fetchRebalanceRequests(!initialLoadComplete);
     }
   }, [user, selectedDate]); // Reload when selectedDate changes
 
@@ -149,7 +151,7 @@ export default function RebalanceHistoryTable() {
         (payload) => {
           // Only fetch if it's an update to a running rebalance
           if (payload.new && runningRebalances.some(r => r.id === payload.new.id)) {
-            fetchRebalanceRequests();
+            fetchRebalanceRequests(false); // Don't show loading on subscription updates
           }
         }
       )
@@ -157,7 +159,7 @@ export default function RebalanceHistoryTable() {
 
     // Much slower polling - every 15 seconds instead of 3 seconds
     const interval = setInterval(() => {
-      fetchRebalanceRequests();
+      fetchRebalanceRequests(false); // Don't show loading on polling updates
     }, 15000); // Poll every 15 seconds for running rebalances
 
     return () => {
@@ -165,6 +167,12 @@ export default function RebalanceHistoryTable() {
       clearInterval(interval);
     };
   }, [user, runningRebalances.length > 0, selectedDate, initialLoadComplete]); // Use boolean comparison
+
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    await fetchRebalanceRequests(false);
+    setRefreshing(false);
+  };
 
   const fetchAnalysisDataForRebalance = async (rebalanceId: string) => {
     try {
@@ -182,9 +190,14 @@ export default function RebalanceHistoryTable() {
     }
   };
 
-  const fetchRebalanceRequests = async () => {
+  const fetchRebalanceRequests = async (isInitialLoad = false) => {
     if (!user) return;
 
+    // Only show loading state on initial load or when explicitly requested
+    if (isInitialLoad) {
+      setLoading(true);
+    }
+    
     try {
       // Build date range for the selected date using local date parsing
       const [year, month, day] = selectedDate.split('-').map(Number);
@@ -200,7 +213,27 @@ export default function RebalanceHistoryTable() {
         .lte('created_at', endOfDay.toISOString())
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching rebalance requests:', error);
+        
+        // Handle 500 errors gracefully - don't throw, just return
+        if (error.message?.includes('500') || error.code === '500') {
+          console.log('Server error, skipping update');
+          return;
+        }
+
+        // Handle authentication errors
+        if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+          console.log('JWT error detected, will attempt refresh on next poll');
+          // Try to refresh the session
+          supabase.auth.refreshSession().catch(err => {
+            console.error('Failed to refresh session:', err);
+          });
+          return;
+        }
+        
+        throw error;
+      }
 
       // Debug logging
       console.log('Fetched rebalance requests:', data?.map(r => ({
@@ -243,7 +276,7 @@ export default function RebalanceHistoryTable() {
 
     } catch (error) {
       console.error('Error fetching rebalance requests:', error);
-      if (!loading) {
+      if (!initialLoadComplete) { // Only show toast if not initial load
         toast({
           title: 'Error Loading History',
           description: 'Failed to load rebalance history. Please try again.',
@@ -251,16 +284,28 @@ export default function RebalanceHistoryTable() {
         });
       }
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
       setInitialLoadComplete(true);
     }
   };
 
   const handleDelete = async () => {
-    if (!selectedRebalanceId) return;
+    if (!selectedRebalanceId || !user) return;
 
     setDeleting(true);
     try {
+      const { error: tradingError } = await supabase
+        .from('trading_actions')
+        .delete()
+        .eq('rebalance_request_id', selectedRebalanceId)
+        .eq('user_id', user.id);
+
+      if (tradingError && tradingError.code !== '23503') {
+        throw tradingError;
+      }
+
       // Delete related analyses first from analysis_history table
       const { error: analysesError } = await supabase
         .from('analysis_history')
@@ -268,7 +313,6 @@ export default function RebalanceHistoryTable() {
         .eq('rebalance_request_id', selectedRebalanceId);
 
       if (analysesError && analysesError.code !== '23503') {
-        // Ignore foreign key constraint errors as cascade delete should handle it
         console.warn('Error deleting related analyses:', analysesError);
       }
 
@@ -308,10 +352,16 @@ export default function RebalanceHistoryTable() {
 
     setCancelling(true);
     try {
+      // Find the item to be cancelled
+      const itemToCancel = runningRebalances.find(r => r.id === selectedRebalanceId);
+      if (!itemToCancel) {
+        throw new Error('Rebalance not found in running list');
+      }
+
       // First check if the rebalance exists and belongs to the user
       const { data: checkData, error: checkError } = await supabase
         .from('rebalance_requests')
-        .select('id, status')
+        .select('*')
         .eq('id', selectedRebalanceId)
         .eq('user_id', user.id)
         .single();
@@ -341,7 +391,8 @@ export default function RebalanceHistoryTable() {
         const { error: updateError } = await supabase
           .from('rebalance_requests')
           .update({
-            status: REBALANCE_STATUS.CANCELLED
+            status: REBALANCE_STATUS.CANCELLED,
+            error_message: 'Cancelled by user'
           })
           .eq('id', selectedRebalanceId)
           .eq('user_id', user.id);
@@ -349,17 +400,50 @@ export default function RebalanceHistoryTable() {
         if (updateError) throw updateError;
       }
 
+      // Gracefully move from running to cancelled list
+      setRunningRebalances(prev => prev.filter(r => r.id !== selectedRebalanceId));
+      
+      // Create the cancelled item with all data from the database
+      const cancelledItem: RebalanceRequest = {
+        ...checkData,
+        status: REBALANCE_STATUS.CANCELLED,
+        error_message: checkData.error_message || 'Cancelled by user'
+      };
+      
+      setCancelledRebalances(prev => [cancelledItem, ...prev]);
+
+      // Also cancel all related analyses if any
+      if (analysisData[selectedRebalanceId]) {
+        const analysesToCancel = analysisData[selectedRebalanceId];
+        // Update analysis statuses in the background
+        analysesToCancel.forEach(async (analysis: any) => {
+          await supabase
+            .from('analysis_history')
+            .update({ 
+              analysis_status: 'CANCELLED',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', analysis.id)
+            .eq('rebalance_request_id', selectedRebalanceId);
+        });
+        
+        // Remove from analysis data
+        setAnalysisData(prev => {
+          const newData = { ...prev };
+          delete newData[selectedRebalanceId];
+          return newData;
+        });
+      }
 
       toast({
         title: 'Success',
         description: 'Rebalance cancelled successfully'
       });
 
-      // Move from running to cancelled instead of refreshing everything
-      const cancelledItem = runningRebalances.find(r => r.id === selectedRebalanceId);
-      if (cancelledItem) {
-        setRunningRebalances(prev => prev.filter(r => r.id !== selectedRebalanceId));
-        setCancelledRebalances(prev => [{...cancelledItem, status: REBALANCE_STATUS.CANCELLED}, ...prev]);
+      // Close modal if viewing this rebalance
+      if (selectedDetailId === selectedRebalanceId) {
+        setDetailModalOpen(false);
+        setSelectedDetailId(undefined);
       }
     } catch (error: any) {
       console.error('Error cancelling rebalance:', error);
@@ -595,12 +679,12 @@ export default function RebalanceHistoryTable() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => fetchRebalanceRequests()}
-                disabled={loading}
+                onClick={handleManualRefresh}
+                disabled={refreshing}
                 className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
                 title="Refresh"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               </Button>
               
               <div className="w-px h-6 bg-border" />

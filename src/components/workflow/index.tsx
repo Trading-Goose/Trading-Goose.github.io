@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Activity, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useRBAC } from '@/hooks/useRBAC';
 import { useToast } from '@/hooks/use-toast';
@@ -151,10 +151,27 @@ function HorizontalWorkflow() {
                 Analyzing
               </Badge>
             ) : activeAnalysisTicker && currentAnalysis ? (
-              <Badge variant="outline" className="flex items-center gap-1">
-                <CheckCircle className="h-3 w-3" />
-                {currentAnalysis.decision || 'Complete'}
-              </Badge>
+              currentAnalysis.decision === 'BUY' ? (
+                <Badge className="border border-green-500/30 bg-green-500/10 text-green-600 font-semibold hover:bg-green-500/20 text-xs flex items-center gap-1">
+                  <ArrowUpRight className="h-3 w-3" />
+                  BUY
+                </Badge>
+              ) : currentAnalysis.decision === 'SELL' ? (
+                <Badge className="border border-red-500/30 bg-red-500/10 text-red-600 font-semibold hover:bg-red-500/20 text-xs flex items-center gap-1">
+                  <ArrowDownRight className="h-3 w-3" />
+                  SELL
+                </Badge>
+              ) : currentAnalysis.decision === 'HOLD' ? (
+                <Badge className="border border-gray-500/30 bg-gray-500/10 text-gray-600 font-semibold hover:bg-gray-500/20 text-xs flex items-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  HOLD
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  Complete
+                </Badge>
+              )
             ) : null}
           </div>
         </CardHeader>

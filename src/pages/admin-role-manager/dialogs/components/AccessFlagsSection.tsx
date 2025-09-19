@@ -54,6 +54,16 @@ export default function AccessFlagsSection({
           onCheckedChange={(v) => onUpdate({ ...limits, enable_auto_trading: v })}
         />
       </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <Label>Near Limit Analysis Access</Label>
+          <p className="text-sm text-muted-foreground">Allow users to enable auto near limit analysis</p>
+        </div>
+        <Switch
+          checked={limits.near_limit_analysis_access ?? false}
+          onCheckedChange={(v) => onUpdate({ ...limits, near_limit_analysis_access: v })}
+        />
+      </div>
     </div>
   );
 }

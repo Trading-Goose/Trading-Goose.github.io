@@ -168,4 +168,5 @@ export interface TradingTabProps {
   handleClearTrading?: () => void;
   canUseLiveTrading?: boolean;
   canUseAutoTrading?: boolean;
+  canUseNearLimitAnalysis?: boolean;
 }

@@ -526,6 +526,7 @@ export const fetchStockDataForPeriod = async (ticker: string, period: string): P
 
     // For 1D period, fetch previous close and current quote for accurate daily change calculation
     let previousClose: number | undefined;
+    let previousCloseTime: string | number | undefined;
     let currentQuotePrice: number | undefined;
     if (period === '1D') {
       try {
@@ -536,7 +537,12 @@ export const fetchStockDataForPeriod = async (ticker: string, period: string): P
         });
         
         if (batchData[ticker]?.previousBar) {
-          previousClose = batchData[ticker].previousBar.c;
+          const previousBar = batchData[ticker].previousBar;
+          previousClose = previousBar.c;
+          const previousBarTime = previousBar.t ?? previousBar.timestamp;
+          if (previousBarTime) {
+            previousCloseTime = previousBarTime;
+          }
           console.log(`Using previous close for ${ticker}: $${previousClose}`);
         }
         
@@ -562,6 +568,63 @@ export const fetchStockDataForPeriod = async (ticker: string, period: string): P
 
     // Convert and downsample the data for display
     let fullData = convertBarsToDataPoints(filteredBars, period, previousClose);
+
+    if (period === '1D' && previousClose !== undefined && fullData.length > 0) {
+      let previousCloseDate: Date | null = null;
+
+      if (previousCloseTime !== undefined) {
+        if (typeof previousCloseTime === 'string') {
+          const parsed = new Date(previousCloseTime);
+          if (!isNaN(parsed.getTime())) {
+            previousCloseDate = parsed;
+          }
+        } else if (typeof previousCloseTime === 'number') {
+          const timestamp = previousCloseTime > 1_000_000_000_000
+            ? previousCloseTime
+            : previousCloseTime * 1000;
+          const parsed = new Date(timestamp);
+          if (!isNaN(parsed.getTime())) {
+            previousCloseDate = parsed;
+          }
+        }
+      }
+
+      if (!previousCloseDate && filteredBars.length > 0) {
+        const firstBarTime = filteredBars[0]?.t ?? filteredBars[0]?.timestamp;
+        if (firstBarTime) {
+          const parsed = new Date(firstBarTime);
+          if (!isNaN(parsed.getTime())) {
+            parsed.setMinutes(parsed.getMinutes() - 1);
+            previousCloseDate = parsed;
+          }
+        }
+      }
+
+      if (!previousCloseDate) {
+        previousCloseDate = new Date();
+      }
+
+      const formattedPreviousCloseTime = formatDate(previousCloseDate, period);
+
+      if (fullData[0].time !== formattedPreviousCloseTime) {
+        fullData = [
+          {
+            time: formattedPreviousCloseTime,
+            value: previousClose,
+            pnl: 0,
+            pnlPercent: 0
+          },
+          ...fullData
+        ];
+      } else {
+        fullData[0] = {
+          time: formattedPreviousCloseTime,
+          value: previousClose,
+          pnl: 0,
+          pnlPercent: 0
+        };
+      }
+    }
 
     // For YTD, filter to current year
     if (period === 'YTD' && filteredBars.length > 0) {

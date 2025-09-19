@@ -37,7 +37,8 @@ export function useRoleActions({
         opportunity_agent_access: editingLimits.opportunity_agent_access,
         additional_provider_access: editingLimits.additional_provider_access,
         enable_live_trading: editingLimits.enable_live_trading,
-        enable_auto_trading: editingLimits.enable_auto_trading
+        enable_auto_trading: editingLimits.enable_auto_trading,
+        near_limit_analysis_access: editingLimits.near_limit_analysis_access
       });
 
       toast({

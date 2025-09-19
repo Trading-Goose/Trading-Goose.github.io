@@ -7,7 +7,24 @@ interface LimitsDisplayProps {
   role: RoleWithLimits;
 }
 
+// Define the boolean access fields and their display names
+const BOOLEAN_ACCESS_FIELDS: Record<string, string> = {
+  rebalance_access: 'Rebalance',
+  opportunity_agent_access: 'Opportunity Agent',
+  additional_provider_access: 'Additional Providers',
+  enable_live_trading: 'Live Trading',
+  enable_auto_trading: 'Auto Trading',
+  near_limit_analysis_access: 'Near Limit Analysis'
+};
+
 export default function LimitsDisplay({ role }: LimitsDisplayProps) {
+  // Dynamically get all boolean access values from the role
+  const booleanAccessEntries = Object.entries(BOOLEAN_ACCESS_FIELDS).map(([key, label]) => ({
+    key,
+    label,
+    value: role[key as keyof RoleWithLimits] as boolean
+  }));
+
   return (
     <>
       {/* Numeric Limits Grid */}
@@ -38,23 +55,13 @@ export default function LimitsDisplay({ role }: LimitsDisplayProps) {
         </div>
       </div>
 
-      {/* Access Flags */}
+      {/* Access Flags - Dynamically rendered */}
       <div className="flex flex-wrap gap-2">
-        <Badge variant={role.rebalance_access ? "default" : "secondary"}>
-          Rebalance: {role.rebalance_access ? <Check className="h-3 w-3 ml-1" /> : <X className="h-3 w-3 ml-1" />}
-        </Badge>
-        <Badge variant={role.opportunity_agent_access ? "default" : "secondary"}>
-          Opportunity Agent: {role.opportunity_agent_access ? <Check className="h-3 w-3 ml-1" /> : <X className="h-3 w-3 ml-1" />}
-        </Badge>
-        <Badge variant={role.additional_provider_access ? "default" : "secondary"}>
-          Additional Providers: {role.additional_provider_access ? <Check className="h-3 w-3 ml-1" /> : <X className="h-3 w-3 ml-1" />}
-        </Badge>
-        <Badge variant={role.enable_live_trading ? "default" : "secondary"}>
-          Live Trading: {role.enable_live_trading ? <Check className="h-3 w-3 ml-1" /> : <X className="h-3 w-3 ml-1" />}
-        </Badge>
-        <Badge variant={role.enable_auto_trading ? "default" : "secondary"}>
-          Auto Trading: {role.enable_auto_trading ? <Check className="h-3 w-3 ml-1" /> : <X className="h-3 w-3 ml-1" />}
-        </Badge>
+        {booleanAccessEntries.map(({ key, label, value }) => (
+          <Badge key={key} variant={value ? "default" : "secondary"}>
+            {label}: {value ? <Check className="h-3 w-3 ml-1" /> : <X className="h-3 w-3 ml-1" />}
+          </Badge>
+        ))}
       </div>
     </>
   );

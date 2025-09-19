@@ -67,6 +67,7 @@ export default function TradingTab({
   handleClearTrading,
   canUseLiveTrading = true,
   canUseAutoTrading = true,
+  canUseNearLimitAnalysis = true,
 }: TradingTabProps) {
   return (
     <Card>
@@ -449,7 +450,15 @@ export default function TradingTab({
 
             {/* Auto Near-Limit Analysis */}
             <div className="rounded-lg border bg-muted/30 p-4">
-              <div className="space-y-3">
+              {!canUseNearLimitAnalysis && (
+                <Alert className="mb-3">
+                  <Lock className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Auto near-limit analysis requires a higher subscription plan.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className={`space-y-3 ${!canUseNearLimitAnalysis ? 'opacity-50' : ''}`}>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <LabelWithHelp
@@ -475,8 +484,9 @@ export default function TradingTab({
                   </div>
                   <Switch
                     id="auto-near-limit"
-                    checked={autoNearLimitAnalysis || false}
+                    checked={canUseNearLimitAnalysis ? (autoNearLimitAnalysis || false) : false}
                     onCheckedChange={setAutoNearLimitAnalysis}
+                    disabled={!canUseNearLimitAnalysis}
                     className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
                   />
                 </div>

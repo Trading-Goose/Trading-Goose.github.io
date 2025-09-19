@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as DatePicker } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw, Loader2, ExternalLink, FileText, BarChart3, Calendar, Package, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Clock, CheckCircle, XCircle, TrendingUp, RefreshCw, Loader2, ExternalLink, FileText, BarChart3, Calendar as CalendarIcon, Package, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth, hasAlpacaCredentials } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getCachedSession } from "@/lib/cachedAuth";
@@ -58,6 +60,7 @@ export default function TradeHistoryTable() {
   const today = new Date();
   const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const [selectedDate, setSelectedDate] = useState<string>(todayString);
+  const isViewingToday = selectedDate === todayString;
 
   // Helper to format date display
   const getDateDisplay = () => {
@@ -86,14 +89,20 @@ export default function TradeHistoryTable() {
   const navigateDate = (direction: 'prev' | 'next') => {
     const [year, month, day] = selectedDate.split('-').map(Number);
     const currentDate = new Date(year, month - 1, day);
+    const targetDate = new Date(currentDate);
 
     if (direction === 'prev') {
-      currentDate.setDate(currentDate.getDate() - 1);
+      targetDate.setDate(targetDate.getDate() - 1);
     } else {
-      currentDate.setDate(currentDate.getDate() + 1);
+      targetDate.setDate(targetDate.getDate() + 1);
+      const today = new Date();
+      const todayWithoutTime = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      if (targetDate > todayWithoutTime) {
+        return;
+      }
     }
 
-    const newDateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+    const newDateString = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
     setSelectedDate(newDateString);
   };
 
@@ -315,21 +324,27 @@ export default function TradeHistoryTable() {
   };
 
   useEffect(() => {
-    // Always fetch trades from database
-    fetchAllTrades();
-
-    if (hasAlpacaConfig) {
-      // Check Alpaca order status for approved orders
-      console.log('Alpaca credentials detected, updating order status...');
-      updateAlpacaOrderStatus();
-    } else {
-      console.log('No Alpaca credentials found, skipping order status update');
+    if (!user?.id) {
+      setAllTrades([]);
+      setLoading(false);
+      return;
     }
-  }, [apiSettings, user, selectedDate, hasAlpacaConfig]); // Added selectedDate dependency
+
+    fetchAllTrades();
+  }, [user?.id, selectedDate]);
+
+  useEffect(() => {
+    if (!user?.id || !hasAlpacaConfig || !isViewingToday) {
+      return;
+    }
+
+    console.log('Alpaca credentials detected, updating order status...');
+    updateAlpacaOrderStatus();
+  }, [user?.id, hasAlpacaConfig, isViewingToday]);
 
   // Periodically update Alpaca order status
   useEffect(() => {
-    if (!hasAlpacaConfig) return;
+    if (!user?.id || !hasAlpacaConfig || !isViewingToday) return;
 
     const interval = setInterval(() => {
       console.log('Periodic order status update...');
@@ -337,7 +352,7 @@ export default function TradeHistoryTable() {
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(interval);
-  }, [apiSettings, user, hasAlpacaConfig]);
+  }, [user?.id, hasAlpacaConfig, isViewingToday]);
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -790,7 +805,7 @@ export default function TradeHistoryTable() {
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
+                      <CalendarIcon className="h-4 w-4" />
                       {formatFullDate(group.createdAt)}
                     </div>
                   </div>
@@ -830,15 +845,73 @@ export default function TradeHistoryTable() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="px-3 min-w-[140px] hover:border-[#fc0] hover:bg-[#fc0]/10 hover:text-[#fc0] transition-all duration-200"
-              onClick={jumpToToday}
-            >
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              {getDateDisplay()}
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="px-3 min-w-[140px] hover:border-[#fc0] hover:bg-[#fc0]/10 hover:text-[#fc0] transition-all duration-200"
+                >
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  {getDateDisplay()}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-auto p-0 bg-background border-border"
+                align="center"
+              >
+                <div className="space-y-2 p-3">
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
+                      onClick={() => {
+                        const yesterday = new Date();
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        const year = yesterday.getFullYear();
+                        const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+                        const day = String(yesterday.getDate()).padStart(2, '0');
+                        setSelectedDate(`${year}-${month}-${day}`);
+                      }}
+                    >
+                      Yesterday
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 text-xs hover:bg-[#fc0]/10 hover:border-[#fc0]/50 hover:text-[#fc0]"
+                      onClick={jumpToToday}
+                    >
+                      Today
+                    </Button>
+                  </div>
+                </div>
+                <DatePicker
+                  mode="single"
+                  selected={(() => {
+                    const [year, month, day] = selectedDate.split('-').map(Number);
+                    return new Date(year, month - 1, day);
+                  })()}
+                  onSelect={(date) => {
+                    if (date) {
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      setSelectedDate(`${year}-${month}-${day}`);
+                    }
+                  }}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(23, 59, 59, 999);
+                    return date > today;
+                  }}
+                  showOutsideDays={false}
+                  initialFocus
+                  className="rounded-b-lg"
+                />
+              </PopoverContent>
+            </Popover>
 
             <Button
               variant="ghost"

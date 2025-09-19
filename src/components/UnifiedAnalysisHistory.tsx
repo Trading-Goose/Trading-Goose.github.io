@@ -457,8 +457,43 @@ export default function UnifiedAnalysisHistory() {
 
       if (error) throw error;
 
+      // Find the running analysis to get its created_at
+      const runningItem = runningAnalyses.find(item => item.id === analysisId);
+      
       // Move from running to canceled list
       setRunningAnalyses(prev => prev.filter(item => item.id !== analysisId));
+      
+      // Add to cancelled list with the updated data
+      const cancelledItem: AnalysisHistoryItem = {
+        id: analysisId,
+        ticker: ticker,
+        analysis_date: new Date().toISOString(),
+        decision: 'CANCELED',
+        confidence: 0,
+        agent_insights: runningItem?.agent_insights || currentAnalysis?.full_analysis?.agent_insights || {},
+        full_analysis: {
+          ...currentAnalysis?.full_analysis,
+          status: 'error',
+          completedAt: new Date().toISOString(),
+          canceledAt: new Date().toISOString(),
+          currentPhase: 'Canceled by user',
+          error: 'Analysis cancelled by user',
+          messages: [
+            ...existingMessages,
+            {
+              agent: 'System',
+              message: 'Analysis was canceled by user',
+              timestamp: new Date().toISOString(),
+              type: 'error'
+            }
+          ]
+        },
+        created_at: runningItem?.created_at || new Date().toISOString(),
+        analysis_status: ANALYSIS_STATUS.CANCELLED
+      };
+      
+      setCanceledAnalyses(prev => [cancelledItem, ...prev]);
+      setFilteredCanceled(prev => [cancelledItem, ...prev]);
 
       toast({
         title: "Analysis Cancelled",
@@ -494,6 +529,14 @@ export default function UnifiedAnalysisHistory() {
 
     setDeleting(true);
     try {
+      const { error: tradeDeleteError } = await supabase
+        .from('trading_actions')
+        .delete()
+        .eq('analysis_id', analysisId)
+        .eq('user_id', user.id);
+
+      if (tradeDeleteError) throw tradeDeleteError;
+
       const { error } = await supabase
         .from('analysis_history')
         .delete()
@@ -505,6 +548,10 @@ export default function UnifiedAnalysisHistory() {
       setHistory(prev => prev.filter(item => item.id !== analysisId));
       setRunningAnalyses(prev => prev.filter(item => item.id !== analysisId));
       setCanceledAnalyses(prev => prev.filter(item => item.id !== analysisId));
+      
+      // Also update filtered lists to reflect the deletion immediately
+      setFilteredHistory(prev => prev.filter(item => item.id !== analysisId));
+      setFilteredCanceled(prev => prev.filter(item => item.id !== analysisId));
 
       toast({
         title: "Analysis Deleted",

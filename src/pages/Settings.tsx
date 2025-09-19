@@ -82,7 +82,8 @@ export default function SettingsPage() {
     hasOpportunityAgentAccess,
     hasAdditionalProviderAccess,
     canUseLiveTrading,
-    canUseAutoTrading
+    canUseAutoTrading,
+    canUseNearLimitAnalysis
   } = useRBAC();
 
   const [saved, setSaved] = useState(false);
@@ -1786,6 +1787,7 @@ export default function SettingsPage() {
               handleClearTrading={handleClearTrading}
               canUseLiveTrading={canUseLiveTrading()}
               canUseAutoTrading={canUseAutoTrading()}
+              canUseNearLimitAnalysis={canUseNearLimitAnalysis()}
             />
           </TabsContent>
         </Tabs>

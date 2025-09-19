@@ -27,6 +27,7 @@ export function useRBAC() {
         additional_provider_access?: boolean;
         enable_live_trading?: boolean;
         enable_auto_trading?: boolean;
+        near_limit_analysis_access?: boolean;
     }>>(new Map());
     const [isLoading, setIsLoading] = useState(true);
 
@@ -107,6 +108,7 @@ export function useRBAC() {
                             const additionalProviderAccess = limits?.additional_provider_access ?? false;
                             const enableLiveTrading = limits?.enable_live_trading ?? false;
                             const enableAutoTrading = limits?.enable_auto_trading ?? false;
+                            const nearLimitAnalysisAccess = limits?.near_limit_analysis_access ?? false;
 
                             console.log('[useRBAC] Role limits for', role.name, ':', limits);
 
@@ -129,7 +131,8 @@ export function useRBAC() {
                                 opportunity_agent_access: opportunityAgentAccess,
                                 additional_provider_access: additionalProviderAccess,
                                 enable_live_trading: enableLiveTrading,
-                                enable_auto_trading: enableAutoTrading
+                                enable_auto_trading: enableAutoTrading,
+                                near_limit_analysis_access: nearLimitAnalysisAccess
                             });
                         });
                         setRoleDetails(roleMap);
@@ -528,9 +531,25 @@ export function useRBAC() {
         return false;
     };
 
+    const canUseNearLimitAnalysis = (): boolean => {
+        // Don't automatically grant to admin - check their actual role permissions
+        // This ensures admins must explicitly have this feature enabled in their role
+        
+        // Check if any role has near limit analysis access
+        for (const userRole of userRoles) {
+            const roleDetail = roleDetails.get(userRole.role_id);
+            if (roleDetail && roleDetail.near_limit_analysis_access) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
     // Aliases for compatibility with different naming conventions
     const hasLiveTradingAccess = canUseLiveTrading;
     const hasAutoTradingAccess = canUseAutoTrading;
+    const hasNearLimitAnalysisAccess = canUseNearLimitAnalysis;
 
     return {
         permissions,
@@ -557,8 +576,10 @@ export function useRBAC() {
         hasAdditionalProviderAccess,
         canUseLiveTrading,
         canUseAutoTrading,
+        canUseNearLimitAnalysis,
         hasLiveTradingAccess,
         hasAutoTradingAccess,
+        hasNearLimitAnalysisAccess,
         userRoles,
         roleDetails
     };

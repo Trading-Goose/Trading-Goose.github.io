@@ -18,6 +18,7 @@ export interface RoleLimit {
   additional_provider_access: boolean;
   enable_live_trading: boolean;
   enable_auto_trading: boolean;
+  near_limit_analysis_access: boolean;
 }
 
 export interface RoleWithLimits {
@@ -56,6 +57,7 @@ export interface RoleWithLimits {
   additional_provider_access: boolean;
   enable_live_trading: boolean;
   enable_auto_trading: boolean;
+  near_limit_analysis_access: boolean;
 }
 
 export function useRoleManagement() {
@@ -138,7 +140,8 @@ export function useRoleManagement() {
           opportunity_agent_access: limits?.opportunity_agent_access ?? false,
           additional_provider_access: limits?.additional_provider_access ?? false,
           enable_live_trading: limits?.enable_live_trading ?? false,
-          enable_auto_trading: limits?.enable_auto_trading ?? false
+          enable_auto_trading: limits?.enable_auto_trading ?? false,
+          near_limit_analysis_access: limits?.near_limit_analysis_access ?? false
         };
       }) || [];
 
@@ -188,7 +191,8 @@ export function useRoleManagement() {
             opportunity_agent_access: false,
             additional_provider_access: false,
             enable_live_trading: false,
-            enable_auto_trading: false
+            enable_auto_trading: false,
+            near_limit_analysis_access: false
           });
       }
 

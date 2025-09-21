@@ -88,31 +88,55 @@ const calculateAgentCompletion = (analysisItem: any, isRebalanceAnalysis: boolea
   let totalAgents = 0;
   let completedAgents = 0;
 
-  // Primary method: Check workflow_steps structure (similar to GitHub Actions)
-  // This is the most reliable way as it mirrors the workflow visualization
-  if (analysisItem.full_analysis?.workflow_steps) {
-    const workflowSteps = analysisItem.full_analysis.workflow_steps;
-    
-    // Iterate through all phases and count agents
-    Object.keys(workflowSteps).forEach(phase => {
-      // Skip portfolio phase for rebalance analyses
-      if (phase === 'portfolio' && isRebalanceAnalysis) {
-        return;
-      }
-      
-      const phaseData = workflowSteps[phase];
-      if (phaseData?.agents && Array.isArray(phaseData.agents)) {
-        phaseData.agents.forEach((agent: any) => {
-          totalAgents++;
-          // Check if agent is completed (similar to GitHub Actions step status)
-          if (agent.status === 'completed' || agent.status === 'complete') {
-            completedAgents++;
-          }
-        });
+  const rawWorkflowSteps = analysisItem.full_analysis?.workflow_steps || analysisItem.full_analysis?.workflowSteps;
+
+  const countAgents = (agents: any) => {
+    if (!agents) return;
+    const list = Array.isArray(agents)
+      ? agents
+      : typeof agents === 'object'
+        ? Object.values(agents)
+        : [];
+
+    list.forEach((agent: any) => {
+      if (!agent) return;
+      totalAgents++;
+      const status = typeof agent === 'object' ? agent.status : undefined;
+      const normalizedStatus = typeof status === 'string' ? status.toLowerCase() : '';
+      if (['completed', 'complete', 'success', 'done'].includes(normalizedStatus)) {
+        completedAgents++;
       }
     });
-    
-    // Return percentage if we found agents
+  };
+
+  const shouldSkipPhase = (phaseName: string) => {
+    if (!phaseName) return false;
+    if (!isRebalanceAnalysis) return false;
+    const normalized = phaseName.toString().toLowerCase();
+    return normalized.includes('portfolio');
+  };
+
+  if (rawWorkflowSteps) {
+    if (Array.isArray(rawWorkflowSteps)) {
+      rawWorkflowSteps.forEach((step: any) => {
+        const phaseName = step?.id || step?.name || '';
+        if (shouldSkipPhase(phaseName)) {
+          return;
+        }
+        countAgents(step?.agents);
+      });
+    } else if (typeof rawWorkflowSteps === 'object') {
+      Object.keys(rawWorkflowSteps).forEach((phase) => {
+        if (shouldSkipPhase(phase)) {
+          return;
+        }
+        const phaseData = rawWorkflowSteps[phase];
+        if (phaseData?.agents) {
+          countAgents(phaseData.agents);
+        }
+      });
+    }
+
     if (totalAgents > 0) {
       return Math.round((completedAgents / totalAgents) * 100);
     }

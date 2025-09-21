@@ -168,7 +168,7 @@ export default function RegisterPage() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                We're in closed beta testing phase. Join our Discord community to request early access and be among the first to experience AI-powered analysis.
+                We're in closed beta testing phase. Join our Discord community to get early access and be among the first to experience AI-powered analysis.
               </AlertDescription>
             </Alert>
             <p className="text-sm text-muted-foreground text-center">

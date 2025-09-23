@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth";
 
 export default function InvitationSetup() {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -99,8 +99,8 @@ export default function InvitationSetup() {
         setUserEmail(currentUser.email || '');
         
         // Check if user already completed setup directly from the session
-        if (currentUser.user_metadata?.name || currentUser.user_metadata?.full_name) {
-          console.log('User already has name in metadata, redirecting to dashboard');
+        if (currentUser.user_metadata?.username || currentUser.user_metadata?.name || currentUser.user_metadata?.full_name) {
+          console.log('User already has username in metadata, redirecting to dashboard');
           navigate('/dashboard');
           return;
         }
@@ -109,11 +109,11 @@ export default function InvitationSetup() {
         try {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('name, full_name')
+            .select('name')
             .eq('id', currentUser.id)
             .single();
 
-          if (!profileError && profile && (profile.name || profile.full_name)) {
+          if (!profileError && profile && profile.name) {
             console.log('User already has profile, redirecting to dashboard');
             navigate('/dashboard');
             return;
@@ -161,8 +161,10 @@ export default function InvitationSetup() {
     setError("");
 
     // Validation
-    if (!name.trim()) {
-      setError("Please enter your name");
+    const trimmedUsername = username.trim();
+
+    if (!trimmedUsername) {
+      setError("Please enter your username");
       return;
     }
 
@@ -183,8 +185,8 @@ export default function InvitationSetup() {
       const { error: updateError } = await supabase.auth.updateUser({ 
         password: password,
         data: { 
-          name: name.trim(),
-          full_name: name.trim()
+          name: trimmedUsername,
+          username: trimmedUsername
         }
       });
 
@@ -204,8 +206,7 @@ export default function InvitationSetup() {
           .upsert({
             id: user.id,
             email: user.email,
-            name: name.trim(),
-            full_name: name.trim(),
+            name: trimmedUsername,
             updated_at: new Date().toISOString()
           });
 
@@ -313,7 +314,7 @@ export default function InvitationSetup() {
         <CardHeader>
           <CardTitle>Complete Your Account Setup</CardTitle>
           <CardDescription>
-            Welcome! Please set your name and password to complete your account.
+            Welcome! Please set your username and password to complete your account.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -334,14 +335,14 @@ export default function InvitationSetup() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Your Name</Label>
+              <Label htmlFor="username">Username</Label>
               <div className="relative">
                 <Input
-                  id="name"
+                  id="username"
                   type="text"
-                  placeholder="Enter your full name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Pick a username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
                   disabled={isLoading}
                 />
@@ -422,7 +423,7 @@ export default function InvitationSetup() {
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isLoading || !name || !password || !confirmPassword}
+              disabled={isLoading || !username || !password || !confirmPassword}
             >
               {isLoading ? (
                 <>

@@ -20,7 +20,7 @@ export default function RegisterPage() {
   const publicRegistrationEnabled = import.meta.env.VITE_ENABLE_PUBLIC_REGISTRATION !== 'false';
 
   // Form state
-  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -56,10 +56,16 @@ export default function RegisterPage() {
       return;
     }
 
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername) {
+      setError("Username is required");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const result = await register(email, password, name);
+      const result = await register(email, password, trimmedUsername);
 
       setIsLoading(false);
 
@@ -67,7 +73,7 @@ export default function RegisterPage() {
         setSuccessMessage("Registration successful! Please check your email to verify your account.");
         setError("");
         // Clear form
-        setName("");
+        setUsername("");
         setEmail("");
         setPassword("");
         setConfirmPassword("");
@@ -139,7 +145,7 @@ export default function RegisterPage() {
               className="w-full"
               onClick={() => {
                 setSuccessMessage("");
-                setName("");
+                setUsername("");
                 setEmail("");
                 setPassword("");
                 setConfirmPassword("");
@@ -224,6 +230,20 @@ export default function RegisterPage() {
 
         <form onSubmit={handleRegister}>
           <CardContent className="space-y-4">
+
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Goose Captain"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                disabled={isLoading}
+                autoComplete="username"
+              />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

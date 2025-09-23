@@ -25,7 +25,7 @@ interface AuthState {
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  register: (email: string, password: string, username: string) => Promise<{ success: boolean; error?: string }>;
 
   // Password methods
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -532,7 +532,7 @@ export const useAuth = create<AuthState>()(
       },
 
       // Register
-      register: async (email: string, password: string, name: string) => {
+      register: async (email: string, password: string, username: string) => {
         console.log('🔐 Register attempt for:', email);
         set({ isLoading: true, error: null });
 
@@ -541,7 +541,7 @@ export const useAuth = create<AuthState>()(
             email,
             password,
             options: {
-              data: { name }
+              data: { name: username, username }
             }
           });
 
@@ -557,7 +557,7 @@ export const useAuth = create<AuthState>()(
               .insert({
                 id: data.user.id,
                 email,
-                name,
+                name: username,
                 created_at: new Date().toISOString()
               });
 

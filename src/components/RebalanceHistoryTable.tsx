@@ -93,11 +93,13 @@ export default function RebalanceHistoryTable() {
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [analysisData, setAnalysisData] = useState<{ [key: string]: any[] }>({});
+  const [activeTab, setActiveTab] = useState<string>("all");
 
   // Date filter states - default to today (using local date to avoid timezone issues)
   const today = new Date();
   const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const [selectedDate, setSelectedDate] = useState<string>(todayString);
+  const isTodaySelected = selectedDate === todayString;
 
   // Track if initial data has been loaded
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -132,11 +134,11 @@ export default function RebalanceHistoryTable() {
     }
   }, [user, selectedDate]); // Reload when selectedDate changes
 
-  // Separate useEffect for polling running rebalances only
+  // Separate useEffect for real-time updates on running rebalances only
   useEffect(() => {
-    if (!user || !initialLoadComplete) return;
-    
-    // Only set up polling if there are actually running rebalances
+    if (!user || !initialLoadComplete || !isTodaySelected) return;
+
+    // Only subscribe if there are running rebalances
     if (runningRebalances.length === 0) return;
 
     // Set up real-time subscription for instant updates
@@ -158,16 +160,20 @@ export default function RebalanceHistoryTable() {
       )
       .subscribe();
 
-    // Much slower polling - every 15 seconds instead of 3 seconds
-    const interval = setInterval(() => {
-      fetchRebalanceRequests(false); // Don't show loading on polling updates
-    }, 15000); // Poll every 15 seconds for running rebalances
-
     return () => {
       subscription.unsubscribe();
-      clearInterval(interval);
     };
-  }, [user, runningRebalances.length > 0, selectedDate, initialLoadComplete]); // Use boolean comparison
+  }, [user, runningRebalances.length > 0, selectedDate, initialLoadComplete, isTodaySelected]); // Use boolean comparison
+
+  useEffect(() => {
+    if (!user || !isTodaySelected) return;
+
+    const intervalId = setInterval(() => {
+      fetchRebalanceRequests(false);
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [user, selectedDate, activeTab, isTodaySelected]);
 
   const handleManualRefresh = async () => {
     setRefreshing(true);
@@ -191,11 +197,11 @@ export default function RebalanceHistoryTable() {
     }
   };
 
-  const fetchRebalanceRequests = async (isInitialLoad = false) => {
+  const fetchRebalanceRequests = async (isInitialLoad = false, withSpinner: boolean = isInitialLoad) => {
     if (!user) return;
 
     // Only show loading state on initial load or when explicitly requested
-    if (isInitialLoad) {
+    if (withSpinner) {
       setLoading(true);
     }
     
@@ -285,10 +291,17 @@ export default function RebalanceHistoryTable() {
         });
       }
     } finally {
-      if (isInitialLoad) {
+      if (withSpinner) {
         setLoading(false);
       }
       setInitialLoadComplete(true);
+    }
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    if (isTodaySelected) {
+      fetchRebalanceRequests(false);
     }
   };
 
@@ -837,7 +850,7 @@ export default function RebalanceHistoryTable() {
             </div>
           </div>
 
-          <Tabs defaultValue="all" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="all">
                 All <span className="hidden sm:inline">({totalCount})</span>

@@ -129,8 +129,41 @@ export function useRebalanceData(isOpen: boolean) {
           currentShares: parseFloat(pos.qty || '0'),
           currentValue: parseFloat(pos.market_value || '0'),
           currentAllocation: (parseFloat(pos.market_value || '0') / totalEquity) * 100,
-          avgPrice: parseFloat(pos.avg_entry_price || '0')
+          avgPrice: parseFloat(pos.avg_entry_price || '0'),
+          assetClass: pos.asset_class
         }));
+
+        const cryptoTickers = Array.from(new Set(
+          processedPositions
+            .filter(pos => (pos.assetClass || '').toLowerCase() === 'crypto')
+            .map(pos => pos.ticker)
+        ));
+
+        if (cryptoTickers.length > 0) {
+          const assetSymbolEntries = await Promise.all(
+            cryptoTickers.map(async (ticker) => {
+              try {
+                const asset = await alpacaAPI.getAsset(ticker);
+                const symbol = typeof asset?.symbol === 'string' ? asset.symbol : null;
+                return [ticker, symbol] as const;
+              } catch (error) {
+                console.warn(`Failed to fetch asset metadata for ${ticker}:`, error);
+                return [ticker, null] as const;
+              }
+            })
+          );
+
+          const assetSymbolMap = new Map(
+            assetSymbolEntries.filter(([, symbol]) => typeof symbol === 'string' && !!symbol)
+          );
+
+          processedPositions.forEach((position) => {
+            const assetSymbol = assetSymbolMap.get(position.ticker);
+            if (assetSymbol) {
+              position.assetSymbol = assetSymbol;
+            }
+          });
+        }
 
         // Sort positions by allocation (descending)
         processedPositions.sort((a, b) => b.currentAllocation - a.currentAllocation);

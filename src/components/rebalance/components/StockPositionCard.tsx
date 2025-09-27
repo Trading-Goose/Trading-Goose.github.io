@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Eye } from "lucide-react";
+import { formatTickerForDisplay } from "@/lib/tickers";
 import type { RebalancePosition } from "../types";
 
 interface StockPositionCardProps {
@@ -24,8 +25,9 @@ export function StockPositionCard({
   isWatchlist = false,
   onToggle
 }: StockPositionCardProps) {
-  const displayTicker = ticker || position?.ticker || '';
-  
+  const rawTicker = ticker || position?.ticker || '';
+  const displayTicker = formatTickerForDisplay(rawTicker, { assetClass: position?.assetClass, assetSymbol: position?.assetSymbol });
+
   if (isWatchlist && ticker) {
     // Watchlist stock card (simpler version)
     return (
@@ -42,7 +44,7 @@ export function StockPositionCard({
               onClick={(e) => e.stopPropagation()}
               disabled={isDisabled}
             />
-            <span className="font-semibold">{ticker}</span>
+            <span className="font-semibold">{displayTicker}</span>
             {isDisabled && <Lock className="h-4 w-4 text-muted-foreground" />}
             <Badge variant="outline" className="text-xs">
               <Eye className="w-3 h-3 mr-1" />
@@ -81,7 +83,7 @@ export function StockPositionCard({
               onClick={(e) => e.stopPropagation()}
               disabled={isDisabled}
             />
-            <span className="font-semibold text-lg">{position.ticker}</span>
+            <span className="font-semibold text-lg">{displayTicker}</span>
             {isDisabled && <Lock className="h-4 w-4 text-muted-foreground" />}
           </div>
           <div className="text-right">

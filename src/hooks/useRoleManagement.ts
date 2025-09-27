@@ -66,7 +66,7 @@ export function useRoleManagement() {
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const canManageRoles = isAdmin;
 
   // Load roles
@@ -105,7 +105,7 @@ export function useRoleManagement() {
         const rolePermIds = rolePermsData?.filter(rp => rp.role_id === role.id).map(rp => rp.permission_id) || [];
         const rolePermNames = permsData?.filter(p => rolePermIds.includes(p.id)).map(p => p.name) || [];
         const limits = limitsData?.find(l => l.role_id === role.id);
-        
+
         return {
           id: role.id,
           role_id: role.id, // For compatibility with the component
@@ -214,7 +214,7 @@ export function useRoleManagement() {
         stripe_price_id_yearly: updates.stripe_price_id_yearly
       }
     });
-    
+
     if (!isAdmin) {
       return { success: false, error: 'Admin access required' };
     }
@@ -235,10 +235,10 @@ export function useRoleManagement() {
       }
 
       // Try RPC function first, fall back to direct update if it doesn't exist
-      if (updates.name || updates.display_name || updates.description || updates.priority !== undefined || 
-          updates.color !== undefined || updates.icon_url !== undefined || updates.price_monthly !== undefined || 
-          updates.price_yearly !== undefined || updates.features !== undefined || updates.discord_role_id !== undefined ||
-          updates.stripe_product_id !== undefined || updates.stripe_price_id_monthly !== undefined || updates.stripe_price_id_yearly !== undefined) {
+      if (updates.name || updates.display_name || updates.description || updates.priority !== undefined ||
+        updates.color !== undefined || updates.icon_url !== undefined || updates.price_monthly !== undefined ||
+        updates.price_yearly !== undefined || updates.features !== undefined || updates.discord_role_id !== undefined ||
+        updates.stripe_product_id !== undefined || updates.stripe_price_id_monthly !== undefined || updates.stripe_price_id_yearly !== undefined) {
         const { data: rpcData, error: rpcError } = await supabase
           .rpc('update_role_details', {
             p_role_id: roleId,
@@ -269,14 +269,14 @@ export function useRoleManagement() {
           if (updates.stripe_product_id !== undefined) updateData.stripe_product_id = updates.stripe_product_id || null;
           if (updates.stripe_price_id_monthly !== undefined) updateData.stripe_price_id_monthly = updates.stripe_price_id_monthly || null;
           if (updates.stripe_price_id_yearly !== undefined) updateData.stripe_price_id_yearly = updates.stripe_price_id_yearly || null;
-          
+
           console.log('Direct update - updateData:', updateData);
           console.log('Direct update - Stripe fields being saved:', {
             stripe_product_id: updateData.stripe_product_id,
             stripe_price_id_monthly: updateData.stripe_price_id_monthly,
             stripe_price_id_yearly: updateData.stripe_price_id_yearly
           });
-          
+
           const { error: updateError } = await supabase
             .from('roles')
             .update(updateData)
@@ -290,7 +290,7 @@ export function useRoleManagement() {
           // since the RPC function might not handle them
           const extendedUpdateData: any = {};
           let hasExtendedUpdates = false;
-          
+
           // Handle extended fields that might not be in the RPC function
           if (updates.color !== undefined) {
             extendedUpdateData.color = updates.color || null;
@@ -328,7 +328,7 @@ export function useRoleManagement() {
             extendedUpdateData.stripe_price_id_yearly = updates.stripe_price_id_yearly || null;
             hasExtendedUpdates = true;
           }
-          
+
           // If there are extended fields to update, do a direct update for those
           if (hasExtendedUpdates) {
             console.log('Extended update - extendedUpdateData:', extendedUpdateData);
@@ -337,12 +337,12 @@ export function useRoleManagement() {
               stripe_price_id_monthly: extendedUpdateData.stripe_price_id_monthly,
               stripe_price_id_yearly: extendedUpdateData.stripe_price_id_yearly
             });
-            
+
             const { error: extendedUpdateError } = await supabase
               .from('roles')
               .update(extendedUpdateData)
               .eq('id', roleId);
-              
+
             if (extendedUpdateError) throw extendedUpdateError;
           }
         }
@@ -364,9 +364,9 @@ export function useRoleManagement() {
       console.log('Role updated successfully');
       return { success: true };
     } catch (err) {
-      return { 
-        success: false, 
-        error: err instanceof Error ? err.message : 'Failed to update role' 
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to update role'
       };
     }
   };
@@ -386,7 +386,7 @@ export function useRoleManagement() {
         .single();
 
       if (roleError) throw roleError;
-      
+
       if (roleData?.is_built_in) {
         throw new Error(`Cannot delete built-in role ${roleData.name}`);
       }
@@ -398,13 +398,13 @@ export function useRoleManagement() {
       // If RPC function doesn't exist, do manual deletion
       if (rpcError && rpcError.code === '42883') {
         // Function doesn't exist, do manual deletion
-        
+
         // 1. First UPDATE user_roles to deactivate instead of delete to avoid materialized view issues
         const { error: deactivateError } = await supabase
           .from('user_roles')
           .update({ is_active: false })
           .eq('role_id', roleId);
-        
+
         if (deactivateError && deactivateError.code !== '42P01') {
           console.error('Error deactivating user_roles:', deactivateError);
         }
@@ -477,13 +477,19 @@ export function useRoleManagement() {
     }
 
     try {
+      const payload = Object.fromEntries(
+        Object.entries({
+          ...limits,
+          role_id: roleId
+        }).filter(([, value]) => value !== undefined)
+      );
+
       const { error } = await supabase
         .from('role_limits')
-        .update(limits)
-        .eq('role_id', roleId);
+        .upsert(payload, { onConflict: 'role_id' });
 
       if (error) throw error;
-      
+
       await loadRoles();
     } catch (err) {
       throw err;
@@ -575,7 +581,7 @@ export function useRoleManagement() {
           if (error) throw error;
         }
       }
-      
+
       // Refresh roles to update the UI
       await loadRoles();
     } catch (err) {

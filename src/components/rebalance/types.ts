@@ -7,6 +7,8 @@ export interface RebalancePosition {
   currentValue: number;
   currentAllocation: number;
   avgPrice?: number;
+  assetClass?: string;
+  assetSymbol?: string;
 }
 
 export interface RebalanceConfig {

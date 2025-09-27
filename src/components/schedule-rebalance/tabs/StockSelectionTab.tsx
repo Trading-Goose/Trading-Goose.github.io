@@ -13,6 +13,7 @@ import { StockPositionCard } from "@/components/rebalance/components/StockPositi
 import { PortfolioComposition } from "@/components/rebalance/components/PortfolioComposition";
 import { generatePositionColors } from "@/components/rebalance/utils";
 import type { Position } from "../types";
+import { formatTickerForDisplay } from "@/lib/tickers";
 
 interface StockSelectionTabProps {
   loading: boolean;
@@ -100,6 +101,7 @@ export function StockSelectionTab({
                     {watchlistStocks.map(ticker => {
                       const isSelected = selectedPositions.has(ticker);
                       const isDisabled = !isSelected && maxStocks > 0 && selectedPositions.size >= maxStocks;
+                      const displayTicker = formatTickerForDisplay(ticker);
                       return (
                         <Badge
                           key={ticker}
@@ -108,7 +110,7 @@ export function StockSelectionTab({
                           onClick={() => !isDisabled && togglePosition(ticker)}
                         >
                           <Eye className="w-3 h-3 mr-1" />
-                          {ticker}
+                          {displayTicker}
                           {isDisabled && <Lock className="w-3 h-3 ml-1" />}
                         </Badge>
                       );

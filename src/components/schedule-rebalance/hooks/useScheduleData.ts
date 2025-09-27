@@ -7,6 +7,7 @@ import { alpacaAPI } from "@/lib/alpaca";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useRBAC } from "@/hooks/useRBAC";
+import { normalizeTickerForComparison } from "@/lib/tickers";
 import type { 
   Position, 
   ExistingSchedule, 
@@ -54,34 +55,12 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
       }
 
       if (data) {
-        const positionTickers = new Set(positions.map(p => p.ticker));
+        const positionTickers = new Set(positions.map(p => normalizeTickerForComparison(p.ticker)));
         const watchlistOnlyStocks = data
           .map(item => item.ticker)
-          .filter(ticker => !positionTickers.has(ticker));
+          .filter(ticker => !positionTickers.has(normalizeTickerForComparison(ticker)));
 
         setWatchlistStocks(watchlistOnlyStocks);
-
-        if (watchlistOnlyStocks.length > 0) {
-          setSelectedPositions(prev => {
-            const newSelection = new Set(prev);
-            let addedCount = 0;
-            for (const ticker of watchlistOnlyStocks) {
-              if (maxStocks > 0 && newSelection.size >= maxStocks) {
-                if (addedCount < watchlistOnlyStocks.length) {
-                  toast({
-                    title: "Stock Selection Limit",
-                    description: `Only ${addedCount} of ${watchlistOnlyStocks.length} watchlist stocks were selected due to the ${maxStocks} stock limit.`,
-                    variant: "default",
-                  });
-                }
-                break;
-              }
-              newSelection.add(ticker);
-              addedCount++;
-            }
-            return newSelection;
-          });
-        }
       }
     } catch (error) {
       console.error('Error loading watchlist:', error);
@@ -125,6 +104,8 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
       }
 
       if (scheduleData && !scheduleError) {
+        const includeAllFromSchedule = Boolean(scheduleData.include_all_positions);
+
         setExistingSchedule(scheduleData as ExistingSchedule);
 
         setConfig({
@@ -161,7 +142,7 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
           setSelectedPositions(new Set(scheduleData.selected_tickers));
         }
         setIncludeWatchlist(scheduleData.include_watchlist || false);
-        setIncludeAllPositions(scheduleData.include_all_positions || false);
+        setIncludeAllPositions(includeAllFromSchedule);
       } else {
         if (apiSettings) {
           setRebalanceConfig(prev => ({
@@ -178,6 +159,10 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
           }));
         }
       }
+
+      const shouldSelectAllPositions = scheduleData && !scheduleError
+        ? Boolean(scheduleData.include_all_positions)
+        : includeAllPositions;
 
       if (hasAlpacaConfig) {
         const [accountData, alpacaPositions] = await Promise.all([
@@ -204,13 +189,46 @@ export function useScheduleData(isOpen: boolean, scheduleId: string | null = nul
             currentShares: parseFloat(pos.qty || '0'),
             currentValue: parseFloat(pos.market_value || '0'),
             currentAllocation: totalEquity > 0 ? (parseFloat(pos.market_value || '0') / totalEquity) * 100 : 0,
-            avgPrice: parseFloat(pos.avg_entry_price || '0')
+            avgPrice: parseFloat(pos.avg_entry_price || '0'),
+            assetClass: pos.asset_class
           }));
+
+          const cryptoTickers = Array.from(new Set(
+            processedPositions
+              .filter(pos => (pos.assetClass || '').toLowerCase() === 'crypto')
+              .map(pos => pos.ticker)
+          ));
+
+          if (cryptoTickers.length > 0) {
+            const assetSymbolEntries = await Promise.all(
+              cryptoTickers.map(async (ticker) => {
+                try {
+                  const asset = await alpacaAPI.getAsset(ticker);
+                  const symbol = typeof asset?.symbol === 'string' ? asset.symbol : null;
+                  return [ticker, symbol] as const;
+                } catch (error) {
+                  console.warn(`Failed to fetch asset metadata for ${ticker}:`, error);
+                  return [ticker, null] as const;
+                }
+              })
+            );
+
+            const assetSymbolMap = new Map(
+              assetSymbolEntries.filter(([, symbol]) => typeof symbol === 'string' && !!symbol)
+            );
+
+            processedPositions.forEach((position) => {
+              const assetSymbol = assetSymbolMap.get(position.ticker);
+              if (assetSymbol) {
+                position.assetSymbol = assetSymbol;
+              }
+            });
+          }
 
           processedPositions.sort((a, b) => b.currentAllocation - a.currentAllocation);
           setPositions(processedPositions);
 
-          if (includeAllPositions) {
+          if (shouldSelectAllPositions) {
             if (maxStocks > 0 && processedPositions.length > maxStocks) {
               const limitedSelection = processedPositions.slice(0, maxStocks).map(p => p.ticker);
               setSelectedPositions(new Set(limitedSelection));

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, RefreshCw, Loader2, Eye, Activity, Clock, AlertCircle, AlertTriangle, Lock } from "lucide-react";
 import { alpacaAPI } from "@/lib/alpaca";
+import { formatTickerForDisplay } from "@/lib/tickers";
 import { useAuth, isSessionValid, hasAlpacaCredentials } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,7 @@ import ScheduleListModal from "./ScheduleListModal";
 
 interface Position {
   symbol: string;
+  displaySymbol: string;
   shares: number;
   avgCost: number;
   currentPrice: number;
@@ -42,6 +44,8 @@ interface Position {
   unrealizedPLPct: number;
   dayChange: number;
   description?: string;
+  assetClass?: string;
+  assetSymbol?: string;
 }
 
 interface PortfolioPositionsProps {
@@ -188,6 +192,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
 
         // Calculate today's change from open if we have the data
         const stockData = batchData[pos.symbol];
+        const assetSymbol = stockData?.asset?.symbol;
         if (stockData?.currentBar) {
           const todayOpen = stockData.currentBar.o;
           const priceChange = currentPrice - todayOpen;
@@ -205,6 +210,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
 
         return {
           symbol: pos.symbol,
+          displaySymbol: formatTickerForDisplay(pos.symbol, { assetClass: pos.asset_class, assetSymbol }),
           shares: parseFloat(pos.qty),
           avgCost: parseFloat(pos.avg_entry_price),
           currentPrice: currentPrice,
@@ -212,7 +218,9 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
           unrealizedPL: parseFloat(pos.unrealized_pl),
           unrealizedPLPct: parseFloat(pos.unrealized_plpc) * 100,
           dayChange: dayChangePercent,
-          description: description
+          description: description,
+          assetClass: pos.asset_class,
+          assetSymbol
         };
       });
 
@@ -610,7 +618,7 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                       >
                         <TableCell className="font-medium w-[60px]">
                           <Badge variant={selectedStock === position.symbol ? 'default' : 'outline'}>
-                            {position.symbol}
+                            {position.displaySymbol}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right text-sm px-2">{position.shares.toFixed(2)}</TableCell>

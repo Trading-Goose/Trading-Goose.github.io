@@ -11,6 +11,7 @@ import { Loader2, Eye, Lock, AlertCircle } from "lucide-react";
 import { PortfolioComposition } from "../components/PortfolioComposition";
 import { StockPositionCard } from "../components/StockPositionCard";
 import type { RebalancePosition, RebalanceConfig } from "../types";
+import { formatTickerForDisplay } from "@/lib/tickers";
 
 interface StockSelectionTabProps {
   loading: boolean;
@@ -99,6 +100,7 @@ export function StockSelectionTab({
                     {watchlistStocks.map(ticker => {
                       const isSelected = selectedPositions.has(ticker);
                       const isDisabled = !isSelected && maxStocks > 0 && selectedPositions.size >= maxStocks;
+                      const displayTicker = formatTickerForDisplay(ticker);
                       return (
                         <Badge 
                           key={ticker} 
@@ -107,7 +109,7 @@ export function StockSelectionTab({
                           onClick={() => !isDisabled && onTogglePosition(ticker)}
                         >
                           <Eye className="w-3 h-3 mr-1" />
-                          {ticker}
+                          {displayTicker}
                           {isDisabled && <Lock className="w-3 h-3 ml-1" />}
                         </Badge>
                       );

@@ -477,10 +477,16 @@ export function useRoleManagement() {
     }
 
     try {
+      const payload = Object.fromEntries(
+        Object.entries({
+          ...limits,
+          role_id: roleId
+        }).filter(([, value]) => value !== undefined)
+      );
+
       const { error } = await supabase
         .from('role_limits')
-        .update(limits)
-        .eq('role_id', roleId);
+        .upsert(payload, { onConflict: 'role_id' });
 
       if (error) throw error;
       

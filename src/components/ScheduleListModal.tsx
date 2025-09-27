@@ -65,7 +65,6 @@ interface Schedule {
   timezone: string;
   selected_tickers: string[];
   include_watchlist: boolean;
-  include_all_positions: boolean;
   last_executed_at?: string;
   next_scheduled_at?: string; // Deprecated - calculated dynamically from last_executed_at + interval
   execution_count: number;
@@ -522,11 +521,7 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
                         <div className="text-sm">
                           <p className="text-muted-foreground mb-1">Stock Selection</p>
                           <div className="flex items-center gap-2">
-                            {schedule.include_all_positions ? (
-                              <Badge variant="outline" className="text-xs">
-                                All Positions
-                              </Badge>
-                            ) : schedule.selected_tickers.length > 0 ? (
+                            {schedule.selected_tickers.length > 0 ? (
                               <Badge variant="outline" className="text-xs">
                                 {schedule.selected_tickers.length} Selected Stocks
                               </Badge>

@@ -466,7 +466,7 @@ export default function RebalanceInsightsTab({
                           </span>
                         </Badge>
                       )}
-                      {analysis.confidence && (
+                      {analysis.confidence > 0 && (
                         <span className={`text-sm font-medium ${getConfidenceColor(analysis.confidence)}`}>
                           {analysis.confidence}% confidence
                         </span>

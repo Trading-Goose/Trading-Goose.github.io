@@ -9,6 +9,53 @@ interface WorldTimeAPIResponse {
   week_number: number;
 }
 
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+
+interface TimezoneDateInfo {
+  year: number;
+  month: number;
+  day: number;
+  weekday: number;
+}
+
+const getIntlFormatter = (timezone: string) => new Intl.DateTimeFormat('en-US', {
+  timeZone: timezone,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  weekday: 'short',
+});
+
+function getTimezoneDateInfo(date: Date, timezone: string): TimezoneDateInfo {
+  const parts = getIntlFormatter(timezone).formatToParts(date);
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value;
+
+  const year = parseInt(getPart('year') ?? '1970', 10);
+  const month = parseInt(getPart('month') ?? '01', 10);
+  const day = parseInt(getPart('day') ?? '01', 10);
+  const weekdayName = getPart('weekday') ?? 'Sun';
+  const weekday = WEEKDAY_NAMES.indexOf(weekdayName);
+
+  return {
+    year,
+    month,
+    day,
+    weekday: weekday === -1 ? 0 : weekday,
+  };
+}
+
+function addDaysUTC(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+function getWeekStartDayNumber(info: TimezoneDateInfo): number {
+  const dayNumber = Math.floor(Date.UTC(info.year, info.month - 1, info.day) / MS_IN_DAY);
+  return dayNumber - info.weekday;
+}
+
 // Cache for storing fetched time and calculating offset
 let timeOffset: number | null = null;
 let lastFetchTime: number | null = null;
@@ -117,6 +164,59 @@ export async function createScheduledDateUTC(
   ));
 }
 
+async function findNextWeeklyRun(
+  now: Date,
+  schedule: {
+    day_of_week: number[];
+    timezone: string;
+    interval_value: number;
+    created_at: string;
+    last_executed_at?: string;
+  },
+  hours: number,
+  minutes: number
+): Promise<Date | null> {
+  if (!schedule.day_of_week.length) return null;
+
+  const sortedDays = [...new Set(schedule.day_of_week)].sort((a, b) => a - b);
+  const currentInfo = getTimezoneDateInfo(now, schedule.timezone);
+
+  const anchorSource = schedule.last_executed_at
+    ? new Date(schedule.last_executed_at)
+    : new Date(schedule.created_at);
+  const anchorInfo = getTimezoneDateInfo(anchorSource, schedule.timezone);
+  const anchorWeekStart = getWeekStartDayNumber(anchorInfo);
+
+  const applicableInterval = Math.max(1, schedule.interval_value);
+  const maxWeeksToCheck = Math.max(applicableInterval * 4, 8);
+
+  for (let weekOffset = 0; weekOffset < maxWeeksToCheck; weekOffset++) {
+    for (const targetDay of sortedDays) {
+      const dayDelta = ((targetDay - currentInfo.weekday + 7) % 7) + weekOffset * 7;
+      const candidateBase = addDaysUTC(now, dayDelta);
+      const candidate = await createScheduledDateUTC(candidateBase, hours, minutes, schedule.timezone);
+
+      if (candidate <= now) {
+        continue;
+      }
+
+      if (applicableInterval > 1) {
+        const candidateInfo = getTimezoneDateInfo(candidate, schedule.timezone);
+        const candidateWeekStart = getWeekStartDayNumber(candidateInfo);
+        const weeksDiff = Math.floor((candidateWeekStart - anchorWeekStart) / 7);
+
+        if (weeksDiff < 0 || weeksDiff % applicableInterval !== 0) {
+          continue;
+        }
+      }
+
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Calculates the next run time for a schedule using true UTC time
  */
@@ -130,6 +230,7 @@ export async function calculateNextRunUTC(
     day_of_month?: number[];
     enabled: boolean;
     last_executed_at?: string;
+    created_at: string;
   }
 ): Promise<Date | null> {
   if (!schedule.enabled) return null;
@@ -137,6 +238,20 @@ export async function calculateNextRunUTC(
   // Get true UTC time
   const now = await getTrueUTCTime();
   const [hours, minutes] = schedule.time_of_day.split(':').map(Number);
+
+  if (schedule.interval_unit === 'weeks' && schedule.day_of_week && schedule.day_of_week.length > 0) {
+    const nextWeeklyRun = await findNextWeeklyRun(now, {
+      day_of_week: schedule.day_of_week,
+      timezone: schedule.timezone,
+      interval_value: schedule.interval_value,
+      created_at: schedule.created_at,
+      last_executed_at: schedule.last_executed_at,
+    }, hours, minutes);
+
+    if (nextWeeklyRun) {
+      return nextWeeklyRun;
+    }
+  }
   
   // If never executed, calculate from current date
   if (!schedule.last_executed_at) {

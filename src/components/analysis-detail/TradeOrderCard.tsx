@@ -70,33 +70,33 @@ export default function TradeOrderCard({
   // Extract allocation values from various possible locations
   // For rejected orders, ALWAYS use the saved trade order data if available
   // to show what was intended at the time of creation, not current values
-  const beforeAllocation = (isOrderRejected && tradeOrder?.beforeAllocation !== undefined) 
+  const beforeAllocation = (isOrderRejected && tradeOrder?.beforeAllocation !== undefined)
     ? tradeOrder.beforeAllocation
-    : tradeOrder?.beforeAllocation ||
-      finalDecision?.beforeAllocation ||
-      finalDecision?.currentAllocation ||
-      finalDecision?.beforePosition?.allocation ||
-      finalDecision?.currentPosition?.allocation ||
-      portfolioManagerInsight?.currentAllocation ||
+    : tradeOrder?.beforeAllocation ??
+      finalDecision?.beforeAllocation ??
+      finalDecision?.currentAllocation ??
+      finalDecision?.beforePosition?.allocation ??
+      finalDecision?.currentPosition?.allocation ??
+      portfolioManagerInsight?.currentAllocation ??
       0;
 
   const afterAllocation = (isOrderRejected && tradeOrder?.afterAllocation !== undefined)
-    ? tradeOrder.afterAllocation  
-    : tradeOrder?.afterAllocation ||
-      finalDecision?.afterAllocation ||
-      finalDecision?.targetAllocation ||
-      finalDecision?.afterPosition?.allocation ||
-      finalDecision?.targetPosition?.allocation ||
-      finalDecision?.percentOfPortfolio ||
-      portfolioManagerInsight?.targetAllocation ||
-      portfolioManagerInsight?.percentOfPortfolio ||
+    ? tradeOrder.afterAllocation
+    : tradeOrder?.afterAllocation ??
+      finalDecision?.afterAllocation ??
+      finalDecision?.targetAllocation ??
+      finalDecision?.afterPosition?.allocation ??
+      finalDecision?.targetPosition?.allocation ??
+      finalDecision?.percentOfPortfolio ??
+      portfolioManagerInsight?.targetAllocation ??
+      portfolioManagerInsight?.percentOfPortfolio ??
       0;
 
   const percentOfPortfolio = (isOrderRejected && tradeOrder?.afterAllocation !== undefined)
     ? tradeOrder.afterAllocation
-    : tradeOrder?.afterAllocation ||
-      finalDecision?.percentOfPortfolio ||
-      finalDecision?.targetAllocation ||
+    : tradeOrder?.afterAllocation ??
+      finalDecision?.percentOfPortfolio ??
+      finalDecision?.targetAllocation ??
       afterAllocation;
 
   // Extract order size information
@@ -123,19 +123,19 @@ export default function TradeOrderCard({
   // Also extract before/after shares and values if available
   const beforeShares = (isOrderRejected && tradeOrder?.beforeShares !== undefined)
     ? tradeOrder.beforeShares
-    : tradeOrder?.beforeShares || finalDecision?.beforePosition?.shares || 0;
+    : tradeOrder?.beforeShares ?? finalDecision?.beforePosition?.shares ?? 0;
   
   const afterShares = (isOrderRejected && tradeOrder?.afterShares !== undefined)
     ? tradeOrder.afterShares
-    : tradeOrder?.afterShares || finalDecision?.afterPosition?.shares || orderShares;
+    : tradeOrder?.afterShares ?? finalDecision?.afterPosition?.shares ?? orderShares;
   
   const beforeValue = (isOrderRejected && tradeOrder?.beforeValue !== undefined)
     ? tradeOrder.beforeValue
-    : tradeOrder?.beforeValue || finalDecision?.beforePosition?.value || 0;
+    : tradeOrder?.beforeValue ?? finalDecision?.beforePosition?.value ?? 0;
   
   const afterValue = (isOrderRejected && tradeOrder?.afterValue !== undefined)
     ? tradeOrder.afterValue
-    : tradeOrder?.afterValue || finalDecision?.afterPosition?.value || orderDollarAmount;
+    : tradeOrder?.afterValue ?? finalDecision?.afterPosition?.value ?? orderDollarAmount;
 
   // Debug logging to understand data structure
   console.log('TradeOrderCard - Full analysisData:', analysisData);

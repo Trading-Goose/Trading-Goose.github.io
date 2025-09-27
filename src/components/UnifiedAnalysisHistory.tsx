@@ -88,31 +88,55 @@ const calculateAgentCompletion = (analysisItem: any, isRebalanceAnalysis: boolea
   let totalAgents = 0;
   let completedAgents = 0;
 
-  // Primary method: Check workflow_steps structure (similar to GitHub Actions)
-  // This is the most reliable way as it mirrors the workflow visualization
-  if (analysisItem.full_analysis?.workflow_steps) {
-    const workflowSteps = analysisItem.full_analysis.workflow_steps;
-    
-    // Iterate through all phases and count agents
-    Object.keys(workflowSteps).forEach(phase => {
-      // Skip portfolio phase for rebalance analyses
-      if (phase === 'portfolio' && isRebalanceAnalysis) {
-        return;
-      }
-      
-      const phaseData = workflowSteps[phase];
-      if (phaseData?.agents && Array.isArray(phaseData.agents)) {
-        phaseData.agents.forEach((agent: any) => {
-          totalAgents++;
-          // Check if agent is completed (similar to GitHub Actions step status)
-          if (agent.status === 'completed' || agent.status === 'complete') {
-            completedAgents++;
-          }
-        });
+  const rawWorkflowSteps = analysisItem.full_analysis?.workflow_steps || analysisItem.full_analysis?.workflowSteps;
+
+  const countAgents = (agents: any) => {
+    if (!agents) return;
+    const list = Array.isArray(agents)
+      ? agents
+      : typeof agents === 'object'
+        ? Object.values(agents)
+        : [];
+
+    list.forEach((agent: any) => {
+      if (!agent) return;
+      totalAgents++;
+      const status = typeof agent === 'object' ? agent.status : undefined;
+      const normalizedStatus = typeof status === 'string' ? status.toLowerCase() : '';
+      if (['completed', 'complete', 'success', 'done'].includes(normalizedStatus)) {
+        completedAgents++;
       }
     });
-    
-    // Return percentage if we found agents
+  };
+
+  const shouldSkipPhase = (phaseName: string) => {
+    if (!phaseName) return false;
+    if (!isRebalanceAnalysis) return false;
+    const normalized = phaseName.toString().toLowerCase();
+    return normalized.includes('portfolio');
+  };
+
+  if (rawWorkflowSteps) {
+    if (Array.isArray(rawWorkflowSteps)) {
+      rawWorkflowSteps.forEach((step: any) => {
+        const phaseName = step?.id || step?.name || '';
+        if (shouldSkipPhase(phaseName)) {
+          return;
+        }
+        countAgents(step?.agents);
+      });
+    } else if (typeof rawWorkflowSteps === 'object') {
+      Object.keys(rawWorkflowSteps).forEach((phase) => {
+        if (shouldSkipPhase(phase)) {
+          return;
+        }
+        const phaseData = rawWorkflowSteps[phase];
+        if (phaseData?.agents) {
+          countAgents(phaseData.agents);
+        }
+      });
+    }
+
     if (totalAgents > 0) {
       return Math.round((completedAgents / totalAgents) * 100);
     }
@@ -150,6 +174,7 @@ export default function UnifiedAnalysisHistory() {
   const [runningAnalyses, setRunningAnalyses] = useState<RunningAnalysisItem[]>([]);
   const [canceledAnalyses, setCanceledAnalyses] = useState<AnalysisHistoryItem[]>([]);
   const [loading, setLoading] = useState(true); // Start with loading true
+  const [activeTab, setActiveTab] = useState<string>("all");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [selectedAnalysisDate, setSelectedAnalysisDate] = useState<string | null>(null);
   const [selectedViewAnalysisId, setSelectedViewAnalysisId] = useState<string | null>(null); // For viewing specific analysis
@@ -164,6 +189,7 @@ export default function UnifiedAnalysisHistory() {
   const today = new Date();
   const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const [selectedDate, setSelectedDate] = useState<string>(todayString);
+  const isTodaySelected = selectedDate === todayString;
 
   // Track if initial data has been loaded
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -197,10 +223,12 @@ export default function UnifiedAnalysisHistory() {
     });
   };
 
-  const loadAllAnalyses = async () => {
+  const loadAllAnalyses = async (withSpinner: boolean = true) => {
     if (!user) return;
 
-    setLoading(true);
+    if (withSpinner) {
+      setLoading(true);
+    }
     try {
       // Build date range for the selected date using local date parsing
       const [year, month, day] = selectedDate.split('-').map(Number);
@@ -309,7 +337,9 @@ export default function UnifiedAnalysisHistory() {
         });
       }
     } finally {
-      setLoading(false);
+      if (withSpinner) {
+        setLoading(false);
+      }
       setInitialLoadComplete(true);
     }
   };
@@ -327,17 +357,26 @@ export default function UnifiedAnalysisHistory() {
     }
   }, [isAuthenticated, user, selectedDate]); // Reload when selectedDate changes
 
+  useEffect(() => {
+    if (!isAuthenticated || !user || !isTodaySelected) return;
+
+    const intervalId = setInterval(() => {
+      loadAllAnalyses(false);
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, user, selectedDate, activeTab, isTodaySelected]);
+
   // Only poll for running analyses updates, not the entire list
   useEffect(() => {
-    if (!user || !initialLoadComplete) return;
+    if (!user || !initialLoadComplete || !isTodaySelected) return;
 
     // Only set up polling if there are actually running analyses
     if (runningAnalyses.length === 0) return;
 
     let intervalId: NodeJS.Timeout;
 
-    // Much slower polling - every 15 seconds instead of 3-5 seconds
-    // Users can manually refresh if they want faster updates
+    // Poll running analyses separately every 10 seconds for live progress
     intervalId = setInterval(async () => {
       try {
         // Only check status of running analyses, don't reload everything
@@ -393,12 +432,19 @@ export default function UnifiedAnalysisHistory() {
       } catch (error) {
         console.error('Error checking running analyses:', error);
       }
-    }, 15000); // Poll every 15 seconds instead of 3-5 seconds
+    }, 10000); // Poll every 10 seconds to keep progress fresh
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [user, runningAnalyses.length, selectedDate, initialLoadComplete]); // Keep minimal dependencies
+  }, [user, runningAnalyses.length, selectedDate, initialLoadComplete, isTodaySelected]); // Keep minimal dependencies
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    if (isTodaySelected) {
+      loadAllAnalyses(false);
+    }
+  };
 
   const viewRunningAnalysis = (ticker: string) => {
     setSelectedTicker(ticker);
@@ -927,7 +973,7 @@ export default function UnifiedAnalysisHistory() {
             </div>
           </div>
 
-          <Tabs defaultValue="all" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="all">
                 All <span className="hidden sm:inline">({displayHistory.length + runningAnalyses.length + displayCanceled.length})</span>

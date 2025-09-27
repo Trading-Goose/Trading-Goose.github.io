@@ -36,15 +36,15 @@ const periods: Array<{ value: TimePeriod; label: string }> = [
 // Helper function to format values for mobile display
 const formatValue = (value: number | undefined, isMobile: boolean = false): string => {
   if (value === undefined || value === null) return 'Loading...';
-  
+
   if (!isMobile) {
     // Desktop: show full formatted number
     return value.toLocaleString();
   }
-  
+
   // Mobile: shorten large numbers
   const absValue = Math.abs(value);
-  
+
   if (absValue >= 1000000) {
     return `${(value / 1000000).toFixed(1)}M`;
   } else if (absValue >= 10000) {
@@ -52,7 +52,7 @@ const formatValue = (value: number | undefined, isMobile: boolean = false): stri
   } else if (absValue >= 1000) {
     return `${(value / 1000).toFixed(1)}K`;
   }
-  
+
   // For smaller values, just format with commas
   return value.toLocaleString();
 };
@@ -73,12 +73,12 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
   const hasConfiguredAlpaca = useMemo(() => hasAlpacaCredentials(apiSettings), [apiSettings]);
   const [hasAlpacaConfig, setHasAlpacaConfig] = useState(hasConfiguredAlpaca);
   const { toast } = useToast();
-  
+
   // Internal state for selected stock (can be from prop or from search)
   const [internalSelectedStock, setInternalSelectedStock] = useState<string | undefined>(propSelectedStock);
   const [tickerInput, setTickerInput] = useState<string>("");
   const [stockDescription, setStockDescription] = useState<string>(selectedStockDescription || "");
-  
+
   // Use prop or internal state
   const selectedStock = propSelectedStock || internalSelectedStock;
 
@@ -138,7 +138,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
             }
           }));
         }
-        
+
         // Fetch stock description if not already fetched
         if (!stockDescription && hasConfiguredAlpaca) {
           try {
@@ -146,7 +146,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
               console.warn(`Could not fetch asset info for ${selectedStock}:`, err);
               return null;
             });
-            
+
             if (assetInfo?.name) {
               setStockDescription(assetInfo.name);
             }
@@ -168,41 +168,41 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
       // Try to fetch metrics only once (not period-specific)
       if (!metricsLoaded.current) {
         const metricsData = await alpacaAPI.calculateMetrics().catch(err => {
-        console.warn("Failed to calculate metrics:", err);
-        // Check if it's a configuration error
-        if (err.message?.includes('API settings not found') ||
-          err.message?.includes('not configured')) {
-          console.log("Alpaca API not configured");
-          setHasAlpacaConfig(false);
-          setError(null); // Clear error for missing API config
-        } else if (err.message?.includes('timeout') ||
-          err.message?.includes('504') ||
-          err.message?.includes('503') ||
-          err.message?.includes('Unable to connect to Alpaca') ||
-          err.message?.includes('Alpaca services appear to be down') ||
-          err.message?.includes('Alpaca rate limit') ||
-          err.message?.includes('https://app.alpaca.markets/dashboard/overview')) {
-          console.log("Alpaca API appears to be down or rate limited:", err.message);
+          console.warn("Failed to calculate metrics:", err);
+          // Check if it's a configuration error
+          if (err.message?.includes('API settings not found') ||
+            err.message?.includes('not configured')) {
+            console.log("Alpaca API not configured");
+            setHasAlpacaConfig(false);
+            setError(null); // Clear error for missing API config
+          } else if (err.message?.includes('timeout') ||
+            err.message?.includes('504') ||
+            err.message?.includes('503') ||
+            err.message?.includes('Unable to connect to Alpaca') ||
+            err.message?.includes('Alpaca services appear to be down') ||
+            err.message?.includes('Alpaca rate limit') ||
+            err.message?.includes('https://app.alpaca.markets/dashboard/overview')) {
+            console.log("Alpaca API appears to be down or rate limited:", err.message);
 
-          // Extract the meaningful error message
-          let errorMessage = err.message;
-          if (err.message?.includes('https://app.alpaca.markets/dashboard/overview')) {
-            // Already has the full message with link
-            errorMessage = err.message;
-          } else if (err.message?.includes('503') || err.message?.includes('504')) {
-            errorMessage = "Unable to connect to Alpaca. Please check if Alpaca services are operational at https://app.alpaca.markets/dashboard/overview";
+            // Extract the meaningful error message
+            let errorMessage = err.message;
+            if (err.message?.includes('https://app.alpaca.markets/dashboard/overview')) {
+              // Already has the full message with link
+              errorMessage = err.message;
+            } else if (err.message?.includes('503') || err.message?.includes('504')) {
+              errorMessage = "Unable to connect to Alpaca. Please check if Alpaca services are operational at https://app.alpaca.markets/dashboard/overview";
+            }
+
+            toast({
+              title: "Alpaca Connection Error",
+              description: errorMessage,
+              variant: "destructive",
+              duration: 10000, // Show for 10 seconds
+            });
+            setError(null);
           }
-
-          toast({
-            title: "Alpaca Connection Error",
-            description: errorMessage,
-            variant: "destructive",
-            duration: 10000, // Show for 10 seconds
-          });
-          setError(null);
-        }
-        return null;
-      });
+          return null;
+        });
 
         // Positions are now included in metrics data
         const positionsData = metricsData?.positions || [];
@@ -272,21 +272,21 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
       setPositionsLoading(false);
       return;
     }
-    
+
     const fetchKey = `${selectedStock || 'portfolio'}-${selectedPeriod}`;
-    
+
     // Avoid duplicate fetches for the same configuration
     if (fetchedRef.current === fetchKey) {
       return;
     }
-    
+
     fetchedRef.current = fetchKey;
-    
+
     // Add a small delay on initial mount to ensure session is settled
     const timeoutId = setTimeout(() => {
       fetchData(selectedPeriod);
     }, 500);
-    
+
     return () => clearTimeout(timeoutId);
   }, [selectedStock, selectedPeriod, fetchData, isAuthenticated, hasConfiguredAlpaca]);
 
@@ -333,7 +333,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
     const marketValue = position.marketValue !== undefined ? position.marketValue : (parseFloat(position.market_value || '0') || 0);
     const unrealizedPL = position.unrealizedPL !== undefined ? position.unrealizedPL : (parseFloat(position.unrealized_pl || '0') || 0);
     const unrealizedPLPercent = position.unrealizedPLPct !== undefined ? position.unrealizedPLPct : ((parseFloat(position.unrealized_plpc || '0') || 0) * 100);
-    
+
     // For intraday P/L, calculate from day change if not directly available
     const dayChange = position.dayChange !== undefined ? position.dayChange : 0;
     const todayPL = position.unrealized_intraday_pl !== undefined ? parseFloat(position.unrealized_intraday_pl || '0') : (dayChange * shares * currentPrice / 100);
@@ -385,7 +385,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
   }, [selectedStock, stockData, selectedPeriod, portfolioData]);
 
   const currentData = useMemo(() => getCurrentData(), [getCurrentData]);
-  
+
   // Custom tick formatter for X-axis based on period
   const formatXAxisTick = useCallback((value: string) => {
     // For 1M period, show abbreviated format
@@ -396,7 +396,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
     }
     return value;
   }, [selectedPeriod]);
-  
+
   const latestValue = currentData[currentData.length - 1] || { value: 0, pnl: 0 };
   const firstValue = currentData[0] || { value: 0, pnl: 0 };
   const totalReturn = latestValue.pnl || (latestValue.value - firstValue.value);
@@ -404,7 +404,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
     parseFloat(String(latestValue.pnlPercent)).toFixed(2) :
     (firstValue.value > 0 ? ((totalReturn / firstValue.value) * 100).toFixed(2) : '0.00');
   const isPositive = totalReturn >= 0;
-  
+
   // Debug log for 1D period
   if (selectedStock && selectedPeriod === '1D' && currentData.length > 0) {
     console.log(`[PerformanceChart] ${selectedStock} 1D data:`, {
@@ -474,7 +474,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
   }, [currentData, selectedStock, selectedPeriod, firstValue]);
 
   const yAxisDomain = useMemo(() => getYAxisDomain(), [getYAxisDomain]);
-  
+
   // For 1D view with selected stock, use the reference price (previous close)
   // which would make the first value show 0 change
   const startPrice = selectedPeriod === '1D' && selectedStock && firstValue?.pnl === 0
@@ -541,7 +541,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
                     placeholder="Search stock..."
                     className="flex-1"
                   />
-                  <Button 
+                  <Button
                     size="sm"
                     onClick={handleViewStock}
                     disabled={!tickerInput.trim()}
@@ -554,7 +554,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
               <div className="text-xs text-muted-foreground">
                 Data may be incomplete or delayed.{' '}
                 <a
-                  href={selectedStock 
+                  href={selectedStock
                     ? `https://app.alpaca.markets/trade/${selectedStock}`
                     : 'https://app.alpaca.markets/dashboard/overview'
                   }
@@ -745,7 +745,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Max DD</p>
+                      <p className="text-xs text-muted-foreground">Max Draw Down</p>
                       <p className="text-sm sm:text-base font-semibold text-danger">
                         -{metrics?.maxDrawdown?.toFixed(1) || 'Loading...'}%
                       </p>

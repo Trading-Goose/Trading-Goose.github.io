@@ -605,9 +605,10 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
                         tickLine={false}
                         axisLine={false}
                         tickFormatter={(value) =>
-                          selectedStock
-                            ? `$${value.toFixed(2)}`
-                            : `$${(value / 1000).toFixed(0)}k`
+                          `$${value.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`
                         }
                       />
                       <Tooltip
@@ -630,7 +631,10 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
                           strokeDasharray="5 5"
                           strokeOpacity={0.7}
                           label={{
-                            value: selectedStock ? `Start: $${startPrice.toFixed(2)}` : `Start: $${(startPrice / 1000).toFixed(0)}k`,
+                            value: `Start: $${startPrice.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}`,
                             position: "left",
                             fill: "#ffcc00",
                             fontSize: 10

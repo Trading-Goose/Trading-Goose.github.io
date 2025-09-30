@@ -623,7 +623,10 @@ export default function PortfolioPositions({ onSelectStock, selectedStock }: Por
                         </TableCell>
                         <TableCell className="text-right text-sm px-2">{position.shares.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-medium text-sm px-2">
-                          ${(position.marketValue / 1000).toFixed(1)}k
+                          ${position.marketValue.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </TableCell>
                         <TableCell className="text-right px-2">
                           <div className={`flex items-center justify-end gap-1 ${position.dayChange >= 0 ? 'text-success' : 'text-danger'

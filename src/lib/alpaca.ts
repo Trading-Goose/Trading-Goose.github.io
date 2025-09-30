@@ -5,25 +5,86 @@
 import { useAuth } from './auth';
 import { supabase } from './supabase';
 
-const KNOWN_CRYPTO_QUOTES = ['USD', 'USDT', 'USDC', 'EUR', 'GBP'];
+const addUnique = (list: string[], value?: string | null) => {
+  if (!value) return;
+  const normalized = value.trim().toUpperCase();
+  if (!normalized) return;
+  if (!list.includes(normalized)) {
+    list.push(normalized);
+  }
+};
 
-const ensureCryptoPairSymbol = (symbol: string): string => {
-  const upper = symbol.toUpperCase();
-  if (upper.includes('/')) {
-    return upper;
+const buildQuoteLengths = (length: number): number[] => {
+  const minQuoteLength = 2;
+  const maxQuoteLength = Math.min(6, length - 1);
+
+  if (maxQuoteLength < minQuoteLength) {
+    return [];
   }
 
-  for (const quote of KNOWN_CRYPTO_QUOTES) {
-    if (upper.endsWith(quote) && upper.length > quote.length) {
-      return `${upper.slice(0, upper.length - quote.length)}/${quote}`;
+  const values: number[] = [];
+  for (let candidate = minQuoteLength; candidate <= maxQuoteLength; candidate++) {
+    values.push(candidate);
+  }
+
+  const ideal = Math.round(length / 2);
+
+  return values.sort((a, b) => {
+    const diff = Math.abs(a - ideal) - Math.abs(b - ideal);
+    if (diff !== 0) {
+      return diff;
+    }
+    return a - b;
+  });
+};
+
+const generateCryptoSymbolCandidates = (symbol: string): string[] => {
+  const upper = symbol.trim().toUpperCase();
+  const sanitized = upper.replace(/[^A-Z0-9]/g, '');
+  const slashCandidates: string[] = [];
+  const plainCandidates: string[] = [];
+
+  addUnique(plainCandidates, sanitized);
+
+  if (upper.includes('/')) {
+    addUnique(slashCandidates, upper);
+  } else {
+    addUnique(plainCandidates, upper);
+
+    if (sanitized.length >= 5) {
+      const quoteLengths = buildQuoteLengths(sanitized.length);
+
+      for (const quoteLength of quoteLengths) {
+        const splitIndex = sanitized.length - quoteLength;
+        if (splitIndex < 2) {
+          continue;
+        }
+
+        const base = sanitized.slice(0, splitIndex);
+        const quote = sanitized.slice(splitIndex);
+        addUnique(slashCandidates, `${base}/${quote}`);
+      }
     }
   }
 
-  if (upper.length > 3) {
-    return `${upper.slice(0, upper.length - 3)}/${upper.slice(-3)}`;
+  const combined = [...slashCandidates, ...plainCandidates];
+  return combined.length > 0 ? combined : [upper];
+};
+
+const MAX_CRYPTO_CANDIDATES = 3;
+
+const looksLikeCrypto = (symbol: string): boolean => {
+  const upper = symbol.toUpperCase();
+  if (upper.includes('/')) {
+    return true;
   }
 
-  return upper;
+  const sanitized = upper.replace(/[^A-Z0-9]/g, '');
+  if (sanitized.length >= 6) {
+    return true;
+  }
+
+  return generateCryptoSymbolCandidates(upper).some((value) => value.includes('/'));
 };
 
 interface AlpacaConfig {
@@ -324,44 +385,62 @@ class AlpacaAPI {
     limit?: number
   ): Promise<any> {
     const upperSymbol = symbol.toUpperCase();
-    const isLikelyCrypto = upperSymbol.includes('/') || KNOWN_CRYPTO_QUOTES.some(quote => upperSymbol.endsWith(quote) && upperSymbol.length > quote.length);
+    const isLikelyCrypto = looksLikeCrypto(upperSymbol);
 
     if (isLikelyCrypto) {
-      const cryptoSymbol = ensureCryptoPairSymbol(upperSymbol);
-      const params: Record<string, string> = {
-        symbols: cryptoSymbol,
-        timeframe,
-        limit: (limit || 10000).toString()
-      };
+      const cryptoCandidates = generateCryptoSymbolCandidates(upperSymbol).slice(0, MAX_CRYPTO_CANDIDATES);
+      let lastError: Error | null = null;
+      let lastErrorMessage: string | null = null;
 
-      if (start) params.start = start;
-      if (end) params.end = end;
+      for (const candidate of cryptoCandidates) {
+        const params: Record<string, string> = {
+          symbols: candidate,
+          timeframe,
+          limit: (limit || 10000).toString()
+        };
 
-      const { data, error } = await supabase.functions.invoke('alpaca-proxy', {
-        body: {
-          method: 'GET',
-          endpoint: '/v1beta3/crypto/us/bars',
-          params
+        if (start) params.start = start;
+        if (end) params.end = end;
+
+        const { data, error } = await supabase.functions.invoke('alpaca-proxy', {
+          body: {
+            method: 'GET',
+            endpoint: '/v1beta3/crypto/us/bars',
+            params
+          }
+        });
+
+        if (error) {
+          console.error(`Failed to fetch crypto bars for ${symbol} via ${candidate}:`, error);
+          lastError = error;
+          continue;
         }
-      });
 
-      if (error) {
-        console.error(`Failed to fetch crypto bars for ${symbol}:`, error);
-        throw new Error(`Failed to fetch bars for ${symbol}: ${error.message}`);
+        if (!data) {
+          lastErrorMessage = `No bar data received for ${symbol}`;
+          continue;
+        }
+
+        if (data.error) {
+          console.error(`Failed to fetch crypto bars for ${symbol} via ${candidate}:`, data.error);
+          lastErrorMessage = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+          continue;
+        }
+
+        const bars = data.bars?.[candidate] || data.bars?.[candidate.replace('/', '')] || [];
+        if (Array.isArray(bars) && bars.length > 0) {
+          console.log(`Alpaca crypto bars response for ${symbol} (${timeframe}) via ${candidate}: ${bars.length} bars`);
+          return bars;
+        }
+
+        console.log(`No crypto bars returned for ${symbol} via ${candidate}`);
       }
 
-      if (!data) {
-        throw new Error(`No bar data received for ${symbol}`);
+      if (lastError) {
+        throw new Error(`Failed to fetch bars for ${symbol}: ${lastError.message}`);
       }
 
-      if (data.error) {
-        console.error(`Failed to fetch crypto bars for ${symbol}:`, data.error);
-        throw new Error(`Failed to fetch bars for ${symbol}: ${typeof data.error === 'string' ? data.error : JSON.stringify(data.error)}`);
-      }
-
-      const bars = data.bars?.[cryptoSymbol] || data.bars?.[cryptoSymbol.replace('/', '')] || [];
-      console.log(`Alpaca crypto bars response for ${symbol} (${timeframe}): ${Array.isArray(bars) ? bars.length : 0} bars`);
-      return Array.isArray(bars) ? bars : [];
+      throw new Error(`Failed to fetch bars for ${symbol}: ${lastErrorMessage ?? 'No historical data returned'}`);
     }
 
     const params: Record<string, string> = {

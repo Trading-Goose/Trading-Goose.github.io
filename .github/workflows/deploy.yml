@@ -43,7 +43,7 @@ jobs:
           VITE_POSTHOG_API_KEY: ${{ secrets.VITE_POSTHOG_API_KEY }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
           # Disable public registration for production
-          VITE_ENABLE_PUBLIC_REGISTRATION: "false"
+          VITE_ENABLE_PUBLIC_REGISTRATION: "true"
           # Set to production to enable console stripping
           NODE_ENV: production
         run: npm run build

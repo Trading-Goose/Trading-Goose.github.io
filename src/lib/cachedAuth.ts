@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, registerRateLimitHit, clearRateLimitState, isRateLimited } from './supabase';
 import type { Session, User } from '@supabase/supabase-js';
 
 // Simple promise-based cache to prevent concurrent requests
@@ -9,28 +9,30 @@ let sessionCacheTime = 0;
 const SESSION_CACHE_DURATION = 60000; // 60 seconds - increase cache duration to reduce API calls
 let lastRefreshAttempt = 0;
 const REFRESH_COOLDOWN = 10000; // 10 seconds minimum between refresh attempts
-let rateLimitBackoff = false;
+let rateLimitCooldownActive = false;
+let authListenerRegistered = false;
+
+const syncSessionCache = (session: Session | null) => {
+  cachedSession = session;
+  sessionCacheTime = session ? Date.now() : 0;
+  sessionPromise = null;
+  userPromise = null;
+};
 
 /**
  * Clear the session cache - useful after login/logout
  */
 export const clearSessionCache = () => {
-  sessionPromise = null;
-  userPromise = null;
-  cachedSession = null;
-  sessionCacheTime = 0;
+  syncSessionCache(null);
   lastRefreshAttempt = 0;
-  rateLimitBackoff = false;
+  rateLimitCooldownActive = false;
 };
 
 /**
  * Update the cached session with a fresh one
  */
 export const updateCachedSession = (session: Session | null) => {
-  cachedSession = session;
-  sessionCacheTime = Date.now();
-  sessionPromise = null;
-  userPromise = null;
+  syncSessionCache(session);
 };
 
 /**
@@ -40,9 +42,8 @@ export const updateCachedSession = (session: Session | null) => {
 export const getCachedSession = async (): Promise<Session | null> => {
   const now = Date.now();
   
-  // If we're in rate limit backoff, return cached session
-  if (rateLimitBackoff) {
-    console.log('🔐 Rate limit backoff active, using cached session');
+  if (rateLimitCooldownActive || isRateLimited()) {
+    console.log('🔐 Rate limit cooldown active, using cached session');
     return cachedSession;
   }
   
@@ -115,27 +116,29 @@ export const getCachedSession = async (): Promise<Session | null> => {
       
       lastRefreshAttempt = Date.now();
       const { data: { session }, error } = await supabase.auth.getSession();
-      
+
       if (error) {
         // Check if it's a rate limit error
         if (error.message?.includes('429') || error.message?.includes('rate')) {
-          console.error('🔐 Rate limit detected in getCachedSession, enabling backoff');
-          rateLimitBackoff = true;
-          // Clear backoff after 30 seconds
+          console.error('🔐 Rate limit detected in getCachedSession, enabling cooldown');
+          const backoffMs = registerRateLimitHit();
+          rateLimitCooldownActive = true;
           setTimeout(() => {
-            rateLimitBackoff = false;
-            console.log('🔐 Rate limit backoff cleared');
-          }, 30000);
+            rateLimitCooldownActive = false;
+            clearRateLimitState();
+            console.log('🔐 Rate limit cooldown cleared');
+          }, backoffMs);
         } else {
           console.error('Error getting session:', error);
         }
         return cachedSession; // Return cached session on error
       }
       
-      // Cache the session
-      cachedSession = session;
-      sessionCacheTime = Date.now();
-      
+      clearRateLimitState();
+      rateLimitCooldownActive = false;
+
+      syncSessionCache(session);
+
       return session;
     } catch (error) {
       console.error('Error in getCachedSession:', error);
@@ -183,6 +186,19 @@ export const getCachedUser = async (): Promise<User | null> => {
 
   return userPromise;
 };
+
+if (!authListenerRegistered) {
+  supabase.auth.onAuthStateChange((_event, session) => {
+    syncSessionCache(session);
+
+    if (session) {
+      clearRateLimitState();
+      rateLimitCooldownActive = false;
+    }
+  });
+
+  authListenerRegistered = true;
+}
 
 // Note: Auth state changes are handled by the main auth.ts module
 // We only export helper functions here to avoid duplicate listeners

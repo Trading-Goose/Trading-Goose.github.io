@@ -63,7 +63,7 @@ interface RebalanceAnalysis {
 
 interface RebalanceRequest {
   id: string;
-  user_id: string;
+  user_id?: string;
   status: RebalanceStatus | string; // Support both new RebalanceStatus and legacy strings
   created_at: string;
   total_stocks: number;
@@ -185,7 +185,7 @@ export default function RebalanceHistoryTable() {
     try {
       const { data, error } = await supabase
         .from('analysis_history')
-        .select('*')
+        .select('id,ticker,analysis_status,full_analysis,created_at')
         .eq('rebalance_request_id', rebalanceId);
 
       if (error) throw error;
@@ -214,7 +214,7 @@ export default function RebalanceHistoryTable() {
       // Query only rebalances from the selected date
       const { data, error } = await supabase
         .from('rebalance_requests')
-        .select('*')
+        .select('id,status,created_at,total_stocks,stocks_analyzed,plan_generated_at,error_message')
         .eq('user_id', user.id)
         .gte('created_at', startOfDay.toISOString())
         .lte('created_at', endOfDay.toISOString())
@@ -274,12 +274,19 @@ export default function RebalanceHistoryTable() {
       setCancelledRebalances(cancelled);
 
       // Fetch analysis data for running rebalances to calculate progress
-      const analysisDataMap: { [key: string]: any[] } = {};
-      for (const rebalance of running) {
-        const analyses = await fetchAnalysisDataForRebalance(rebalance.id);
-        analysisDataMap[rebalance.id] = analyses;
+      if (running.length > 0) {
+        const analysisResults = await Promise.all(
+          running.map((rebalance) => fetchAnalysisDataForRebalance(rebalance.id))
+        );
+
+        const analysisDataMap: { [key: string]: any[] } = {};
+        running.forEach((rebalance, index) => {
+          analysisDataMap[rebalance.id] = analysisResults[index];
+        });
+        setAnalysisData(analysisDataMap);
+      } else {
+        setAnalysisData({});
       }
-      setAnalysisData(analysisDataMap);
 
     } catch (error) {
       console.error('Error fetching rebalance requests:', error);
@@ -688,13 +695,96 @@ export default function RebalanceHistoryTable() {
   if (loading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Rebalance History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Rebalance History</h3>
+            <div className="flex items-center gap-2">
+              {/* Manual refresh button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
+                title="Refresh"
+                disabled
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+
+              <div className="w-px h-6 bg-border" />
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled
+                  className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                      className="justify-start text-left"
+                    >
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      {getDateDisplay()}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={new Date(selectedDate)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled
+                  className="h-8 w-8 p-0 hover:bg-[#fc0]/10 hover:text-[#fc0]"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
+
+          <Tabs value={activeTab} className="space-y-4">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="running">Active</TabsTrigger>
+              <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsTrigger value="canceled">Canceled</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="all" className="space-y-4">
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="running">
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="completed">
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="canceled">
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     );

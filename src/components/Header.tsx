@@ -124,7 +124,7 @@ export default function Header() {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-2 sm:gap-3">
+              <a className="flex items-center gap-2 sm:gap-3" href="/">
                 <div className="p-2 rounded-lg">
                   <img src="/goose.png" alt="TradingGoose Logo" className="h-8 w-8 sm:h-10 sm:w-10" />
                 </div>
@@ -132,7 +132,7 @@ export default function Header() {
                   <h1 className="text-xl sm:text-2xl font-bold" style={{ color: '#FFCC00' }}>TradingGoose</h1>
                   <p className="text-xs sm:text-sm text-muted-foreground">AI-Powered Portfolio Management</p>
                 </div>
-              </div>
+              </a>
 
               {isAuthenticated && (
                 <div className="hidden md:flex items-center gap-1">

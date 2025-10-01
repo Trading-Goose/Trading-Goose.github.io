@@ -190,6 +190,8 @@ async function findNextWeeklyRun(
   const applicableInterval = Math.max(1, schedule.interval_value);
   const maxWeeksToCheck = Math.max(applicableInterval * 4, 8);
 
+  let bestCandidate: Date | null = null;
+
   for (let weekOffset = 0; weekOffset < maxWeeksToCheck; weekOffset++) {
     for (const targetDay of sortedDays) {
       const dayDelta = ((targetDay - currentInfo.weekday + 7) % 7) + weekOffset * 7;
@@ -210,11 +212,21 @@ async function findNextWeeklyRun(
         }
       }
 
-      return candidate;
+      if (!bestCandidate || candidate.getTime() < bestCandidate.getTime()) {
+        bestCandidate = candidate;
+
+        if (weekOffset === 0 && dayDelta % 7 === 0) {
+          return bestCandidate;
+        }
+      }
+    }
+
+    if (bestCandidate) {
+      return bestCandidate;
     }
   }
 
-  return null;
+  return bestCandidate;
 }
 
 /**

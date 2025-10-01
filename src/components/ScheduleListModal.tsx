@@ -271,7 +271,10 @@ export default function ScheduleListModal({ isOpen, onClose }: ScheduleListModal
   const formatDaysList = (days?: number[]) => {
     if (!days || days.length === 0) return '';
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return days.map(d => dayNames[d]).join(', ');
+    return [...new Set(days)]
+      .sort((a, b) => a - b)
+      .map(d => dayNames[d])
+      .join(', ');
   };
 
   // State for storing calculated next run times and true UTC time

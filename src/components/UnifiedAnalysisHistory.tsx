@@ -61,6 +61,8 @@ interface AnalysisHistoryItem {
   full_analysis?: any;
   created_at: string;
   analysis_status?: AnalysisStatus | number; // Support both new and legacy formats
+  rebalance_request_id?: string | null;
+  is_canceled?: boolean;
 }
 
 interface RunningAnalysisItem {
@@ -235,10 +237,10 @@ export default function UnifiedAnalysisHistory() {
       const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
       const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
 
-      // Query only analyses from the selected date
+      // Query only analyses from the selected date (summary fields only)
       const { data, error } = await supabase
         .from('analysis_history')
-        .select('*')
+        .select('id,ticker,analysis_date,decision,confidence,agent_insights,created_at,analysis_status,rebalance_request_id,is_canceled')
         .eq('user_id', user.id)
         .gte('created_at', startOfDay.toISOString())
         .lte('created_at', endOfDay.toISOString())
@@ -266,61 +268,92 @@ export default function UnifiedAnalysisHistory() {
         throw error;
       }
 
-      // Separate running, completed, and canceled analyses based on database data
-      const runningAnalyses: RunningAnalysisItem[] = [];
+      const baseRows = data ?? [];
+      const runningIds: string[] = [];
+      const runningBase: Array<Omit<RunningAnalysisItem, 'full_analysis'>> = [];
       const completedAnalyses: AnalysisHistoryItem[] = [];
       const canceledAnalyses: AnalysisHistoryItem[] = [];
 
-      for (const item of data || []) {
-        // Use analysis_status field if available, otherwise fall back to old logic
-        if ('analysis_status' in item) {
-          // Convert legacy numeric status to new string format
-          const status: AnalysisStatus = typeof item.analysis_status === 'number'
-            ? convertLegacyAnalysisStatus(item.analysis_status)
-            : item.analysis_status as AnalysisStatus;
+      for (const item of baseRows) {
+        let status: AnalysisStatus | null = null;
 
-          if (status === ANALYSIS_STATUS.RUNNING || status === ANALYSIS_STATUS.PENDING) {
-            runningAnalyses.push({
-              id: item.id,
-              ticker: item.ticker,
-              created_at: item.created_at,
-              full_analysis: item.full_analysis,
-              agent_insights: item.agent_insights,  // Add this!
-              rebalance_request_id: item.rebalance_request_id,
-              status: status
-            });
-          } else if (status === ANALYSIS_STATUS.COMPLETED) {
-            completedAnalyses.push(item);
-          } else if (status === ANALYSIS_STATUS.ERROR || status === ANALYSIS_STATUS.CANCELLED) {
-            // Show canceled/error analyses in the canceled section
-            canceledAnalyses.push({
-              ...item,
-              decision: status === ANALYSIS_STATUS.ERROR ? 'ERROR' : 'CANCELED',
-              confidence: item.confidence || 0
-            });
-          }
-        } else {
-          // Fall back to old logic for backward compatibility
-          const hasAgentInsights = item.agent_insights && Object.keys(item.agent_insights).length > 0;
-          const isRunning = item.analysis_status === ANALYSIS_STATUS.RUNNING ||
-            (item.confidence === 0 && !hasAgentInsights);
+        if (typeof item.analysis_status === 'number') {
+          status = convertLegacyAnalysisStatus(item.analysis_status);
+        } else if (typeof item.analysis_status === 'string') {
+          status = item.analysis_status.toLowerCase() as AnalysisStatus;
+        }
 
-          if (isRunning) {
-            runningAnalyses.push({
-              id: item.id,
-              ticker: item.ticker,
-              created_at: item.created_at,
-              full_analysis: item.full_analysis,
-              rebalance_request_id: item.rebalance_request_id,
-              status: ANALYSIS_STATUS.RUNNING  // Default to running for fallback logic
-            });
-          } else if ((item.confidence > 0 || hasAgentInsights) && item.decision && ['BUY', 'SELL', 'HOLD'].includes(item.decision)) {
-            completedAnalyses.push(item);
+        if (!status) {
+          const hasAgentInsights = item.agent_insights && Object.keys(item.agent_insights || {}).length > 0;
+
+          if (item.is_canceled) {
+            status = ANALYSIS_STATUS.CANCELLED;
+          } else if (item.confidence === 0 && !hasAgentInsights) {
+            status = ANALYSIS_STATUS.RUNNING;
+          } else if (item.decision && ['BUY', 'SELL', 'HOLD'].includes(item.decision)) {
+            status = ANALYSIS_STATUS.COMPLETED;
+          } else {
+            status = ANALYSIS_STATUS.RUNNING;
           }
+        }
+
+        if (status === ANALYSIS_STATUS.RUNNING || status === ANALYSIS_STATUS.PENDING) {
+          runningIds.push(item.id);
+          runningBase.push({
+            id: item.id,
+            ticker: item.ticker,
+            created_at: item.created_at,
+            agent_insights: item.agent_insights,
+            rebalance_request_id: item.rebalance_request_id || undefined,
+            status
+          });
+        } else if (status === ANALYSIS_STATUS.COMPLETED) {
+          completedAnalyses.push({
+            id: item.id,
+            ticker: item.ticker,
+            analysis_date: item.analysis_date,
+            decision: item.decision,
+            confidence: item.confidence,
+            agent_insights: item.agent_insights,
+            created_at: item.created_at,
+            analysis_status: status,
+            rebalance_request_id: item.rebalance_request_id || undefined
+          });
+        } else if (status === ANALYSIS_STATUS.ERROR || status === ANALYSIS_STATUS.CANCELLED) {
+          canceledAnalyses.push({
+            id: item.id,
+            ticker: item.ticker,
+            analysis_date: item.analysis_date,
+            decision: status === ANALYSIS_STATUS.ERROR ? 'ERROR' : 'CANCELED',
+            confidence: item.confidence || 0,
+            agent_insights: item.agent_insights,
+            created_at: item.created_at,
+            analysis_status: status,
+            rebalance_request_id: item.rebalance_request_id || undefined
+          });
         }
       }
 
-      setRunningAnalyses(runningAnalyses);
+      let runningDetailsMap = new Map<string, any>();
+      if (runningIds.length > 0) {
+        const { data: runningDetails, error: runningDetailsError } = await supabase
+          .from('analysis_history')
+          .select('id, full_analysis')
+          .in('id', runningIds);
+
+        if (!runningDetailsError && runningDetails) {
+          runningDetailsMap = new Map(
+            runningDetails.map(detail => [detail.id, detail.full_analysis])
+          );
+        }
+      }
+
+      const hydratedRunningAnalyses: RunningAnalysisItem[] = runningBase.map(item => ({
+        ...item,
+        full_analysis: runningDetailsMap.get(item.id) || null
+      }));
+
+      setRunningAnalyses(hydratedRunningAnalyses);
       setHistory(completedAnalyses);
       setCanceledAnalyses(canceledAnalyses);
 
@@ -390,7 +423,7 @@ export default function UnifiedAnalysisHistory() {
         // Only fetch the specific running analyses to check their status
         const { data, error } = await supabase
           .from('analysis_history')
-          .select('*')
+          .select('id,analysis_status,full_analysis,agent_insights,created_at')
           .eq('user_id', user.id)
           .in('id', runningIds)
           .gte('created_at', startOfDay.toISOString())

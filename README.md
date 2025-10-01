@@ -2,7 +2,7 @@
 
 <h1 style="line-height:50px;" align="center"><img src="public/goose.png" alt="TradingGoose Logo" style=" vertical-align: middle; width:35px; height:35px;"> TradingGoose </h1>
 
-[![Discord](https://dcbadge.limes.pink/api/server/3dkTaNyp?style=flat)](https://discord.gg/wavf5JWhuT)
+[![Discord](https://dcbadge.limes.pink/api/server/wavf5JWhuT?style=flat)](https://discord.gg/wavf5JWhuT)
   
   An intelligent trading platform powered by multiple AI agents that collaborate to analyze markets, manage portfolios, and execute trades with sophisticated risk management.
 

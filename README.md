@@ -2,7 +2,7 @@
 
 <h1 style="line-height:50px;" align="center"><img src="public/goose.png" alt="TradingGoose Logo" style=" vertical-align: middle; width:35px; height:35px;"> TradingGoose </h1>
 
-[![Discord](https://dcbadge.limes.pink/api/server/3dkTaNyp?style=flat)](https://discord.gg/3dkTaNyp)
+[![Discord](https://dcbadge.limes.pink/api/server/3dkTaNyp?style=flat)](https://discord.gg/wavf5JWhuT)
   
   An intelligent trading platform powered by multiple AI agents that collaborate to analyze markets, manage portfolios, and execute trades with sophisticated risk management.
 
@@ -272,7 +272,7 @@ This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE)
 For issues, questions, or suggestions:
 
 - Open an issue on GitHub
-- Join our [Discord community](https://discord.gg/3dkTaNyp) 🎮
+- Join our [Discord community](https://discord.gg/wavf5JWhuT) 🎮
 
 ## 🚧 Development
 

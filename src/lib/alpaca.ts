@@ -657,11 +657,24 @@ class AlpacaAPI {
   }
 
   // Batch method for account and positions data
-  async getBatchAccountData() {
+  async getBatchAccountData(options?: {
+    includeActivities?: boolean;
+    activitiesTypes?: string[];
+    activitiesSince?: string;
+    activitiesUntil?: string;
+    maxActivityPages?: number;
+    activityPageSize?: number;
+  }) {
     const { data, error } = await supabase.functions.invoke('alpaca-batch', {
       body: {
         includeAccount: true,
-        includePositions: true
+        includePositions: true,
+        includeActivities: options?.includeActivities ?? false,
+        activitiesTypes: options?.activitiesTypes,
+        activitiesSince: options?.activitiesSince,
+        activitiesUntil: options?.activitiesUntil,
+        maxActivityPages: options?.maxActivityPages,
+        activityPageSize: options?.activityPageSize
       }
     });
 
@@ -708,14 +721,18 @@ class AlpacaAPI {
   async calculateMetrics() {
     try {
       // Use batch endpoint for account and positions
-      const [batchData, history] = await Promise.all([
-        this.getBatchAccountData().catch(err => {
+      const [batchData, intradayHistory, lifetimeHistory] = await Promise.all([
+        this.getBatchAccountData({ includeActivities: true }).catch(err => {
           console.warn('Failed to get batch account data:', err);
-          return { account: null, positions: [] };
+          return { account: null, positions: [], cashFlows: null };
         }),
         this.getPortfolioHistory('1D', '5Min').catch(err => {
           console.warn('Failed to get portfolio history:', err);
-          return { timestamp: [], equity: [], profit_loss: [], profit_loss_pct: [] };
+          return { timestamp: [], equity: [], profit_loss: [], profit_loss_pct: [], base_value: 0 };
+        }),
+        this.getPortfolioHistory('all', '1D').catch(err => {
+          console.warn('Failed to get lifetime portfolio history:', err);
+          return null;
         })
       ]);
 
@@ -755,45 +772,132 @@ class AlpacaAPI {
       const todayReturn = currentEquity - lastEquity;
       const todayReturnPct = (todayReturn / lastEquity) * 100;
 
-      // Total return - calculate from current equity vs initial investment
-      // The initial investment for paper trading is typically $100,000
-      const initialInvestment = 100000;
-      
-      // Total return is the difference between current equity and initial investment
-      // This accounts for all gains/losses including closed positions and cash
-      const totalReturn = currentEquity - initialInvestment;
-      const totalReturnPct = (totalReturn / initialInvestment) * 100;
-      
+      const normalizeNumber = (value: any): number => {
+        if (typeof value === 'number') {
+          return Number.isFinite(value) ? value : 0;
+        }
+
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        return 0;
+      };
+
+      const getBaseValueFromHistory = (historyData: any): number => {
+        if (!historyData) {
+          return 0;
+        }
+
+        const directBase = normalizeNumber(historyData.base_value ?? historyData.baseValue);
+        if (directBase > 0) {
+          return directBase;
+        }
+
+        if (Array.isArray(historyData.equity)) {
+          for (const value of historyData.equity) {
+            const numeric = normalizeNumber(value);
+            if (numeric > 0) {
+              return numeric;
+            }
+          }
+        }
+
+        return 0;
+      };
+
+      const cashFlowSummary = batchData.cashFlows;
+      const hasCashFlowData = cashFlowSummary && typeof cashFlowSummary.activityCount === 'number' && cashFlowSummary.activityCount > 0;
+
+      const totalDeposits = hasCashFlowData ? normalizeNumber(cashFlowSummary.totalDeposits) : 0;
+      const totalWithdrawals = hasCashFlowData ? normalizeNumber(cashFlowSummary.totalWithdrawals) : 0;
+      const netContributions = hasCashFlowData ? normalizeNumber(cashFlowSummary.netContributions) : 0;
+
+      let totalReturnSource: 'cash_flows' | 'history_base' | 'unknown' = 'unknown';
+      let totalReturn = 0;
+      let totalReturnPct = 0;
+      let baselineValueUsed = 0;
+
+      if (hasCashFlowData) {
+        totalReturn = currentEquity + totalWithdrawals - totalDeposits;
+        const baseline = Math.abs(netContributions) > 0.01
+          ? Math.abs(netContributions)
+          : (totalDeposits > 0 ? totalDeposits : 0);
+
+        if (baseline > 0) {
+          totalReturnPct = (totalReturn / baseline) * 100;
+        }
+
+        totalReturnSource = 'cash_flows';
+        baselineValueUsed = baseline;
+      } else {
+        const historyBaseValue = getBaseValueFromHistory(lifetimeHistory) || getBaseValueFromHistory(intradayHistory);
+
+        if (historyBaseValue > 0) {
+          totalReturn = currentEquity - historyBaseValue;
+          totalReturnPct = (totalReturn / historyBaseValue) * 100;
+          totalReturnSource = 'history_base';
+          baselineValueUsed = historyBaseValue;
+        } else {
+          totalReturn = 0;
+          totalReturnPct = 0;
+          totalReturnSource = 'unknown';
+          baselineValueUsed = 0;
+        }
+      }
+
       console.log('Return calculations:', {
         currentEquity,
-        initialInvestment,
+        totalDeposits,
+        totalWithdrawals,
+        netContributions,
         totalReturn,
         totalReturnPct,
         todayReturn,
         todayReturnPct,
-        positionsCount: positions?.length || 0
+        positionsCount: positions?.length || 0,
+        totalReturnSource,
+        baselineValueUsed
       });
+
+      const equitySeries = Array.isArray(intradayHistory.equity)
+        ? intradayHistory.equity.map((value: number) => normalizeNumber(value)).filter((value: number) => Number.isFinite(value))
+        : [];
 
       // Calculate max drawdown
       let maxDrawdown = 0;
-      let peak = history.equity[0];
-      for (const equity of history.equity) {
-        if (equity > peak) peak = equity;
-        const drawdown = ((peak - equity) / peak) * 100;
-        if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+      let peak = equitySeries.length > 0 ? equitySeries[0] : currentEquity;
+      for (const equity of equitySeries) {
+        if (equity > peak) {
+          peak = equity;
+        }
+
+        if (peak > 0) {
+          const drawdown = ((peak - equity) / peak) * 100;
+          if (drawdown > maxDrawdown) {
+            maxDrawdown = drawdown;
+          }
+        }
       }
 
       // Calculate Sharpe ratio (simplified - daily returns)
       const returns: number[] = [];
-      for (let i = 1; i < history.equity.length; i++) {
-        const dailyReturn = (history.equity[i] - history.equity[i - 1]) / history.equity[i - 1];
-        returns.push(dailyReturn);
+      for (let i = 1; i < equitySeries.length; i++) {
+        const previous = equitySeries[i - 1];
+        const current = equitySeries[i];
+
+        if (previous > 0) {
+          returns.push((current - previous) / previous);
+        }
       }
       
-      const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-      const stdDev = Math.sqrt(
-        returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / returns.length
-      );
+      const avgReturn = returns.length > 0 ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
+      const stdDev = returns.length > 0
+        ? Math.sqrt(
+          returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / returns.length
+        )
+        : 0;
       const sharpeRatio = stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0; // Annualized
 
       return {
@@ -804,6 +908,18 @@ class AlpacaAPI {
         todayReturnPct,
         totalReturn,
         totalReturnPct,
+        totalReturnSource,
+        baselineValue: baselineValueUsed,
+        cashFlows: hasCashFlowData ? {
+          totalDeposits,
+          totalWithdrawals,
+          netContributions,
+          activityCount: cashFlowSummary.activityCount,
+          earliestActivityAt: cashFlowSummary.earliestActivityAt,
+          latestActivityAt: cashFlowSummary.latestActivityAt,
+          fetchedTypes: cashFlowSummary.fetchedTypes,
+          byType: cashFlowSummary.byType
+        } : null,
         maxDrawdown,
         sharpeRatio,
         positions: positions.map((pos: any) => ({

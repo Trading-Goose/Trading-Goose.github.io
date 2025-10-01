@@ -57,6 +57,56 @@ const formatValue = (value: number | undefined, isMobile: boolean = false): stri
   return value.toLocaleString();
 };
 
+const formatSignedCurrency = (value: number | undefined, isMobile: boolean = false): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return isMobile ? '$0' : '$0.00';
+  }
+
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  const absolute = Math.abs(value);
+  const formatted = isMobile
+    ? formatValue(absolute, true)
+    : absolute.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return `${sign}$${formatted}`;
+};
+
+const formatUnsignedCurrency = (value: number | undefined, isMobile: boolean = false): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return isMobile ? '$0' : '$0.00';
+  }
+
+  const absolute = Math.abs(value);
+  const formatted = isMobile
+    ? formatValue(absolute, true)
+    : absolute.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return `$${formatted}`;
+};
+
+const formatLabelForPeriod = (date: Date, period: TimePeriod): string => {
+  switch (period) {
+    case '1D':
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    case '1W':
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    case '1M':
+    case '3M':
+    case 'YTD':
+    case '1Y':
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    case '5Y':
+    case 'All':
+      return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    default:
+      return date.toLocaleDateString();
+  }
+};
+
 // Remove the old hardcoded function - we'll create a dynamic one in the component
 
 const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selectedStockDescription, onClearSelection }: PerformanceChartProps) => {
@@ -384,7 +434,69 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
     return [];
   }, [selectedStock, stockData, selectedPeriod, portfolioData]);
 
-  const currentData = useMemo(() => getCurrentData(), [getCurrentData]);
+  const baseData = useMemo(() => getCurrentData(), [getCurrentData]);
+
+  const currentData = useMemo(() => {
+    if (!baseData || baseData.length === 0) {
+      return baseData;
+    }
+
+    if (selectedStock || !metrics?.accountValue) {
+      return baseData;
+    }
+
+    const currentValue = Number(metrics.accountValue);
+    if (!Number.isFinite(currentValue) || currentValue <= 0) {
+      return baseData;
+    }
+
+    const referencePoint = baseData.find(point => Number(point?.value ?? 0) > 0) || baseData[0];
+    if (!referencePoint) {
+      return baseData;
+    }
+
+    const baselineCandidate = Number(referencePoint.value) - Number(referencePoint.pnl ?? 0);
+    const fallbackBaseline = Number(referencePoint.value) || Number.EPSILON;
+    const baseline = Number.isFinite(baselineCandidate) && baselineCandidate !== 0
+      ? baselineCandidate
+      : fallbackBaseline;
+
+    const pnl = currentValue - baseline;
+    const pnlPercent = baseline !== 0 ? (pnl / baseline) * 100 : 0;
+
+    const now = new Date();
+    const timeLabel = formatLabelForPeriod(now, selectedPeriod);
+    const latestTimestamp = Math.floor(now.getTime() / 1000);
+
+    const lastPoint = baseData[baseData.length - 1];
+    const timeAlreadyUsed = lastPoint?.time === timeLabel || Number(lastPoint?.timestamp ?? 0) >= latestTimestamp;
+
+    const replacePeriods = selectedPeriod === '3M'
+      || selectedPeriod === '1Y'
+      || selectedPeriod === '5Y'
+      || selectedPeriod === 'All'
+      || (selectedPeriod === 'YTD' && baseData.length > 31);
+
+    const shouldReplaceLast = timeAlreadyUsed || replacePeriods;
+
+    const dataCopy = [...baseData];
+
+    const newPoint: PortfolioDataPoint = {
+      time: timeLabel,
+      value: currentValue,
+      pnl,
+      pnlPercent,
+      timestamp: latestTimestamp
+    };
+
+    if (shouldReplaceLast && dataCopy.length > 0) {
+      dataCopy[dataCopy.length - 1] = newPoint;
+    } else {
+      dataCopy.push(newPoint);
+    }
+
+    return dataCopy;
+  }, [baseData, metrics, selectedStock, selectedPeriod]);
 
   // Custom tick formatter for X-axis based on period
   const formatXAxisTick = useCallback((value: string) => {
@@ -404,6 +516,22 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
     parseFloat(String(latestValue.pnlPercent)).toFixed(2) :
     (firstValue.value > 0 ? ((totalReturn / firstValue.value) * 100).toFixed(2) : '0.00');
   const isPositive = totalReturn >= 0;
+
+  const cashFlowSummary = metrics?.cashFlows;
+  const hasCashFlowSummary = Boolean(cashFlowSummary);
+  const netContributions = hasCashFlowSummary ? Number(cashFlowSummary?.netContributions ?? 0) : null;
+  const totalDeposits = hasCashFlowSummary ? Number(cashFlowSummary?.totalDeposits ?? 0) : null;
+  const totalWithdrawals = hasCashFlowSummary ? Number(cashFlowSummary?.totalWithdrawals ?? 0) : null;
+  const activityCount = hasCashFlowSummary ? Number(cashFlowSummary?.activityCount ?? 0) : null;
+  const baselineValue = typeof metrics?.baselineValue === 'number' && metrics.baselineValue > 0
+    ? metrics.baselineValue
+    : null;
+  const totalReturnSourceLabel = metrics?.totalReturnSource === 'cash_flows'
+    ? 'cash flow activity'
+    : metrics?.totalReturnSource === 'history_base'
+      ? 'portfolio history baseline'
+      : null;
+  const portfolioMetricsGridClass = `grid grid-cols-2 ${hasCashFlowSummary ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3 sm:gap-4 pt-4 border-t`;
 
   // Debug log for 1D period
   if (selectedStock && selectedPeriod === '1D' && currentData.length > 0) {
@@ -676,7 +804,7 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
               {!selectedStock ? (
                 // Portfolio metrics
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 pt-4 border-t">
+                  <div className={portfolioMetricsGridClass}>
                     <div className="col-span-2 sm:col-span-1">
                       <p className="text-xs text-muted-foreground">Portfolio Value</p>
                       <p className="text-sm sm:text-base font-semibold">
@@ -725,7 +853,37 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
                           'Loading...'
                         )}
                       </p>
+                      {(totalReturnSourceLabel || baselineValue) && (
+                        <p className="text-[11px] text-muted-foreground">
+                          {totalReturnSourceLabel ? `Source: ${totalReturnSourceLabel}` : ''}
+                          {baselineValue ? `${totalReturnSourceLabel ? ' · ' : ''}Baseline ${formatUnsignedCurrency(baselineValue)}` : ''}
+                        </p>
+                      )}
                     </div>
+                    {hasCashFlowSummary && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Net Contributions</p>
+                        <div className="space-y-1">
+                          <p className="text-sm sm:text-base font-semibold text-muted-foreground">
+                            <span className="hidden sm:inline">{formatSignedCurrency(netContributions ?? 0)}</span>
+                            <span className="sm:hidden">{formatSignedCurrency(netContributions ?? 0, true)}</span>
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            <span className="hidden sm:inline">
+                              Deposits {formatUnsignedCurrency(totalDeposits ?? 0)} · Withdrawals {formatUnsignedCurrency(totalWithdrawals ?? 0)}
+                            </span>
+                            <span className="sm:hidden">
+                              Deposits {formatUnsignedCurrency(totalDeposits ?? 0, true)} · Withdrawals {formatUnsignedCurrency(totalWithdrawals ?? 0, true)}
+                            </span>
+                          </p>
+                          {activityCount !== null && activityCount > 0 && (
+                            <p className="text-[11px] text-muted-foreground">
+                              {`Based on ${activityCount} activity${activityCount === 1 ? '' : ' entries'}`}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-4 border-t">
                     <div>

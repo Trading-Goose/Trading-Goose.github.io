@@ -6,6 +6,7 @@ export interface PortfolioDataPoint {
   value: number;
   pnl: number;
   pnlPercent?: number;
+  timestamp?: number;
 }
 
 export interface PortfolioData {
@@ -185,24 +186,54 @@ const convertAlpacaHistory = (
     return [];
   }
 
-  // For 1D period, use market open value as reference
-  let baseValue = history.base_value || history.equity[0];
-  if (period === '1D' && history.timestamp.length > 0) {
-    const marketOpenIndex = findMarketOpenIndex(history.timestamp);
-    baseValue = history.equity[marketOpenIndex];
-    console.log(`Portfolio 1D: Using market open value as base: ${baseValue} (index: ${marketOpenIndex})`);
+  const timestamps: number[] = history.timestamp;
+  const equity: number[] = history.equity.map((value: any) => Number(value) || 0);
+  const profitLoss: number[] | null = Array.isArray(history.profit_loss)
+    ? history.profit_loss.map((value: any) => Number(value) || 0)
+    : null;
+  const profitLossPctRaw: number[] | null = Array.isArray(history.profit_loss_pct)
+    ? history.profit_loss_pct.map((value: any) => Number(value) || 0)
+    : null;
+
+  const profitLossPct = profitLossPctRaw
+    ? profitLossPctRaw.map((value) => {
+        if (Math.abs(value) > 1 && Math.abs(value) <= 100) {
+          return value / 100;
+        }
+        return value;
+      })
+    : null;
+
+  let baseIndex = 0;
+  if (period === '1D' && timestamps.length > 0) {
+    baseIndex = findMarketOpenIndex(timestamps);
+    console.log(`Portfolio 1D: Using market open index ${baseIndex} (timestamp=${timestamps[baseIndex]})`);
   }
 
-  return history.timestamp.map((timestamp: number, index: number) => {
-    const value = history.equity[index];
-    const pnl = value - baseValue;
-    const pnlPercent = baseValue > 0 ? ((value - baseValue) / baseValue) * 100 : 0;
+  const baseValue = Number.isFinite(equity[baseIndex]) ? equity[baseIndex] : equity[0];
+  const baseProfitLoss = profitLoss ? profitLoss[baseIndex] || 0 : 0;
+  const baseProfitLossPct = profitLossPct ? profitLossPct[baseIndex] || 0 : 0;
+  const safeBaseValue = baseValue !== 0 ? baseValue : 1;
+
+  return timestamps.map((timestamp: number, index: number) => {
+    const value = equity[index];
+
+    const pnl = profitLoss
+      ? (profitLoss[index] || 0) - baseProfitLoss
+      : value - baseValue;
+
+    const pnlPercentValue = profitLossPct
+      ? (profitLossPct[index] || 0) - baseProfitLossPct
+      : safeBaseValue !== 0
+        ? (value - baseValue) / safeBaseValue
+        : 0;
 
     return {
       time: formatTimestamp(timestamp, period),
       value,
       pnl,
-      pnlPercent
+      pnlPercent: pnlPercentValue * 100,
+      timestamp
     };
   });
 };
@@ -354,9 +385,11 @@ const filterToCurrentYear = (convertedData: PortfolioDataPoint[], rawData: any):
     ...rawData,
     timestamp: rawData.timestamp.slice(startIndex),
     equity: rawData.equity.slice(startIndex),
-    base_value: rawData.equity[startIndex]
+    base_value: rawData.equity[startIndex],
+    profit_loss: rawData.profit_loss ? rawData.profit_loss.slice(startIndex) : undefined,
+    profit_loss_pct: rawData.profit_loss_pct ? rawData.profit_loss_pct.slice(startIndex) : undefined
   };
-  
+
   return convertAlpacaHistory(filteredHistory, 'YTD');
 };
 

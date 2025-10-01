@@ -45,6 +45,38 @@ interface RebalanceGroup {
   trades: TradeDecision[];
 }
 
+const extractErrorMessage = (value: unknown): string | null => {
+  if (!value) return null;
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (value instanceof Error) {
+    return value.message;
+  }
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const candidateKeys = ['errorDetail', 'error', 'message', 'warning', 'details', 'reason'] as const;
+
+    for (const key of candidateKeys) {
+      const nested = record[key];
+      if (!nested || nested === value) continue;
+      const extracted = extractErrorMessage(nested);
+      if (extracted) {
+        return extracted;
+      }
+    }
+
+    if (record.code !== undefined) {
+      return String(record.code);
+    }
+  }
+
+  return null;
+};
+
 export default function TradeHistoryTable() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false); // Separate state for refresh button
@@ -429,9 +461,10 @@ export default function TradeHistoryTable() {
         // Refresh trades
         fetchAllTrades(false);
       } else {
+        const errorDescription = extractErrorMessage(data) || "Failed to execute order";
         toast({
           title: "Order Failed",
-          description: data.message || "Failed to execute order",
+          description: errorDescription,
           variant: "destructive",
         });
       }
@@ -439,7 +472,7 @@ export default function TradeHistoryTable() {
       console.error('Error executing order:', err);
       toast({
         title: "Order Failed",
-        description: err.message || 'Failed to execute order on Alpaca',
+        description: extractErrorMessage(err) || 'Failed to execute order on Alpaca',
         variant: "destructive"
       });
     } finally {

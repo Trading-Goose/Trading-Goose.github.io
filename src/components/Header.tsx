@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,7 @@ import {
 
 export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile, isAuthenticated, logout, apiSettings } = useAuth();
   const { getPrimaryRole, isLoading: isRoleLoading } = useRBAC();
   const [runningAnalyses, setRunningAnalyses] = useState(0);
@@ -112,10 +113,10 @@ export default function Header() {
     };
 
     checkRunningTasks();
-    const interval = setInterval(checkRunningTasks, 10000); // Check every 10 seconds
+    const interval = setInterval(checkRunningTasks, 100000); // Check every 10 seconds
 
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, location.pathname]);
 
   return (
     <div className="sticky top-0 z-50">

@@ -250,16 +250,12 @@ const Index = () => {
                     </div>
                     <div className="space-y-3">
                       <p className="text-sm text-muted-foreground">
-                        Request beta access and connect with traders:
+                        Get project updates and connect with traders:
                       </p>
                       <ul className="space-y-1 text-sm">
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-3 w-3 text-green-500" />
-                          <span>Get beta invitation</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-500" />
-                          <span>Trading strategies</span>
+                          <span>Community Supports</span>
                         </li>
                         <li className="flex items-center gap-2">
                           <CheckCircle className="h-3 w-3 text-green-500" />

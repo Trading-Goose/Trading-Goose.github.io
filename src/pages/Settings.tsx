@@ -895,7 +895,7 @@ export default function SettingsPage() {
   const getModelOptions = (provider: string) => {
     switch (provider) {
       case 'openai':
-        return ['	gpt-5-chat-latest', 'gpt-5-mini', 'gpt-4.1-2025-04-14', 'gpt-4.1-mini-2025-04-14', 'gpt-4o-2024-08-06', 'custom'];
+        return ['	gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'custom'];
       case 'anthropic':
         return ['claude-opus-4-1-20250805', 'claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-3-7-sonnet-20250219', 'claude-3-5-haiku-20241022', 'custom'];
       case 'google':

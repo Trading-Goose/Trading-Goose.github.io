@@ -895,7 +895,7 @@ export default function SettingsPage() {
   const getModelOptions = (provider: string) => {
     switch (provider) {
       case 'openai':
-        return ['	gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'custom'];
+        return ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'custom'];
       case 'anthropic':
         return ['claude-opus-4-1-20250805', 'claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-3-7-sonnet-20250219', 'claude-3-5-haiku-20241022', 'custom'];
       case 'google':
@@ -996,10 +996,10 @@ export default function SettingsPage() {
   // Clear all provider settings
   const handleClearProviders = async () => {
     if (!user?.id) return;
-    
+
     try {
       setSavingTab('providers');
-      
+
       // Clear all provider settings - only set fields that exist in api_settings table
       const clearedSettings = {
         ai_provider: 'openrouter', // Keep a default provider to satisfy required field
@@ -1030,16 +1030,16 @@ export default function SettingsPage() {
       setAiProviders([{ id: '1', nickname: 'Default AI', provider: 'openrouter', apiKey: '' }]);
       setDefaultAiModel('gpt-4');
       setDefaultCustomModel('');
-      
+
       // Reload settings from backend to refresh auth context
       await checkConfiguredProviders();
       await loadProviderConfigurations();
-      
+
       toast({
         title: "Provider settings cleared",
         description: "All provider API keys have been removed.",
       });
-      
+
     } catch (error) {
       console.error('Error clearing provider settings:', error);
       toast({
@@ -1055,10 +1055,10 @@ export default function SettingsPage() {
   // Clear all trading settings
   const handleClearTrading = async () => {
     if (!user?.id) return;
-    
+
     try {
       setSavingTab('trading');
-      
+
       // Clear all trading settings - use empty strings for API keys
       const clearedSettings = {
         alpaca_paper_api_key: '',
@@ -1097,16 +1097,16 @@ export default function SettingsPage() {
       setProfitTarget(25);
       setStopLoss(10);
       setNearLimitThreshold(20);
-      
+
       // Reload settings from backend to refresh auth context
       await checkConfiguredProviders();
       await loadMaskedTradingCredentials();
-      
+
       toast({
         title: "Trading settings cleared",
         description: "All Alpaca credentials have been removed and settings reset to defaults.",
       });
-      
+
     } catch (error) {
       console.error('Error clearing trading settings:', error);
       toast({

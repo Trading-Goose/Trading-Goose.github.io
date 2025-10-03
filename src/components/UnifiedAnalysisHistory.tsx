@@ -479,10 +479,10 @@ export default function UnifiedAnalysisHistory() {
     }
   };
 
-  const viewRunningAnalysis = (ticker: string) => {
-    setSelectedTicker(ticker);
+  const viewRunningAnalysis = (analysis: RunningAnalysisItem) => {
+    setSelectedTicker(analysis.ticker);
+    setSelectedViewAnalysisId(analysis.id);
     setSelectedAnalysisDate(null);
-    setSelectedViewAnalysisId(null);
   };
 
   const viewDetails = (analysis: AnalysisHistoryItem) => {
@@ -1032,7 +1032,7 @@ export default function UnifiedAnalysisHistory() {
                       <div
                         key={item.id}
                         className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => viewRunningAnalysis(item.ticker)}
+                        onClick={() => viewRunningAnalysis(item)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -1093,7 +1093,7 @@ export default function UnifiedAnalysisHistory() {
                               className="border border-slate-700"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                viewRunningAnalysis(item.ticker);
+                                viewRunningAnalysis(item);
                               }}
                             >
                               <Eye className="h-4 w-4 mr-1" />
@@ -1302,7 +1302,7 @@ export default function UnifiedAnalysisHistory() {
                     <div
                       key={item.id}
                       className="border border-border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => viewRunningAnalysis(item.ticker)}
+                      onClick={() => viewRunningAnalysis(item)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -1357,14 +1357,14 @@ export default function UnifiedAnalysisHistory() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="border border-slate-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              viewRunningAnalysis(item.ticker);
-                            }}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="border border-slate-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                viewRunningAnalysis(item);
+                              }}
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View Details

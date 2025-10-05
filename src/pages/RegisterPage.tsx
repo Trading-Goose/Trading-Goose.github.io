@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [lastRegisteredEmail, setLastRegisteredEmail] = useState<string | null>(null);
 
   // Check if public registration is enabled
   const publicRegistrationEnabled = import.meta.env.VITE_ENABLE_PUBLIC_REGISTRATION !== 'false';
@@ -41,11 +42,25 @@ export default function RegisterPage() {
   }, [isAuthenticated, navigate]);
 
   useEffect(() => {
-    if (successMessage && typeof window !== 'undefined' && typeof window.twq === 'function') {
-      // Fire Twitter conversion event when confirmation modal is shown
-      window.twq('event', 'tw-ql07b-ql07b', {});
+    if (!successMessage || !lastRegisteredEmail) {
+      return;
     }
-  }, [successMessage]);
+
+    if (typeof window === 'undefined' || typeof window.twq !== 'function') {
+      return;
+    }
+
+    const normalizedEmail = lastRegisteredEmail.trim().toLowerCase();
+
+    try {
+      window.twq('event', 'tw-ql07b-ql0xk', {
+        email_address: normalizedEmail || null,
+      });
+    } catch (conversionError) {
+      console.warn('Twitter conversion event failed, sending fallback payload', conversionError);
+      window.twq('event', 'tw-ql07b-ql0xk', {});
+    }
+  }, [successMessage, lastRegisteredEmail]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +100,7 @@ export default function RegisterPage() {
       if (result.success) {
         setSuccessMessage("Registration successful! Please check your email to verify your account.");
         setError("");
+        setLastRegisteredEmail(email);
         // Clear form
         setUsername("");
         setEmail("");

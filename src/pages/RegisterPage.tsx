@@ -9,6 +9,12 @@ import { Loader2, UserPlus, AlertCircle, ArrowLeft, Mail, CheckCircle, Eye, EyeO
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
+declare global {
+  interface Window {
+    twq?: (...args: unknown[]) => void;
+  }
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const { register, isAuthenticated } = useAuth();
@@ -33,6 +39,13 @@ export default function RegisterPage() {
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (successMessage && typeof window !== 'undefined' && typeof window.twq === 'function') {
+      // Fire Twitter conversion event when confirmation modal is shown
+      window.twq('event', 'tw-ql07b-ql07b', {});
+    }
+  }, [successMessage]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,19 +152,6 @@ export default function RegisterPage() {
               onClick={() => navigate('/login')}
             >
               Go to Login
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full"
-              onClick={() => {
-                setSuccessMessage("");
-                setUsername("");
-                setEmail("");
-                setPassword("");
-                setConfirmPassword("");
-              }}
-            >
-              Register Another Account
             </Button>
           </CardFooter>
         </Card>

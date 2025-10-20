@@ -44,7 +44,7 @@ const Index = () => {
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  onClick={() => window.open('https://github.com/Trading-Goose/Open-TradingGoose', '_blank')}
+                  onClick={() => window.open('https://github.com/Trading-Goose/Trading-Goose.github.io', '_blank')}
                 >
                   <svg
                     className="h-4 w-4 fill-current"

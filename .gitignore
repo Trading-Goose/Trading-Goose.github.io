@@ -22,9 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-/supabase
 /.claude
 /todo-list
-deploy-functions.sh
 console.txt
 console.json

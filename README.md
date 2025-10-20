@@ -3,13 +3,44 @@
 <h1 style="line-height:50px;" align="center"><img src="public/goose.png" alt="TradingGoose Logo" style=" vertical-align: middle; width:35px; height:35px;"> TradingGoose </h1>
 
 [![Discord](https://dcbadge.limes.pink/api/server/wavf5JWhuT?style=flat)](https://discord.gg/wavf5JWhuT)
-  
-  An intelligent trading platform powered by multiple AI agents that collaborate to analyze markets, manage portfolios, and execute trades with sophisticated risk management.
 
-  **[Open Source Version Available](https://github.com/Trading-Goose/Open-TradingGoose)** - Deploy your own instance!
+An intelligent trading platform powered by multiple AI agents that collaborate to analyze markets, manage portfolios, and execute trades with sophisticated risk management—now fully open source.
 </div>
 
-<img src="public/screen-shot.png" >
+<img src="public/screen-shot.png" alt="TradingGoose UI">
+
+## 📑 Table of Contents
+
+- [📖 Overview](#-overview)
+  - [🎯 Core Concept](#-core-concept)
+  - [🔄 Intelligent Execution](#-intelligent-execution)
+  - [🏗️ Architecture Foundation](#️-architecture-foundation)
+- [✨ Features](#-features)
+  - [🤖 Multi-Agent Architecture](#-multi-agent-architecture)
+  - [📊 Core Capabilities](#-core-capabilities)
+  - [🔐 Security & Access Control](#-security--access-control)
+- [🛠️ Tech Stack](#️-tech-stack)
+  - [🎨 Frontend](#-frontend)
+  - [⚙️ Backend](#️-backend)
+  - [📈 Trading Integration](#-trading-integration)
+- [🔄 How It Works](#-how-it-works)
+  - [🔬 The Analysis Process](#-the-analysis-process)
+- [🚀 Usage](#-usage)
+  - [🧪 Running an Analysis](#-running-an-analysis)
+  - [💼 Portfolio Rebalancing](#-portfolio-rebalancing)
+- [🔒 Security Considerations](#-security-considerations)
+- [📄 License](#-license)
+- [💬 Support](#-support)
+- [🚀 Self Deployment](#-self-deployment)
+  - [Prerequisites](#prerequisites)
+  - [Perplefina Setup](#perplefina-setup)
+  - [Backend Setup](#backend-setup)
+  - [Frontend Setup](#frontend-setup)
+  - [Development Mode](#development-mode)
+- [🚧 Development](#-development)
+  - [✅ Feature Checklist](#-feature-checklist)
+- [🤝 Contributing](#-contributing)
+- [🙏 Acknowledgments](#-acknowledgments)
 
 ## 📖 Overview
 
@@ -42,7 +73,7 @@ This project's multi-agent analysis workflow architecture is based on the [Tauri
 - **Fundamentals Analyst**: Evaluates company financials and valuation metrics
 - **News Analyst**: Processes and interprets market news and events
 - **Social Media Analyst**: Monitors social sentiment and trending topics
-- **Risk Analysts** (Safe/Neutral/Risky): Provides multi-perspective risk assessments
+- **Risk Analysts** (Safe/Neutral/Risky): Provide multi-perspective risk assessments
 - **Portfolio Manager**: Optimizes portfolio allocation and rebalancing
 
 ### 📊 Core Capabilities
@@ -84,7 +115,7 @@ This project's multi-agent analysis workflow architecture is based on the [Tauri
 ### 📈 Trading Integration
 
 - **Alpaca Markets API** for market data and trade execution
-- **Customizable AI Providers** for agent intelligence (OpenAI, Anthropic, Google, and more)
+- **Customizable AI Providers** for agent intelligence (OpenAI, Anthropic, Google, DeepSeek, and more)
 
 ---
 
@@ -96,16 +127,11 @@ This project's multi-agent analysis workflow architecture is based on the [Tauri
 
 When you initiate a stock analysis, TradingGoose orchestrates a sophisticated multi-agent workflow:
 
-
-<picture style="width:50%">
-  <source media="(prefers-color-scheme: dark)" srcset="public/Analysis-Flow-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="public/Analysis-Flow-light.png">
-  <img alt="Analysis Flow" src="public/Analysis-Flow-light.png" style=" width:50% height: auto;">
-</picture>
+<p>
+  <img alt="Analysis Flow" src="public/analysis-flow.png" style="width:100%; max-width:700px; height:auto;">
+</p>
 
 ###### _Note: This workflow architecture is adapted from the [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) framework._
-
-
 
 <details>
 <summary><strong>1. 📊 Data Analysis Phase</strong></summary>
@@ -113,147 +139,56 @@ When you initiate a stock analysis, TradingGoose orchestrates a sophisticated mu
 - **🌍 Macro Analyst**: Government data and economic indicators
 - **📈 Market Analyst**: Historical data and technical indicators
 - **📰 News Analyst**: Latest news and sentiment analysis
-- **💬 Social Media Analyst**: Social platform trends and impact
-- **💰 Fundamentals Analyst**: Financial statements and profitability
+- **💬 Social Media Analyst**: Social platform trends and sentiment
+- **💼 Fundamentals Analyst**: Company financials and earnings reports
+- **🌡️ Risk Analyst Squad**: Risk-adjusted insights from conservative, balanced, and aggressive perspectives
+
 </details>
 
 <details>
-<summary><strong>2. 🔍 Research & Debate Phase</strong></summary>
+<summary><strong>2. 🧠 Opportunity Synthesis</strong></summary>
 
-- 🐂 Bull Researcher agent presents positive evidence and growth potential
-- 🐻 Bear Researcher agent identifies risks and presents cautionary analysis
-- ⚖️ Both perspectives are rigorously evaluated for balance
+- Agents collaborate to refine opportunities
+- Opportunities include conviction scores, risk factors, and recommended actions
+- Portfolio manager evaluates current allocations
+
 </details>
 
 <details>
-<summary><strong>3. ⚠️ Risk Assessment Phase</strong></summary>
+<summary><strong>3. 💼 Portfolio Manager Execution</strong></summary>
 
-- Three specialized risk agents analyze from different perspectives:
-  - **🛡️ Safe Agent**: Conservative approach focusing on capital preservation
-  - **⚖️ Neutral Agent**: Balanced view weighing opportunities against risks
-  - **🚀 Risky Agent**: Aggressive stance for high-growth potential
-  </details>
+- Validates proposed trades against portfolio constraints
+- Adjusts position sizes for risk and diversification
+- Generates final orders prepared for Alpaca execution
 
-<details>
-<summary><strong>4. 🧩 Decision Synthesis</strong></summary>
-
-- 📋 Research Manager consolidates all agent insights
-- 🎯 Risk Manager combines analyses with defined risk parameters
-- 💼 Portfolio Manager evaluates position sizing and portfolio impact
 </details>
 
 <details>
-<summary><strong>5. ✅ Execution Ready</strong></summary>
+<summary><strong>4. 🔁 Continuous Monitoring</strong></summary>
 
-- 📊 Final recommendations are presented with confidence scores
-- 🚦 Trade signals are generated based on collective intelligence
-- 📝 All analysis is logged for historical tracking
+- Tracks market changes and agent statuses
+- Detects stalled workflows and triggers retries
+- Provides real-time progress updates
+
 </details>
-
-
-
-<br >
-
-### ⚖️ The Rebalancing Process
-
-TradingGoose continuously monitors your portfolio and market conditions:
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="public/Rebalance-Flow-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="public/Rebalance-Flow-light.png">
-  <img alt="Rebalance Flow" src="public/Rebalance-Flow-light.png" style="min-width:200px;  width: 100%; height: auto;">
-</picture>
-</div>
-
-
-<details>
-<summary><strong>1. 👁️ Continuous Monitoring</strong></summary>
-
-- 📉 Price movements are tracked against user-defined thresholds
-- 🎯 Portfolio allocations are compared to target weights
-- 🌐 Market conditions are evaluated for rebalancing opportunities
-</details>
-
-<details>
-<summary><strong>2. 🎯 Opportunity Detection</strong></summary>
-
-- 🚨 When thresholds are exceeded, the Opportunity Agent activates
-- 📍 Stocks requiring attention are identified and prioritized
-- 🔎 Market-wide screening identifies new potential positions
-</details>
-
-<details>
-<summary><strong>3. 🎲 Strategic Analysis</strong></summary>
-
-- 🔬 Selected stocks undergo full multi-agent analysis
-- 📊 Current positions are evaluated for scaling or exit
-- 🆕 New opportunities are assessed for entry
-</details>
-
-<details>
-<summary><strong>4. 🎨 Portfolio Optimization</strong></summary>
-
-- 🎯 Target allocations are calculated based on risk tolerance
-- ⚖️ Rebalancing trades are proposed to achieve optimal weights
-- 💸 Tax implications and transaction costs are considered
-</details>
-
-<details>
-<summary><strong>5. 🚀 Execution Management</strong></summary>
-
-- 📋 Proposed changes are presented for review
-- ✅ Approved rebalancing is executed through connected brokers
-- 📈 Performance tracking begins immediately post-execution
-</details>
-
----
-
-<br >
 
 ## 🚀 Usage
 
-### 🔍 Running an Analysis
+### 🧪 Running an Analysis
 
-1. Navigate to the Dashboard
-2. Enter a stock ticker in the search bar
-3. Click "Analyze" to trigger the multi-agent workflow
-4. Monitor progress in real-time through the workflow visualization
-5. Review comprehensive insights from all agents
+1. Navigate to the dashboard and select **Run Analysis**
+2. Choose tickers and configure analysis parameters
+3. Initiate analysis and monitor live agent collaboration
+4. Review generated insights, risk scores, and recommended actions
+5. Approve or adjust suggested trades before execution
 
 ### 💼 Portfolio Rebalancing
 
-1. Go to Settings > Rebalancing
+1. Go to **Settings → Rebalancing**
 2. Configure rebalancing settings (position sizes, thresholds, frequency)
 3. Schedule automatic rebalancing or trigger manually
 4. Review proposed changes before execution
 5. Track rebalancing history and performance
-
-## 🌟 Key Features in Action
-
-### 🧠 Intelligent Analysis
-
-- **Multi-perspective evaluation**: Every stock is analyzed from bullish and bearish viewpoints
-- **Risk-adjusted recommendations**: Three risk profiles ensure suitable strategies for all investors
-- **Confidence scoring**: Each recommendation includes transparency about certainty levels
-- **Historical context**: Past performance and patterns inform future predictions
-
-### 💎 Smart Portfolio Management
-
-- **Automated rebalancing**: Maintains optimal portfolio allocation without manual intervention
-- **Scheduled execution**: Set daily, weekly, or monthly rebalancing schedules that run automatically
-- **Multi-stock portfolio analysis**: Evaluate entire portfolio health and opportunities across all holdings
-- **Threshold-based triggers**: Customizable sensitivity to market movements
-- **Real order execution**: Direct integration with Alpaca for live market orders
-- **Position sizing algorithms**: Smart allocation based on risk, conviction, and portfolio balance
-- **Tax-aware decisions**: Considers holding periods and tax implications
-- **Dynamic position sizing**: Adjusts positions based on conviction and risk tolerance
-
-### 📡 Real-time Monitoring
-
-- **Live workflow visualization**: Watch agents collaborate in real-time
-- **Progress tracking**: See exactly which phase of analysis is active
-- **Performance metrics**: Track success rates and portfolio growth
-- **Comprehensive audit trail**: Every decision is logged and traceable
 
 ## 🔒 Security Considerations
 
@@ -265,22 +200,97 @@ TradingGoose continuously monitors your portfolio and market conditions:
 
 ## 📄 License
 
-This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+TradingGoose is released under the AGPL-3.0 License. Refer to [LICENSE](LICENSE) for the full terms.
 
 ## 💬 Support
 
 For issues, questions, or suggestions:
 
 - Open an issue on GitHub
-- Join our [Discord community](https://discord.gg/wavf5JWhuT) 🎮
+- Join our [Discord community](https://discord.gg/wavf5JWhuT)
+
+## 🚀 Self Deployment
+
+Bring your own TradingGoose instance online using the following workflow.
+
+### Prerequisites
+
+1. **Supabase CLI** (latest version)
+2. **Node.js** 18+
+3. **npm** or **pnpm**
+4. **Alpaca Markets** account (paper trading is supported)
+5. **Perplexica/Perplefina** instance or another compatible LLM orchestration layer
+
+### Perplefina Setup
+
+Perplefina provides the external research layer that TradingGoose relies on for market news and web context. You need a running instance that the Supabase edge functions can reach.
+
+1. **Clone and install Perplefina**
+   ```bash
+   git clone https://github.com/Trading-Goose/Perplefina.git
+   cd Perplefina
+   npm install
+   ```
+2. **Configure providers**
+   - Follow the configuration instructions in the [Perplefina repository](https://github.com/Trading-Goose/Perplefina)
+   - Add API keys for the AI models you plan to use (OpenAI, Anthropic, Google, DeepSeek, etc.)
+   - Configure your preferred web search provider credentials
+3. **Deploy Perplefina publicly**
+   - Deploy to Railway, Render, Fly.io, or another cloud host and record the public URL
+   - Confirm the URL is accessible from the internet—Supabase edge functions cannot reach `localhost`
+4. **Record the API endpoint**
+   - You will supply this URL when setting Supabase secrets (`PERPLEFINA_API_URL`)
+
+### Backend Setup
+
+1. Install Supabase CLI and authenticate:
+   ```bash
+   npx supabase login
+   ```
+2. Link the project to your Supabase instance:
+   ```bash
+   npx supabase link --project-ref your-project-ref
+   ```
+3. Set required secrets, including your Perplefina URL:
+   ```bash
+   npx supabase secrets set PERPLEFINA_API_URL=https://your-public-perplexica-url.com
+   ```
+4. Deploy the edge functions powering the multi-agent workflow:
+   ```bash
+   export SUPABASE_ACCESS_TOKEN=your-access-token-here
+   ./deploy-functions.sh
+   ```
+
+### Frontend Setup
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Build the static site:
+   ```bash
+   npm run build
+   ```
+3. Serve locally or deploy the `dist` folder to your hosting provider.
+   ```bash
+   npm run dev    # development server with hot reload
+   npm run serve  # preview the built site after running dev
+   ```
+
+### Development Mode
+
+For hot reload during development:
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:8080` (or the port shown in your terminal).
 
 ## 🚧 Development
 
 🎉 **No humans were harmed in the making of this application!**
 
-This entire project was crafted with love by **[Claude Code](https://claude.ai/code)** - every single line of code, from the sleekest UI component to the smartest trading algorithm, was written by AI. Zero human-written code, 100% AI magic! 🪄
-
-Who says robots can't be creative? This production-ready financial platform proves that AI can build sophisticated applications that actually work in the real world. Welcome to the future of software development! 🚀
+TradingGoose was crafted with love by **[Claude Code](https://claude.ai/code)**—every line of code, from the sleek UI components to the trading orchestration logic, started life as an AI-generated idea. Now that the project is open source, community contributions keep the goose flying! 🪄
 
 ---
 
@@ -299,7 +309,7 @@ Who says robots can't be creative? This production-ready financial platform prov
 
 #### Portfolio Management
 
-- [x] Automated Scheduled rebalancing (daily/weekly/monthly)
+- [x] Automated scheduled rebalancing (daily/weekly/monthly)
 - [x] Manual rebalancing triggers
 - [x] Position size configuration (min/max)
 - [x] Multi-stock portfolio monitoring
@@ -318,7 +328,7 @@ Who says robots can't be creative? This production-ready financial platform prov
 - [x] Provider failover and retry logic
 - [x] Model selection flexibility
 
-####Data & Analysis
+#### Data & Analysis
 
 - [x] Historical data range selection
 - [x] Custom analysis timeframes
@@ -329,16 +339,26 @@ Who says robots can't be creative? This production-ready financial platform prov
 
 #### User Management
 
-- [x] User Acount system
+- [x] User account system
 - [x] API key management interface
 - [x] User activity tracking
 - [x] Secure credential storage
+
+## 🤝 Contributing
+
+We welcome pull requests, feature ideas, and bug reports! To get started:
+
+1. Fork the repository and create a feature branch.
+2. Ensure linting/tests pass where applicable.
+3. Submit a pull request with clear context about the change.
+
+For larger features, open a discussion or issue first so we can plan together.
 
 ## 🙏 Acknowledgments
 
 - Built with [Supabase](https://supabase.com)
 - Trading powered by [Alpaca Markets](https://alpaca.markets)
-- AI analysis powered by customizable providers (OpenAI, Anthropic, Google, and more)
+- AI analysis powered by customizable providers (OpenAI, Anthropic, Google, DeepSeek, and more)
 - UI components from [shadcn/ui](https://ui.shadcn.com)
 - Multi-agent architecture inspired by [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)
 - **100% developed with [Claude Code](https://claude.ai/code)** 🤖

@@ -577,13 +577,13 @@ const PerformanceChart = React.memo(({ selectedStock: propSelectedStock, selecte
     }
 
     // Calculate padding as a percentage of the range
-    // Use 10% padding above and below the range for good visibility
-    const padding = range * 0.1;
+    // Use 5% padding above and below the range for good visibility
+    const padding = range * 0.05;
 
     // Set minimum padding to ensure visibility
     const minPadding = selectedStock
-      ? Math.max(0.01, range * 0.05) // For stocks, at least $0.01 or 5% of range
-      : Math.max(10, range * 0.05);   // For portfolio, at least $10 or 5% of range
+      ? Math.max(0.01, range * 0.1) // For stocks, at least $0.01 or 5% of range
+      : Math.max(1, range * 0.1);   // For portfolio, at least $5 or 5% of range
 
     const actualPadding = Math.max(padding, minPadding);
 

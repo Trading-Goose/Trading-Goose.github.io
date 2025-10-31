@@ -271,12 +271,12 @@ export default function Pricing() {
           ? role.stripe_price_id_yearly
           : role.stripe_price_id_monthly;
 
-        // If switching to free plan, handle cancellation
+        // If switching to free plan, send user to billing portal to manage cancellation
         if (!role.price_monthly || role.price_monthly === 0) {
           const { data: result, error: invokeError } = await supabase
             .functions.invoke('create-smart-session', {
               body: {
-                action: 'cancel',
+                action: 'manage',
                 cancel_url: `${window.location.origin}/pricing`
               }
             });
@@ -355,11 +355,11 @@ export default function Pricing() {
             return;
           }
 
-          // Use smart session to handle cancellation
+          // Open billing portal so the user can manage their cancellation
           const { data: sessionData, error: sessionError } = await supabase
             .functions.invoke('create-smart-session', {
               body: {
-                action: 'cancel',
+                action: 'manage',
                 cancel_url: window.location.href
               }
             });
